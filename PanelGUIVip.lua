@@ -1,23 +1,25 @@
--- Anonymous9x RepText UI v2.3 - FINAL PRODUCTION VERSION -- Ultra Compact 240x290px | Back Button | Improved Help | Longer Texts
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
+-- Anonymous9x RepText UI v3.0
+-- Center Locked | Scrollable | Mobile + PC | No Help Button | Modern B&W Theme
+
+local TweenService = game:GetService("TweenService")
 
 local UI_CONFIG = {
     Name = "Anonymous9x RepText",
-    Creator = "Anonymous9x",
-    Version = "2.3",
+    Version = "3.0",
     Theme = {
-        Background = Color3.fromRGB(12, 12, 12),
-        Dark = Color3.fromRGB(18, 18, 18),
-        Card = Color3.fromRGB(22, 22, 22),
-        Border = Color3.fromRGB(255, 255, 255),
-        Text = Color3.fromRGB(255, 255, 255),
-        TextSecondary = Color3.fromRGB(200, 200, 200),
-        Hover = Color3.fromRGB(35, 35, 35),
-        Accent = Color3.fromRGB(45, 45, 45)
+        Background   = Color3.fromRGB(12, 12, 12),
+        Dark         = Color3.fromRGB(18, 18, 18),
+        Card         = Color3.fromRGB(22, 22, 22),
+        Border       = Color3.fromRGB(235, 235, 235),
+        Text         = Color3.fromRGB(245, 245, 245),
+        TextSub      = Color3.fromRGB(190, 190, 190),
+        Hover        = Color3.fromRGB(38, 38, 38),
+        Accent       = Color3.fromRGB(40, 40, 40),
+        CopyActive   = Color3.fromRGB(55, 55, 55),
     }
 }
 
+-- ===== REPORT TEXTS DATA =====
 local REPORT_TEXTS = {
     ["Harassment"] = {
         title = "Harassment",
@@ -150,543 +152,440 @@ local REPORT_TEXTS = {
     }
 }
 
+-- ===== HELPER: UIStroke (border gaya notif Adidas) =====
+local function addStroke(parent, color, thickness, transparency)
+    local s = Instance.new("UIStroke")
+    s.Color = color or UI_CONFIG.Theme.Border
+    s.Thickness = thickness or 1.5
+    s.Transparency = transparency or 0.2
+    s.Parent = parent
+    return s
+end
+
+local function addCorner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 10)
+    c.Parent = parent
+    return c
+end
+
+-- ===== BUILD UI =====
 local function createRepTextUI()
+    -- Hapus instance lama kalau ada
+    local PlayerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+    local existing = PlayerGui:FindFirstChild("RepTextUI")
+    if existing then existing:Destroy() end
+
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "RepTextUI"
     screenGui.ResetOnSpawn = false
     screenGui.DisplayOrder = 999
+    screenGui.IgnoreGuiInset = true
+    screenGui.Parent = PlayerGui
 
+    -- ===== MAIN FRAME =====
+    -- Sedikit lebih besar dari versi lama (240x290 → 270x330), tetap mobile-friendly
+    -- AnchorPoint center + Position center = terkunci di tengah layar
+    local W, H = 270, 335
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 240, 0, 290)
-    mainFrame.Position = UDim2.new(0.5, -120, 0.5, -145)
+    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    mainFrame.Size = UDim2.fromOffset(W, H)
+    mainFrame.Position = UDim2.fromScale(0.5, 0.5)
     mainFrame.BackgroundColor3 = UI_CONFIG.Theme.Background
-    mainFrame.BorderColor3 = UI_CONFIG.Theme.Border
-    mainFrame.BorderSizePixel = 2
+    mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
+    addCorner(mainFrame, 14)
+    addStroke(mainFrame, UI_CONFIG.Theme.Border, 1.5, 0.2)
 
-    local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0, 6)
-    mainCorner.Parent = mainFrame
-
-    -- Title Bar (ALWAYS VISIBLE) -- SUDAH DIPERBAIKI
+    -- ===== TITLE BAR =====
     local titleBar = Instance.new("Frame")
     titleBar.Name = "TitleBar"
-    titleBar.Size = UDim2.new(1, 0, 0, 32)
+    titleBar.Size = UDim2.new(1, 0, 0, 36)
     titleBar.BackgroundColor3 = UI_CONFIG.Theme.Dark
-    titleBar.BorderColor3 = UI_CONFIG.Theme.Border
-    titleBar.BorderSizePixel = 1
-    titleBar.ZIndex = 100
+    titleBar.BorderSizePixel = 0
+    titleBar.ZIndex = 10
     titleBar.Parent = mainFrame
+    addCorner(titleBar, 14)
 
-    local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 6)
-    titleCorner.Parent = titleBar
+    -- Cover bottom rounded corners of titlebar (so it looks flat at bottom)
+    local titleBarFill = Instance.new("Frame")
+    titleBarFill.Size = UDim2.new(1, 0, 0.5, 0)
+    titleBarFill.Position = UDim2.new(0, 0, 0.5, 0)
+    titleBarFill.BackgroundColor3 = UI_CONFIG.Theme.Dark
+    titleBarFill.BorderSizePixel = 0
+    titleBarFill.ZIndex = 9
+    titleBarFill.Parent = titleBar
 
-    -- FIX: Judul Panel (Teks "Anonymous9x") dengan ZIndex lebih tinggi dan padding
+    -- Divider garis tipis bawah titlebar
+    local divider = Instance.new("Frame")
+    divider.Size = UDim2.new(1, 0, 0, 1)
+    divider.Position = UDim2.new(0, 0, 1, -1)
+    divider.BackgroundColor3 = UI_CONFIG.Theme.Border
+    divider.BackgroundTransparency = 0.65
+    divider.BorderSizePixel = 0
+    divider.ZIndex = 11
+    divider.Parent = titleBar
+
+    -- Title Text
     local titleText = Instance.new("TextLabel")
     titleText.Name = "TitleText"
-    titleText.Size = UDim2.new(1, -78, 1, 0)  -- Lebar dikurangi 78px untuk button container
+    titleText.Size = UDim2.new(1, -70, 1, 0)
+    titleText.Position = UDim2.new(0, 14, 0, 0)
     titleText.BackgroundTransparency = 1
     titleText.TextColor3 = UI_CONFIG.Theme.Text
-    titleText.TextSize = 10
+    titleText.TextSize = 12
     titleText.Font = Enum.Font.GothamBold
-    titleText.Text = "Anonymous9x"
+    titleText.Text = "Anonymous9x  RepText"
     titleText.TextXAlignment = Enum.TextXAlignment.Left
-    titleText.ZIndex = 102  -- FIX: ZIndex lebih tinggi dari button container (101)
+    titleText.ZIndex = 12
     titleText.Parent = titleBar
 
-    local titlePadding = Instance.new("UIPadding")
-    titlePadding.PaddingLeft = UDim.new(0, 8)  -- FIX: Padding kiri 8px agar teks tidak menempel
-    titlePadding.Parent = titleText
+    -- Button container kanan (hanya Minimize + Close)
+    local btnContainer = Instance.new("Frame")
+    btnContainer.Size = UDim2.new(0, 58, 1, 0)
+    btnContainer.Position = UDim2.new(1, -62, 0, 0)
+    btnContainer.BackgroundTransparency = 1
+    btnContainer.ZIndex = 12
+    btnContainer.Parent = titleBar
 
-    -- Button Container (tetap sama)
-    local buttonContainer = Instance.new("Frame")
-    buttonContainer.Name = "ButtonContainer"
-    buttonContainer.Size = UDim2.new(0, 72, 1, 0)
-    buttonContainer.Position = UDim2.new(1, -72, 0, 0)
-    buttonContainer.BackgroundTransparency = 1
-    buttonContainer.ZIndex = 101  -- FIX: ZIndex button container 101
-    buttonContainer.Parent = titleBar
+    local function makeHeaderBtn(icon, xPos)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.fromOffset(24, 24)
+        btn.Position = UDim2.new(0, xPos, 0.5, -12)
+        btn.BackgroundColor3 = UI_CONFIG.Theme.Accent
+        btn.BorderSizePixel = 0
+        btn.TextColor3 = UI_CONFIG.Theme.Text
+        btn.TextSize = 14
+        btn.Font = Enum.Font.GothamBold
+        btn.Text = icon
+        btn.ZIndex = 13
+        btn.Parent = btnContainer
+        addCorner(btn, 6)
+        addStroke(btn, UI_CONFIG.Theme.Border, 1, 0.5)
 
-    -- Help Button
-    local helpBtn = Instance.new("TextButton")
-    helpBtn.Name = "HelpBtn"
-    helpBtn.Size = UDim2.new(0, 22, 0, 22)
-    helpBtn.Position = UDim2.new(0, 2, 0.5, -11)
-    helpBtn.BackgroundColor3 = UI_CONFIG.Theme.Accent
-    helpBtn.BorderColor3 = UI_CONFIG.Theme.Border
-    helpBtn.BorderSizePixel = 1
-    helpBtn.TextColor3 = UI_CONFIG.Theme.Text
-    helpBtn.TextSize = 11
-    helpBtn.Font = Enum.Font.GothamBold
-    helpBtn.Text = "?"
-    helpBtn.ZIndex = 101
-    helpBtn.Parent = buttonContainer
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = UI_CONFIG.Theme.Hover}):Play()
+        end)
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = UI_CONFIG.Theme.Accent}):Play()
+        end)
+        return btn
+    end
 
-    local helpCorner = Instance.new("UICorner")
-    helpCorner.CornerRadius = UDim.new(0, 3)
-    helpCorner.Parent = helpBtn
+    local minimizeBtn = makeHeaderBtn("−", 2)
+    local closeBtn    = makeHeaderBtn("×", 30)
 
-    -- Minimize Button
-    local minimizeBtn = Instance.new("TextButton")
-    minimizeBtn.Name = "MinimizeBtn"
-    minimizeBtn.Size = UDim2.new(0, 22, 0, 22)
-    minimizeBtn.Position = UDim2.new(0, 26, 0.5, -11)
-    minimizeBtn.BackgroundColor3 = UI_CONFIG.Theme.Accent
-    minimizeBtn.BorderColor3 = UI_CONFIG.Theme.Border
-    minimizeBtn.BorderSizePixel = 1
-    minimizeBtn.TextColor3 = UI_CONFIG.Theme.Text
-    minimizeBtn.TextSize = 13
-    minimizeBtn.Font = Enum.Font.GothamBold
-    minimizeBtn.Text = "−"
-    minimizeBtn.ZIndex = 101
-    minimizeBtn.Parent = buttonContainer
-
-    local minCorner = Instance.new("UICorner")
-    minCorner.CornerRadius = UDim.new(0, 3)
-    minCorner.Parent = minimizeBtn
-
-    -- Close Button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Name = "CloseBtn"
-    closeBtn.Size = UDim2.new(0, 22, 0, 22)
-    closeBtn.Position = UDim2.new(0, 50, 0.5, -11)
-    closeBtn.BackgroundColor3 = UI_CONFIG.Theme.Accent
-    closeBtn.BorderColor3 = UI_CONFIG.Theme.Border
-    closeBtn.BorderSizePixel = 1
-    closeBtn.TextColor3 = UI_CONFIG.Theme.Text
-    closeBtn.TextSize = 13
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.Text = "×"
-    closeBtn.ZIndex = 101
-    closeBtn.Parent = buttonContainer
-
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 3)
-    closeCorner.Parent = closeBtn
-
-    -- Content Frame
+    -- ===== CONTENT FRAME =====
     local contentFrame = Instance.new("Frame")
     contentFrame.Name = "ContentFrame"
-    contentFrame.Size = UDim2.new(1, 0, 1, -32)
-    contentFrame.Position = UDim2.new(0, 0, 0, 32)
+    contentFrame.Size = UDim2.new(1, 0, 1, -37)
+    contentFrame.Position = UDim2.new(0, 0, 0, 37)
     contentFrame.BackgroundTransparency = 1
+    contentFrame.ClipsDescendants = true
     contentFrame.Parent = mainFrame
 
-    -- Category Scroll
-    local categoryScroll = Instance.new("ScrollingFrame")
-    categoryScroll.Name = "CategoryScroll"
-    categoryScroll.Size = UDim2.new(1, 0, 0, 38)
-    categoryScroll.BackgroundColor3 = UI_CONFIG.Theme.Dark
-    categoryScroll.BorderColor3 = UI_CONFIG.Theme.Border
-    categoryScroll.BorderSizePixel = 1
-    categoryScroll.ScrollBarThickness = 2
-    categoryScroll.CanvasSize = UDim2.new(4, 0, 0, 38)
-    categoryScroll.Parent = contentFrame
-    pcall(function() categoryScroll.ScrollDirection = Enum.ScrollDirection.X end)
+    -- ===== CATEGORY SCROLL (horizontal, di atas) =====
+    local catScroll = Instance.new("ScrollingFrame")
+    catScroll.Name = "CategoryScroll"
+    catScroll.Size = UDim2.new(1, 0, 0, 40)
+    catScroll.BackgroundColor3 = UI_CONFIG.Theme.Dark
+    catScroll.BorderSizePixel = 0
+    catScroll.ScrollBarThickness = 0         -- sembunyi, swipe manual
+    catScroll.CanvasSize = UDim2.new(0, 0, 0, 40)
+    catScroll.AutomaticCanvasSize = Enum.AutomaticSize.X
+    catScroll.ScrollingDirection = Enum.ScrollingDirection.X
+    catScroll.Parent = contentFrame
+    pcall(function() catScroll.ScrollDirection = Enum.ScrollDirection.X end)
+
+    -- Garis bawah category bar
+    local catDivider = Instance.new("Frame")
+    catDivider.Size = UDim2.new(1, 0, 0, 1)
+    catDivider.Position = UDim2.new(0, 0, 1, -1)
+    catDivider.BackgroundColor3 = UI_CONFIG.Theme.Border
+    catDivider.BackgroundTransparency = 0.65
+    catDivider.BorderSizePixel = 0
+    catDivider.Parent = catScroll
 
     local catLayout = Instance.new("UIListLayout")
     catLayout.FillDirection = Enum.FillDirection.Horizontal
-    catLayout.Padding = UDim.new(0, 4)
-    catLayout.Parent = categoryScroll
+    catLayout.Padding = UDim.new(0, 5)
+    catLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    catLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    catLayout.Parent = catScroll
 
-    local catPadding = Instance.new("UIPadding")
-    catPadding.PaddingLeft = UDim.new(0, 4)
-    catPadding.PaddingRight = UDim.new(0, 4)
-    catPadding.Parent = categoryScroll
+    local catPad = Instance.new("UIPadding")
+    catPad.PaddingLeft = UDim.new(0, 6)
+    catPad.PaddingRight = UDim.new(0, 6)
+    catPad.Parent = catScroll
 
-    -- Text Scroll
+    -- ===== TEXT SCROLL (vertical, isi teks) =====
     local textScroll = Instance.new("ScrollingFrame")
     textScroll.Name = "TextScroll"
-    textScroll.Size = UDim2.new(1, 0, 1, -42)
-    textScroll.Position = UDim2.new(0, 0, 0, 38)
+    textScroll.Size = UDim2.new(1, 0, 1, -41)
+    textScroll.Position = UDim2.new(0, 0, 0, 41)
     textScroll.BackgroundColor3 = UI_CONFIG.Theme.Background
-    textScroll.BorderColor3 = UI_CONFIG.Theme.Border
-    textScroll.BorderSizePixel = 1
+    textScroll.BorderSizePixel = 0
     textScroll.ScrollBarThickness = 2
-    textScroll.CanvasSize = UDim2.new(0, 0, 10, 0)
+    textScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+    textScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    textScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     textScroll.Parent = contentFrame
 
     local textLayout = Instance.new("UIListLayout")
     textLayout.FillDirection = Enum.FillDirection.Vertical
-    textLayout.Padding = UDim.new(0, 4)
+    textLayout.Padding = UDim.new(0, 6)
+    textLayout.SortOrder = Enum.SortOrder.LayoutOrder
     textLayout.Parent = textScroll
 
-    local textPadding = Instance.new("UIPadding")
-    textPadding.PaddingLeft = UDim.new(0, 5)
-    textPadding.PaddingRight = UDim.new(0, 5)
-    textPadding.PaddingTop = UDim.new(0, 5)
-    textPadding.PaddingBottom = UDim.new(0, 5)
-    textPadding.Parent = textScroll
+    local textPad = Instance.new("UIPadding")
+    textPad.PaddingLeft = UDim.new(0, 8)
+    textPad.PaddingRight = UDim.new(0, 8)
+    textPad.PaddingTop = UDim.new(0, 8)
+    textPad.PaddingBottom = UDim.new(0, 8)
+    textPad.Parent = textScroll
 
-    -- Help Panel (with Back button)
-    local helpPanel = Instance.new("Frame")
-    helpPanel.Name = "HelpPanel"
-    helpPanel.Size = UDim2.new(1, 0, 1, -32)
-    helpPanel.Position = UDim2.new(0, 0, 0, 32)
-    helpPanel.BackgroundColor3 = UI_CONFIG.Theme.Background
-    helpPanel.Visible = false
-    helpPanel.Parent = mainFrame
+    -- Placeholder label sebelum kategori dipilih
+    local placeholderLabel = Instance.new("TextLabel")
+    placeholderLabel.Name = "Placeholder"
+    placeholderLabel.Size = UDim2.new(1, 0, 0, 80)
+    placeholderLabel.BackgroundTransparency = 1
+    placeholderLabel.TextColor3 = Color3.fromRGB(90, 90, 90)
+    placeholderLabel.TextSize = 11
+    placeholderLabel.Font = Enum.Font.Gotham
+    placeholderLabel.Text = "← Pilih kategori di atas"
+    placeholderLabel.TextXAlignment = Enum.TextXAlignment.Center
+    placeholderLabel.TextYAlignment = Enum.TextYAlignment.Center
+    placeholderLabel.LayoutOrder = 0
+    placeholderLabel.Parent = textScroll
 
-    -- Back Button in Help Panel
-    local backBtn = Instance.new("TextButton")
-    backBtn.Name = "BackBtn"
-    backBtn.Size = UDim2.new(1, -10, 0, 24)
-    backBtn.Position = UDim2.new(0, 5, 0, 5)
-    backBtn.BackgroundColor3 = UI_CONFIG.Theme.Accent
-    backBtn.BorderColor3 = UI_CONFIG.Theme.Border
-    backBtn.BorderSizePixel = 1
-    backBtn.TextColor3 = UI_CONFIG.Theme.Text
-    backBtn.TextSize = 9
-    backBtn.Font = Enum.Font.GothamBold
-    backBtn.Text = "← Back"
-    backBtn.Parent = helpPanel
-
-    local backCorner = Instance.new("UICorner")
-    backCorner.CornerRadius = UDim.new(0, 3)
-    backCorner.Parent = backBtn
-
-    -- Help Scroll
-    local helpScroll = Instance.new("ScrollingFrame")
-    helpScroll.Name = "HelpScroll"
-    helpScroll.Size = UDim2.new(1, 0, 1, -34)
-    helpScroll.Position = UDim2.new(0, 0, 0, 30)
-    helpScroll.BackgroundTransparency = 1
-    helpScroll.ScrollBarThickness = 2
-    helpScroll.CanvasSize = UDim2.new(0, 0, 5, 0)
-    helpScroll.Parent = helpPanel
-
-    local helpText = Instance.new("TextLabel")
-    helpText.Name = "HelpText"
-    helpText.Size = UDim2.new(1, -10, 0, 200)
-    helpText.BackgroundTransparency = 1
-    helpText.TextColor3 = UI_CONFIG.Theme.TextSecondary
-    helpText.TextSize = 7.5
-    helpText.Font = Enum.Font.Gotham
-    helpText.Text = "📋 HOW TO USE:\n\n1️⃣ SCROLL CATEGORIES\nSwipe left/right to find category\n\n2️⃣ CLICK CATEGORY\nClick to load report texts\n\n3️⃣ READ PREVIEW\nRead text in card\n\n4️⃣ COPY TEXT\nClick COPY button\n\n5️⃣ OPEN REPORT FORM\nGo to Roblox report\n\n6️⃣ PASTE\nCtrl+V or Cmd+V\n\n7️⃣ SUBMIT\nSubmit your report\n\n🎮 DRAG UI:\nClick & drag title bar anywhere\n\n➖ MINIMIZE:\nClick − button (header stays visible)\n\n❌ CLOSE:\nClick × button\n\n❓ HELP:\nClick ? button (you are here)"
-    helpText.TextWrapped = true
-    helpText.TextXAlignment = Enum.TextXAlignment.Left
-    helpText.TextYAlignment = Enum.TextYAlignment.Top
-    helpText.Parent = helpScroll
-
-    local helpPadding = Instance.new("UIPadding")
-    helpPadding.PaddingLeft = UDim.new(0, 5)
-    helpPadding.PaddingRight = UDim.new(0, 5)
-    helpPadding.PaddingTop = UDim.new(0, 5)
-    helpPadding.Parent = helpText
-
-    -- Loading Screen
-    local loadingScreen = Instance.new("Frame")
-    loadingScreen.Name = "LoadingScreen"
-    loadingScreen.Size = UDim2.new(1, 0, 1, 0)
-    loadingScreen.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    loadingScreen.BackgroundTransparency = 0.5
-    loadingScreen.Visible = false
-    loadingScreen.ZIndex = 50
-    loadingScreen.Parent = mainFrame
-
-    local loadingBox = Instance.new("Frame")
-    loadingBox.Size = UDim2.new(0, 90, 0, 60)
-    loadingBox.Position = UDim2.new(0.5, -45, 0.5, -30)
-    loadingBox.BackgroundColor3 = UI_CONFIG.Theme.Dark
-    loadingBox.BorderColor3 = UI_CONFIG.Theme.Border
-    loadingBox.BorderSizePixel = 2
-    loadingBox.ZIndex = 51
-    loadingBox.Parent = loadingScreen
-
-    local loadCorner = Instance.new("UICorner")
-    loadCorner.CornerRadius = UDim.new(0, 4)
-    loadCorner.Parent = loadingBox
-
-    local dotsContainer = Instance.new("Frame")
-    dotsContainer.Size = UDim2.new(1, 0, 0.5, 0)
-    dotsContainer.BackgroundTransparency = 1
-    dotsContainer.Parent = loadingBox
-
-    local dots = {}
-    for i = 1, 3 do
-        local dot = Instance.new("TextLabel")
-        dot.Size = UDim2.new(0, 4, 0, 4)
-        dot.Position = UDim2.new(0.5, -10 + (i-1)*10, 0.5, -2)
-        dot.BackgroundColor3 = UI_CONFIG.Theme.Border
-        dot.BorderSizePixel = 0
-        dot.Text = ""
-        dot.Parent = dotsContainer
-        local dotCorner = Instance.new("UICorner")
-        dotCorner.CornerRadius = UDim.new(1, 0)
-        dotCorner.Parent = dot
-        dots[i] = dot
-    end
-
-    local loadText = Instance.new("TextLabel")
-    loadText.Size = UDim2.new(1, 0, 0.5, 0)
-    loadText.Position = UDim2.new(0, 0, 0.5, 0)
-    loadText.BackgroundTransparency = 1
-    loadText.TextColor3 = UI_CONFIG.Theme.Text
-    loadText.TextSize = 8
-    loadText.Font = Enum.Font.GothamBold
-    loadText.Text = "Loading..."
-    loadText.Parent = loadingBox
-
-    -- Variables
+    -- ===== STATE =====
     local isMinimized = false
-    local helpShowing = false
-    local selectedCategory = nil
+    local selectedCat = nil
+    local fullH = H   -- tinggi penuh saat expanded
+    local catButtons = {}
 
-    -- Create Category Button
-    local function createCategoryButton(categoryName)
-        local btn = Instance.new("TextButton")
-        btn.Name = categoryName
-        btn.Size = UDim2.new(0, 50, 0, 30)
-        btn.BackgroundColor3 = UI_CONFIG.Theme.Dark
-        btn.BorderColor3 = UI_CONFIG.Theme.Border
-        btn.BorderSizePixel = 1
-        btn.TextColor3 = UI_CONFIG.Theme.TextSecondary
-        btn.TextSize = 7
-        btn.Font = Enum.Font.GothamBold
-        btn.Text = REPORT_TEXTS[categoryName].title
-        btn.TextWrapped = true
-        btn.Parent = categoryScroll
+    -- ===== CATEGORY BUTTON FACTORY =====
+    local catOrder = {
+        "Harassment","18+ Content","Advertising","Exploiting",
+        "Scamming","Racism","Threats","Username",
+        "Game Content","Impersonation","Child Safety","Bot Account","Toxicity"
+    }
 
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(0, 3)
-        btnCorner.Parent = btn
-
-        btn.MouseEnter:Connect(function()
-            btn.BackgroundColor3 = UI_CONFIG.Theme.Hover
-            btn.TextColor3 = UI_CONFIG.Theme.Text
-        end)
-
-        btn.MouseLeave:Connect(function()
-            if selectedCategory ~= categoryName then
-                btn.BackgroundColor3 = UI_CONFIG.Theme.Dark
-                btn.TextColor3 = UI_CONFIG.Theme.TextSecondary
+    local function selectCategory(catName)
+        -- Reset highlight semua button
+        for name, btn in pairs(catButtons) do
+            if name == catName then
+                btn.BackgroundColor3 = UI_CONFIG.Theme.Accent
+                btn.TextColor3 = UI_CONFIG.Theme.Text
+            else
+                btn.BackgroundColor3 = Color3.fromRGB(0,0,0,0) -- transparan
+                btn.BackgroundTransparency = 1
+                btn.TextColor3 = UI_CONFIG.Theme.TextSub
             end
-        end)
+        end
 
-        btn.MouseButton1Click:Connect(function()
-            loadingScreen.Visible = true
-            helpPanel.Visible = false
-            helpShowing = false
+        selectedCat = catName
 
-            if selectedCategory and categoryScroll:FindFirstChild(selectedCategory) then
-                categoryScroll:FindFirstChild(selectedCategory).BackgroundColor3 = UI_CONFIG.Theme.Dark
-                categoryScroll:FindFirstChild(selectedCategory).TextColor3 = UI_CONFIG.Theme.TextSecondary
-            end
+        -- Hapus kartu lama
+        for _, child in ipairs(textScroll:GetChildren()) do
+            if child:IsA("Frame") then child:Destroy() end
+        end
+        if placeholderLabel then placeholderLabel.Visible = false end
 
-            selectedCategory = categoryName
-            btn.BackgroundColor3 = UI_CONFIG.Theme.Accent
-            btn.TextColor3 = UI_CONFIG.Theme.Text
+        local data = REPORT_TEXTS[catName]
+        if not data then return end
 
-            for _, child in ipairs(textScroll:GetChildren()) do
-                if child:IsA("Frame") then
-                    child:Destroy()
+        for i, txt in ipairs(data.texts) do
+            -- Card
+            local card = Instance.new("Frame")
+            card.Name = "Card_"..i
+            card.Size = UDim2.new(1, 0, 0, 0)         -- height auto
+            card.AutomaticSize = Enum.AutomaticSize.Y
+            card.BackgroundColor3 = UI_CONFIG.Theme.Card
+            card.BorderSizePixel = 0
+            card.LayoutOrder = i
+            card.Parent = textScroll
+            addCorner(card, 8)
+            addStroke(card, UI_CONFIG.Theme.Border, 1, 0.72)
+
+            local cardPad = Instance.new("UIPadding")
+            cardPad.PaddingLeft  = UDim.new(0, 8)
+            cardPad.PaddingRight = UDim.new(0, 8)
+            cardPad.PaddingTop   = UDim.new(0, 8)
+            cardPad.PaddingBottom = UDim.new(0, 34)   -- ruang untuk copy button
+            cardPad.Parent = card
+
+            -- Nomor kecil di pojok kanan atas
+            local numLabel = Instance.new("TextLabel")
+            numLabel.Size = UDim2.fromOffset(18, 14)
+            numLabel.Position = UDim2.new(1, -22, 0, 6)
+            numLabel.BackgroundTransparency = 1
+            numLabel.TextColor3 = Color3.fromRGB(70,70,70)
+            numLabel.TextSize = 9
+            numLabel.Font = Enum.Font.GothamBold
+            numLabel.Text = tostring(i)
+            numLabel.ZIndex = 2
+            numLabel.Parent = card
+
+            -- Teks isi
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Size = UDim2.new(1, 0, 0, 0)
+            textLabel.AutomaticSize = Enum.AutomaticSize.Y
+            textLabel.BackgroundTransparency = 1
+            textLabel.TextColor3 = UI_CONFIG.Theme.TextSub
+            textLabel.TextSize = 9
+            textLabel.Font = Enum.Font.Gotham
+            textLabel.Text = txt
+            textLabel.TextWrapped = true
+            textLabel.TextXAlignment = Enum.TextXAlignment.Left
+            textLabel.TextYAlignment = Enum.TextYAlignment.Top
+            textLabel.LayoutOrder = 1
+            textLabel.Parent = card
+
+            local textInnerLayout = Instance.new("UIListLayout")
+            textInnerLayout.FillDirection = Enum.FillDirection.Vertical
+            textInnerLayout.Parent = card
+
+            -- Copy button
+            local copyBtn = Instance.new("TextButton")
+            copyBtn.Size = UDim2.new(1, -16, 0, 24)
+            copyBtn.Position = UDim2.new(0, 8, 1, -30)
+            copyBtn.AnchorPoint = Vector2.new(0, 0)
+            copyBtn.BackgroundColor3 = UI_CONFIG.Theme.Accent
+            copyBtn.BorderSizePixel = 0
+            copyBtn.TextColor3 = UI_CONFIG.Theme.Text
+            copyBtn.TextSize = 10
+            copyBtn.Font = Enum.Font.GothamBold
+            copyBtn.Text = "COPY"
+            copyBtn.ZIndex = 3
+            copyBtn.Parent = card
+            addCorner(copyBtn, 6)
+            addStroke(copyBtn, UI_CONFIG.Theme.Border, 1, 0.6)
+
+            copyBtn.MouseEnter:Connect(function()
+                TweenService:Create(copyBtn, TweenInfo.new(0.1), {BackgroundColor3 = UI_CONFIG.Theme.CopyActive}):Play()
+            end)
+            copyBtn.MouseLeave:Connect(function()
+                if copyBtn.Text == "COPY" then
+                    TweenService:Create(copyBtn, TweenInfo.new(0.1), {BackgroundColor3 = UI_CONFIG.Theme.Accent}):Play()
                 end
-            end
-
-            wait(0.2)
-
-            for i, text in ipairs(REPORT_TEXTS[categoryName].texts) do
-                local textCard = Instance.new("Frame")
-                textCard.Size = UDim2.new(1, -10, 0, 70)
-                textCard.BackgroundColor3 = UI_CONFIG.Theme.Card
-                textCard.BorderColor3 = UI_CONFIG.Theme.Border
-                textCard.BorderSizePixel = 1
-                textCard.Parent = textScroll
-
-                local cardCorner = Instance.new("UICorner")
-                cardCorner.CornerRadius = UDim.new(0, 4)
-                cardCorner.Parent = textCard
-
-                local textLabel = Instance.new("TextLabel")
-                textLabel.Size = UDim2.new(1, -6, 1, -26)
-                textLabel.BackgroundTransparency = 1
-                textLabel.TextColor3 = UI_CONFIG.Theme.TextSecondary
-                textLabel.TextSize = 6.5
-                textLabel.Font = Enum.Font.Gotham
-                textLabel.Text = text
-                textLabel.TextWrapped = true
-                textLabel.TextXAlignment = Enum.TextXAlignment.Left
-                textLabel.TextYAlignment = Enum.TextYAlignment.Top
-                textLabel.Parent = textCard
-
-                local labelPadding = Instance.new("UIPadding")
-                labelPadding.PaddingLeft = UDim.new(0, 3)
-                labelPadding.PaddingRight = UDim.new(0, 3)
-                labelPadding.PaddingTop = UDim.new(0, 3)
-                labelPadding.Parent = textLabel
-
-                local copyBtn = Instance.new("TextButton")
-                copyBtn.Size = UDim2.new(1, -6, 0, 18)
-                copyBtn.Position = UDim2.new(0, 3, 1, -21)
-                copyBtn.BackgroundColor3 = UI_CONFIG.Theme.Accent
-                copyBtn.BorderColor3 = UI_CONFIG.Theme.Border
-                copyBtn.BorderSizePixel = 1
-                copyBtn.TextColor3 = UI_CONFIG.Theme.Text
-                copyBtn.TextSize = 7
-                copyBtn.Font = Enum.Font.GothamBold
-                copyBtn.Text = "COPY"
-                copyBtn.Parent = textCard
-
-                local btnCorner2 = Instance.new("UICorner")
-                btnCorner2.CornerRadius = UDim.new(0, 2)
-                btnCorner2.Parent = copyBtn
-
-                copyBtn.MouseEnter:Connect(function()
-                    copyBtn.BackgroundColor3 = UI_CONFIG.Theme.Hover
-                end)
-
-                copyBtn.MouseLeave:Connect(function()
+            end)
+            copyBtn.MouseButton1Click:Connect(function()
+                pcall(function()
+                    setclipboard(txt)
+                    copyBtn.Text = "✓ Copied!"
+                    copyBtn.BackgroundColor3 = UI_CONFIG.Theme.CopyActive
+                    task.wait(1.5)
+                    copyBtn.Text = "COPY"
                     copyBtn.BackgroundColor3 = UI_CONFIG.Theme.Accent
                 end)
+            end)
+        end
 
-                copyBtn.MouseButton1Click:Connect(function()
-                    pcall(function()
-                        setclipboard(text)
-                        copyBtn.Text = "✓"
-                        task.wait(1)
-                        copyBtn.Text = "COPY"
-                    end)
-                end)
+        -- Scroll balik ke atas setelah ganti kategori
+        textScroll.CanvasPosition = Vector2.new(0, 0)
+    end
 
-                textCard.LayoutOrder = i
+    -- Build category buttons berdasarkan urutan
+    for idx, catName in ipairs(catOrder) do
+        if REPORT_TEXTS[catName] then
+            local btn = Instance.new("TextButton")
+            btn.Name = catName
+            btn.Size = UDim2.fromOffset(0, 28)
+            btn.AutomaticSize = Enum.AutomaticSize.X
+            btn.BackgroundTransparency = 1
+            btn.BackgroundColor3 = UI_CONFIG.Theme.Accent
+            btn.BorderSizePixel = 0
+            btn.TextColor3 = UI_CONFIG.Theme.TextSub
+            btn.TextSize = 10
+            btn.Font = Enum.Font.GothamBold
+            btn.Text = REPORT_TEXTS[catName].title
+            btn.LayoutOrder = idx
+            btn.Parent = catScroll
+
+            local btnPad = Instance.new("UIPadding")
+            btnPad.PaddingLeft  = UDim.new(0, 8)
+            btnPad.PaddingRight = UDim.new(0, 8)
+            btnPad.Parent = btn
+            addCorner(btn, 6)
+
+            btn.MouseEnter:Connect(function()
+                if selectedCat ~= catName then
+                    btn.TextColor3 = UI_CONFIG.Theme.Text
+                end
+            end)
+            btn.MouseLeave:Connect(function()
+                if selectedCat ~= catName then
+                    btn.BackgroundTransparency = 1
+                    btn.TextColor3 = UI_CONFIG.Theme.TextSub
+                end
+            end)
+            btn.MouseButton1Click:Connect(function()
+                selectCategory(catName)
+            end)
+
+            catButtons[catName] = btn
+        end
+    end
+
+    -- ===== MOBILE SWIPE untuk category scroll =====
+    local swipeStartX = 0
+    catScroll.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            swipeStartX = input.Position.X
+        end
+    end)
+    catScroll.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            local delta = swipeStartX - input.Position.X
+            if math.abs(delta) > 1 then
+                catScroll.CanvasPosition = catScroll.CanvasPosition + Vector2.new(delta * 0.6, 0)
+                swipeStartX = input.Position.X
             end
-
-            textScroll.CanvasSize = UDim2.new(0, 0, 0, textLayout.AbsoluteContentSize.Y + 10)
-            loadingScreen.Visible = false
-        end)
-
-        return btn
-    end
-
-    for categoryName, _ in pairs(REPORT_TEXTS) do
-        createCategoryButton(categoryName)
-    end
-
-    -- Button Event Handlers
-    helpBtn.MouseButton1Click:Connect(function()
-        helpShowing = not helpShowing
-        if helpShowing then
-            helpPanel.Visible = true
-            contentFrame.Visible = false
-            helpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        else
-            helpPanel.Visible = false
-            contentFrame.Visible = true
-            helpBtn.BackgroundColor3 = UI_CONFIG.Theme.Accent
         end
     end)
 
-    backBtn.MouseButton1Click:Connect(function()
-        helpShowing = false
-        helpPanel.Visible = false
-        contentFrame.Visible = true
-        helpBtn.BackgroundColor3 = UI_CONFIG.Theme.Accent
-    end)
-
-    backBtn.MouseEnter:Connect(function()
-        backBtn.BackgroundColor3 = UI_CONFIG.Theme.Hover
-    end)
-
-    backBtn.MouseLeave:Connect(function()
-        backBtn.BackgroundColor3 = UI_CONFIG.Theme.Accent
-    end)
-
+    -- ===== MINIMIZE =====
     minimizeBtn.MouseButton1Click:Connect(function()
         if not isMinimized then
             isMinimized = true
             contentFrame.Visible = false
-            helpPanel.Visible = false
-            mainFrame.Size = UDim2.new(0, 240, 0, 32)
+            TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+                Size = UDim2.fromOffset(W, 36)
+            }):Play()
             minimizeBtn.Text = "+"
         else
             isMinimized = false
             contentFrame.Visible = true
-            mainFrame.Size = UDim2.new(0, 240, 0, 290)
+            TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quint), {
+                Size = UDim2.fromOffset(W, fullH)
+            }):Play()
             minimizeBtn.Text = "−"
         end
     end)
 
+    -- ===== CLOSE =====
     closeBtn.MouseButton1Click:Connect(function()
-        pcall(function()
-            screenGui:Destroy()
-        end)
+        -- Slide up keluar layar dulu baru destroy, mirip gaya notif
+        TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+            Position = UDim2.new(0.5, 0, -0.5, 0)
+        }):Play()
+        task.wait(0.28)
+        pcall(function() screenGui:Destroy() end)
     end)
 
-    -- Drag Support
-    local isDragging = false
-    local dragOffset = Vector2.new(0, 0)
+    -- ===== ENTRY ANIMATION =====
+    mainFrame.Position = UDim2.new(0.5, 0, -0.5, 0)
+    TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+        Position = UDim2.fromScale(0.5, 0.5)
+    }):Play()
 
-    titleText.InputBegan:Connect(function(input, gameProcessed)
-        if not gameProcessed and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            isDragging = true
-            dragOffset = Vector2.new(mainFrame.Position.X.Offset - input.Position.X, mainFrame.Position.Y.Offset - input.Position.Y)
-        end
-    end)
-
-    titleText.InputEnded:Connect(function(input, gameProcessed)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = false
-        end
-    end)
-
-    titleText.InputChanged:Connect(function(input, gameProcessed)
-        if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local newX = input.Position.X + dragOffset.X
-            local newY = input.Position.Y + dragOffset.Y
-            mainFrame.Position = UDim2.new(0, newX, 0, newY)
-        end
-    end)
-
-    -- Loading Animation
-    RunService.RenderStepped:Connect(function()
-        if loadingScreen.Visible then
-            local elapsed = tick() % 0.6
-            for i, dot in ipairs(dots) do
-                local delay = (i - 1) * 0.1
-                local phase = (elapsed - delay) % 0.6
-                if phase < 0.3 then
-                    local t = phase / 0.3
-                    dot.BackgroundTransparency = 0.5 - (0.3 * t)
-                else
-                    local t = (phase - 0.3) / 0.3
-                    dot.BackgroundTransparency = 0.2 + (0.3 * t)
-                end
-            end
-        end
-    end)
-
-    -- Mobile Swipe
-    local startX = 0
-    contentFrame.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.UserInputType == Enum.UserInputType.Touch then
-            startX = input.Position.X
-        end
-    end)
-
-    contentFrame.InputChanged:Connect(function(input, gameProcessed)
-        if input.UserInputType == Enum.UserInputType.Touch then
-            local deltaX = startX - input.Position.X
-            if math.abs(deltaX) > 2 then
-                categoryScroll.CanvasPosition = categoryScroll.CanvasPosition + Vector2.new(deltaX * 0.5, 0)
-                startX = input.Position.X
-            end
-        end
-    end)
-
-    screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-    return screenGui
+    print("✓ Anonymous9x RepText v3.0 loaded!")
 end
 
-local function safeInit()
-    local success, err = pcall(createRepTextUI)
-    if not success then
-        warn("RepText Error: " .. tostring(err))
-    else
-        print("✓ Anonymous9x RepText v2.3 - FINAL VERSION LOADED!")
-    end
+-- ===== RUN =====
+local ok, err = pcall(createRepTextUI)
+if not ok then
+    warn("RepText Error: " .. tostring(err))
 end
-
-safeInit()
