@@ -1,8 +1,10 @@
--- Anonymous9x RepText UI v5.0
+-- Anonymous9x RepText UI v6.0
 -- EXECUTOR PROOF: No UIListLayout, No AutomaticSize, No AutomaticCanvasSize
--- Full manual positioning, works on Delta, Fluxus, Arceus X, Hydrogen, etc.
+-- Full manual positioning + UIS global touch scroll with momentum
 
 local TweenService = game:GetService("TweenService")
+local UIS         = game:GetService("UserInputService")
+local RunService  = game:GetService("RunService")
 local PlayerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
 -- THEME
@@ -496,74 +498,106 @@ local function build()
     totalCatContent = curX + 6  -- total lebar semua tombol
 
     -- ============================
-    -- SWIPE CATEGORY BAR (manual scroll catTrack)
+    -- SCROLL SYSTEM — UIS GLOBAL (menembus semua child element)
+    -- Ini satu-satunya cara reliable di mobile executor
     -- ============================
-    local catScrollX = 0
-    local catMaxScroll = math.max(0, totalCatContent - PW)
-    local catSwipeStartX = 0
-    local catSwiping = false
+    local catScrollX   = 0
+    local catMaxScroll = 0  -- di-set setelah tombol dibuat
+    local catVelX      = 0  -- velocity momentum horizontal
 
-    catClip.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.Touch
-        or inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            catSwipeStartX = inp.Position.X
-            catSwiping = true
+    local bodyVelY     = 0  -- velocity momentum vertical
+
+    -- Koordinat sentuhan aktif
+    local touchId      = nil   -- UserInputState instance ID
+    local touchStartX  = 0
+    local touchStartY  = 0
+    local touchLastX   = 0
+    local touchLastY   = 0
+    local touchMode    = nil   -- "cat" | "body" | nil
+
+    -- Fungsi cek apakah posisi layar ada di dalam Frame
+    local function insideFrame(frame, pos)
+        local ap = frame.AbsolutePosition
+        local as = frame.AbsoluteSize
+        return pos.X >= ap.X and pos.X <= ap.X + as.X
+           and pos.Y >= ap.Y and pos.Y <= ap.Y + as.Y
+    end
+
+    -- Touch began: tentukan mode (cat atau body)
+    UIS.TouchStarted:Connect(function(touch, gameProcessed)
+        if touchId ~= nil then return end  -- sudah ada sentuhan aktif
+        touchId     = touch
+        touchStartX = touch.Position.X
+        touchStartY = touch.Position.Y
+        touchLastX  = touch.Position.X
+        touchLastY  = touch.Position.Y
+        catVelX     = 0
+        bodyVelY    = 0
+
+        if insideFrame(catClip, touch.Position) then
+            touchMode = "cat"
+        elseif insideFrame(bodyClip, touch.Position) then
+            touchMode = "body"
+        else
+            touchMode = nil
+            touchId   = nil
         end
     end)
-    catClip.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.Touch
-        or inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            catSwiping = false
-        end
-    end)
-    catClip.InputChanged:Connect(function(inp)
-        if catSwiping and (
-            inp.UserInputType == Enum.UserInputType.Touch or
-            inp.UserInputType == Enum.UserInputType.MouseMovement
-        ) then
-            local delta = catSwipeStartX - inp.Position.X
-            catScrollX = math.clamp(catScrollX + delta * 0.7, 0, catMaxScroll)
+
+    -- Touch moved: lakukan scroll sesuai mode
+    UIS.TouchMoved:Connect(function(touch, gameProcessed)
+        if touch ~= touchId then return end
+        local dx = touchLastX - touch.Position.X
+        local dy = touchLastY - touch.Position.Y
+
+        if touchMode == "cat" then
+            catMaxScroll = math.max(0, totalCatContent - PW)
+            catScrollX   = math.clamp(catScrollX + dx, 0, catMaxScroll)
             catTrack.Position = UDim2.fromOffset(-catScrollX, 0)
-            catSwipeStartX = inp.Position.X
-        end
-    end)
+            catVelX = dx  -- simpan velocity terakhir
 
-    -- ============================
-    -- SCROLL BODY (manual scroll bodyTrack)
-    -- ============================
-    local bodySwipeStartY = 0
-    local bodySwiping = false
-
-    bodyClip.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.Touch
-        or inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            bodySwipeStartY = inp.Position.Y
-            bodySwiping = true
-        end
-    end)
-    bodyClip.InputEnded:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.Touch
-        or inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            bodySwiping = false
-        end
-    end)
-    bodyClip.InputChanged:Connect(function(inp)
-        if bodySwiping and (
-            inp.UserInputType == Enum.UserInputType.Touch or
-            inp.UserInputType == Enum.UserInputType.MouseMovement
-        ) then
-            local delta = bodySwipeStartY - inp.Position.Y
-            bodyScrollY = math.clamp(bodyScrollY + delta * 0.7, 0, bodyMaxScroll)
+        elseif touchMode == "body" then
+            bodyScrollY  = math.clamp(bodyScrollY + dy, 0, bodyMaxScroll)
             bodyTrack.Position = UDim2.fromOffset(0, -bodyScrollY)
-            bodySwipeStartY = inp.Position.Y
+            bodyVelY = dy
         end
+
+        touchLastX = touch.Position.X
+        touchLastY = touch.Position.Y
     end)
 
-    -- Mouse wheel scroll (PC)
-    local UIS = game:GetService("UserInputService")
+    -- Touch ended: lepas + momentum
+    UIS.TouchEnded:Connect(function(touch, gameProcessed)
+        if touch ~= touchId then return end
+        touchId   = nil
+        local mode = touchMode
+        touchMode = nil
+
+        -- Momentum glide setelah jari diangkat
+        task.spawn(function()
+            local velX = catVelX
+            local velY = bodyVelY
+            for _ = 1, 25 do
+                velX = velX * 0.82
+                velY = velY * 0.82
+                if math.abs(velX) < 0.5 and math.abs(velY) < 0.5 then break end
+
+                if mode == "cat" then
+                    catScrollX = math.clamp(catScrollX + velX, 0, catMaxScroll)
+                    catTrack.Position = UDim2.fromOffset(-catScrollX, 0)
+                elseif mode == "body" then
+                    bodyScrollY = math.clamp(bodyScrollY + velY, 0, bodyMaxScroll)
+                    bodyTrack.Position = UDim2.fromOffset(0, -bodyScrollY)
+                end
+                task.wait(0.016)  -- ~60fps
+            end
+        end)
+    end)
+
+    -- Mouse wheel PC (scroll body)
     UIS.InputChanged:Connect(function(inp)
         if inp.UserInputType == Enum.UserInputType.MouseWheel then
-            bodyScrollY = math.clamp(bodyScrollY - inp.Position.Z * 30, 0, bodyMaxScroll)
+            bodyScrollY = math.clamp(bodyScrollY - inp.Position.Z * 35, 0, bodyMaxScroll)
             bodyTrack.Position = UDim2.fromOffset(0, -bodyScrollY)
         end
     end)
@@ -602,7 +636,7 @@ local function build()
     task.wait(0.05)
     tw(mf, {Position = UDim2.fromScale(0.5, 0.5)}, 0.38)
 
-    print("Anonymous9x RepText v5.0 - loaded!")
+    print("Anonymous9x RepText v6.0 - loaded!")
 end
 
 pcall(build)
