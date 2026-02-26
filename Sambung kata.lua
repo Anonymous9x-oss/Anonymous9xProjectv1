@@ -1,28 +1,24 @@
 -- =================================================================
--- AUTO SAMBUNG KATA REAL - Roblox Game
--- Author: Anonymous9x
--- FIXED ENGINE: Flash mode, real auto type, smart word detection
+-- AUTO SAMBUNG KATA REAL v3 - Anonymous9x
+-- FIX: Tidak pakai Remote ngaco, fokus TextBox + tombol Masuk
 -- =================================================================
 
--- Services
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local parentGui = CoreGui or PlayerGui
 
--- Hapus GUI lama
 if parentGui:FindFirstChild("AutoSambungKataReal") then
     parentGui.AutoSambungKataReal:Destroy()
 end
 
 -- =================================================================
--- KAMUS DATA
+-- KAMUS
 -- =================================================================
 local DICTIONARY_URL = "https://raw.githubusercontent.com/eenvyexe/KBBI/refs/heads/main/words.txt"
 local KAMUS = {}
@@ -48,109 +44,56 @@ local function LoadKamus()
             end
         end
         print("[KAMUS] Loaded " .. #KAMUS .. " words")
-        return true
     else
-        local fallback = {"aku","kamu","dia","mereka","kami","kita","siapa","apa","mana","kapan","mengapa","bagaimana","bisa","dapat","mau","akan","sedang","telah","sudah","belum","pernah","selalu","sering","jarang","kadang","mungkin","harus","wajib","boleh","dilarang","jangan","ayo","coba","lihat","dengar","rasa","cium","sentuh","pegang","ambil","beri","taruh","simpan","buang","buka","tutup","hidup","mati","nyala","padam","besar","kecil","panjang","pendek","tinggi","rendah","berat","ringan","cepat","lambat","kuat","lemah","terang","gelap","panas","dingin","basah","kering","bersih","kotor","baru","lama","muda","tua","kaya","miskin","pintar","bodoh","cantik","jelek","baik","buruk","senang","sedih","marah","takut","berani","malas","rajin","sabar","emosi","angin","bumi","api","tanah","langit","laut","hutan","gunung","sungai","danau","pulau","kota","desa","jalan","rumah","pintu","jendela","atap","lantai","dinding","kursi","meja","lemari","tempat","tidur","kasur","bantal","selimut","pakaian","baju","celana","sepatu","sandal","tas","dompet","kunci","lampu","kipas","kulkas","komputer","handphone","televisi","radio","kamera","buku","pena","pensil","kertas","papan","tulis","makan","minum","masak","cuci","bersih","kotor","rapi","berantakan","tidur","bangun","duduk","berdiri","berjalan","berlari","melompat","berenang","terbang","jatuh","naik","turun","masuk","keluar","pergi","datang","pulang","beli","jual","bayar","hitung","baca","tulis","bicara","diam","tertawa","menangis","senyum","ceria","gembira","bahagia"}
+        local fallback = {"aku","kamu","dia","mereka","kami","kita","siapa","apa","mana","kapan","mengapa","bagaimana","bisa","dapat","mau","akan","sedang","telah","sudah","belum","pernah","selalu","sering","jarang","kadang","mungkin","harus","wajib","boleh","dilarang","jangan","ayo","coba","lihat","dengar","rasa","sentuh","ambil","beri","simpan","buang","buka","tutup","hidup","mati","besar","kecil","panjang","pendek","tinggi","rendah","berat","ringan","cepat","lambat","kuat","lemah","terang","gelap","panas","dingin","basah","kering","bersih","kotor","baru","lama","muda","tua","kaya","miskin","pintar","cantik","baik","buruk","senang","sedih","marah","takut","berani","malas","rajin","angin","bumi","api","langit","laut","hutan","gunung","sungai","danau","kota","desa","jalan","rumah","pintu","kursi","meja","buku","pena","kertas","makan","minum","masak","cuci","tidur","duduk","berjalan","berlari","naik","turun","masuk","keluar","pergi","datang","beli","jual","baca","tulis","bicara","tertawa","senyum","bahagia","gembira","indah","cantik","gagah","elok","anggun","mewah","sederhana","tulus","setia","jujur","adil","bijak","arif","cerdas","pandai","rajin","tekun","sabar","ikhlas","tabah","tegar","berani","percaya","harap","cinta","kasih","sayang","rindu","kenang","ingat","lupa","tahu","paham","mengerti","pikir","rasa","hati","jiwa","roh","hidup","nyawa","tubuh","tangan","kaki","mata","telinga","hidung","mulut","lidah","gigi","rambut","wajah","leher","dada","perut","punggung","bahu","siku","lutut","jari","kuku"}
         for _, kata in ipairs(fallback) do
             table.insert(KAMUS, kata)
             local h = string.sub(kata, 1, 1)
             if not KAMUS_BY_HURUF[h] then KAMUS_BY_HURUF[h] = {} end
             table.insert(KAMUS_BY_HURUF[h], kata)
         end
-        print("[KAMUS] Using fallback dictionary (" .. #KAMUS .. " words)")
-        return false
+        print("[KAMUS] Fallback: " .. #KAMUS .. " kata")
     end
 end
 
-local function CariKataLanjutan(kataSebelum)
+local function CariKata(kataSebelum)
     if not kataSebelum or kataSebelum == "" then return nil end
-    local hurufTerakhir = string.lower(string.sub(kataSebelum, -1, -1))
-    local kandidat = KAMUS_BY_HURUF[hurufTerakhir]
-    if not kandidat or #kandidat == 0 then return nil end
-    for attempt = 1, 30 do
-        local idx = math.random(1, #kandidat)
-        local calon = kandidat[idx]
-        if calon ~= kataSebelum then
-            return calon
-        end
+    local huruf = string.lower(string.sub(kataSebelum, -1))
+    local list = KAMUS_BY_HURUF[huruf]
+    if not list or #list == 0 then return nil end
+    for i = 1, 40 do
+        local calon = list[math.random(1, #list)]
+        if calon ~= kataSebelum then return calon end
     end
-    return kandidat[math.random(1, #kandidat)]
+    return list[1]
 end
 
 -- =================================================================
--- SMART WORD DETECTOR
--- Lacak TextLabel yang BERUBAH-UBAH = itu kata game
+-- SCAN ELEMEN GAME
 -- =================================================================
-local trackedLabels = {}   -- [TextLabel] = {lastText, changeCount}
-local BLACKLIST_WORDS = {  -- kata-kata yang BUKAN kata game
-    ["purchased"] = true, ["robux"] = true, ["buy"] = true, ["sale"] = true,
-    ["shop"] = true, ["store"] = true, ["free"] = true, ["item"] = true,
-    ["player"] = true, ["players"] = true, ["score"] = true, ["level"] = true,
-    ["round"] = true, ["time"] = true, ["timer"] = true, ["loading"] = true,
-    ["lobby"] = true, ["waiting"] = true, ["start"] = true, ["end"] = true,
-    ["win"] = true, ["lose"] = true, ["draw"] = true, ["game"] = true,
-    ["play"] = true, ["chat"] = true, ["leaderboard"] = true, ["rank"] = true,
+
+-- Kata-kata yang BUKAN kata game (blacklist)
+local BLACKLIST = {
+    purchased=1,robux=1,buy=1,sale=1,shop=1,store=1,free=1,item=1,
+    player=1,players=1,score=1,level=1,round=1,time=1,timer=1,
+    loading=1,lobby=1,waiting=1,start=1,win=1,lose=1,game=1,
+    play=1,chat=1,rank=1,invite=1,join=1,leave=1,server=1,
+    topbarplus=1,admin=1,running=1,ready=1,flash=1,mode=1,
 }
 
-local function IsValidGameWord(text)
-    if not text or text == "" then return false end
-    text = string.gsub(text, "^%s*(.-)%s*$", "%1")
-    -- Harus hanya huruf alfabet (kata Indonesia)
-    if not string.match(text, "^[a-zA-Z]+$") then return false end
-    if #text < 2 or #text > 30 then return false end
-    -- Tidak boleh kata blacklist
-    if BLACKLIST_WORDS[string.lower(text)] then return false end
+local function IsKataValid(text)
+    if not text then return false end
+    text = text:match("^%s*(.-)%s*$")
+    if not text or #text < 2 or #text > 25 then return false end
+    if not text:match("^[a-zA-Z]+$") then return false end
+    if BLACKLIST[text:lower()] then return false end
     return true
 end
 
--- Scan dan track semua TextLabel
-local function UpdateTrackedLabels()
+-- Cari TextBox input game
+local function CariTextBox()
     for _, gui in ipairs(PlayerGui:GetChildren()) do
-        if gui:IsA("ScreenGui") and gui.Enabled then
-            for _, v in ipairs(gui:GetDescendants()) do
-                if v:IsA("TextLabel") and v.Visible then
-                    if not trackedLabels[v] then
-                        trackedLabels[v] = {lastText = v.Text, changeCount = 0}
-                    else
-                        if v.Text ~= trackedLabels[v].lastText then
-                            trackedLabels[v].changeCount = trackedLabels[v].changeCount + 1
-                            trackedLabels[v].lastText = v.Text
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-
--- Cari TextLabel kata game: yang sering berubah DAN teksnya valid
-local function FindGameWordLabel()
-    local best = nil
-    local bestScore = -1
-    for label, data in pairs(trackedLabels) do
-        -- Cek label masih valid/exists
-        if label and label.Parent and label.Visible then
-            local text = string.gsub(label.Text, "^%s*(.-)%s*$", "%1")
-            if IsValidGameWord(text) then
-                -- Score: berapa kali berubah (lebih banyak = lebih mungkin kata game)
-                local score = data.changeCount
-                if score > bestScore then
-                    bestScore = score
-                    best = label
-                end
-            end
-        else
-            -- Hapus label yang sudah tidak ada
-            trackedLabels[label] = nil
-        end
-    end
-    return best
-end
-
--- Cari TextBox input
-local function FindInputBox()
-    for _, gui in ipairs(PlayerGui:GetChildren()) do
-        if gui:IsA("ScreenGui") and gui.Enabled then
+        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
             for _, v in ipairs(gui:GetDescendants()) do
                 if v:IsA("TextBox") and v.Visible then
                     return v
@@ -161,14 +104,14 @@ local function FindInputBox()
     return nil
 end
 
--- Cari tombol submit
-local function FindSubmitButton()
+-- Cari tombol Masuk / Submit
+local function CariTombolMasuk()
     for _, gui in ipairs(PlayerGui:GetChildren()) do
-        if gui:IsA("ScreenGui") and gui.Enabled then
+        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
             for _, v in ipairs(gui:GetDescendants()) do
                 if v:IsA("TextButton") and v.Visible then
-                    local t = string.lower(v.Text)
-                    if t == "jawab" or t == "submit" or t == "kirim" or t == "ok" or t == "enter" or t == "masuk" or t == "send" then
+                    local t = v.Text:lower():match("^%s*(.-)%s*$")
+                    if t == "masuk" or t == "jawab" or t == "kirim" or t == "submit" or t == "ok" or t == "send" or t == "enter" then
                         return v
                     end
                 end
@@ -178,164 +121,151 @@ local function FindSubmitButton()
     return nil
 end
 
--- Cari Remote Events submit (lebih reliable!)
-local function FindSubmitRemote()
-    -- Scan di ReplicatedStorage / workspace
-    local remotes = {}
-    pcall(function()
-        for _, v in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
-            if v:IsA("RemoteEvent") then
-                local name = string.lower(v.Name)
-                if name:find("submit") or name:find("answer") or name:find("jawab") or name:find("word") or name:find("kata") or name:find("send") then
-                    table.insert(remotes, v)
+-- Track TextLabel yang berubah = kata game
+local labelHistory = {}  -- [label] = {text, changes}
+
+local function TrackLabels()
+    for _, gui in ipairs(PlayerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
+            for _, v in ipairs(gui:GetDescendants()) do
+                if v:IsA("TextLabel") and v.Visible then
+                    if not labelHistory[v] then
+                        labelHistory[v] = {text = v.Text, changes = 0}
+                    elseif v.Text ~= labelHistory[v].text then
+                        labelHistory[v].changes = labelHistory[v].changes + 1
+                        labelHistory[v].text = v.Text
+                    end
                 end
             end
         end
-    end)
-    return remotes[1]  -- return pertama yang ditemukan
-end
-
--- =================================================================
--- FLASH TYPE ENGINE - Ketik super cepat!
--- =================================================================
-local function FlashType(textBox, kata)
-    if not textBox or not kata then return false end
-    
-    -- Method 1: CaptureFocus + set text langsung
-    pcall(function()
-        textBox:CaptureFocus()
-    end)
-    task.wait(0.03)
-    
-    -- Set text
-    textBox.Text = kata
-    task.wait(0.03)
-    
-    -- Method 2: Fire FocusLost dengan ReleaseFocus (simulates pressing Enter)
-    pcall(function()
-        textBox:ReleaseFocus(true)  -- true = enter pressed
-    end)
-    task.wait(0.03)
-    
-    -- Method 3: VirtualInputManager Enter
-    pcall(function()
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, nil)
-        task.wait(0.03)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, nil)
-    end)
-    
-    return true
-end
-
--- =================================================================
--- VARIABEL STATE
--- =================================================================
-local ENABLED = false
-local lastProcessedWord = ""
-local lastAnswerTime = 0
-local ANSWER_COOLDOWN = 0.8  -- minimal jeda antar jawaban
-local foundSubmitRemote = nil
-
--- Tracking scan
-local scanInitialized = false
-local TRACKING_DURATION = 5  -- detik tracking sebelum mulai jawab
-
--- =================================================================
--- FUNGSI UTAMA AUTO ANSWER (FLASH MODE)
--- =================================================================
-local function AutoAnswer()
-    if not ENABLED then return end
-    
-    -- Update tracking labels dulu
-    UpdateTrackedLabels()
-    
-    -- Jika belum cukup tracking, tunggu dulu
-    if not scanInitialized then
-        return
     end
-    
-    -- Cooldown
-    if tick() - lastAnswerTime < ANSWER_COOLDOWN then return end
-    
-    -- Cari kata game
-    local wordLabel = FindGameWordLabel()
-    
-    -- Fallback: jika tidak ada yang berubah, scan biasa
-    if not wordLabel then
-        -- Coba scan semua label valid
+    -- Bersihkan label mati
+    for lbl in pairs(labelHistory) do
+        if not lbl or not lbl.Parent then
+            labelHistory[lbl] = nil
+        end
+    end
+end
+
+-- Cari kata game dari label yang paling sering berubah
+local function CariKataGame()
+    local best, bestScore = nil, -1
+    for lbl, data in pairs(labelHistory) do
+        if lbl and lbl.Parent and lbl.Visible then
+            local txt = lbl.Text:match("^%s*(.-)%s*$")
+            if IsKataValid(txt) then
+                if data.changes > bestScore then
+                    bestScore = data.changes
+                    best = lbl
+                end
+            end
+        end
+    end
+    -- Fallback: scan biasa jika tidak ada yang pernah berubah
+    if not best then
         for _, gui in ipairs(PlayerGui:GetChildren()) do
-            if gui:IsA("ScreenGui") and gui.Enabled then
+            if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
                 for _, v in ipairs(gui:GetDescendants()) do
                     if v:IsA("TextLabel") and v.Visible then
-                        local text = string.gsub(v.Text, "^%s*(.-)%s*$", "%1")
-                        if IsValidGameWord(text) then
-                            wordLabel = v
-                            break
+                        local txt = v.Text:match("^%s*(.-)%s*$")
+                        if IsKataValid(txt) then
+                            return v
                         end
                     end
                 end
-                if wordLabel then break end
             end
         end
     end
+    return best
+end
+
+-- =================================================================
+-- SUBMIT JAWABAN
+-- =================================================================
+local function SubmitJawaban(jawaban)
+    local textBox = CariTextBox()
+    local tombolMasuk = CariTombolMasuk()
     
-    if not wordLabel then
-        return
-    end
-    
-    local currentWord = string.lower(string.gsub(wordLabel.Text, "^%s*(.-)%s*$", "%1"))
-    
-    if currentWord == "" or currentWord == lastProcessedWord then
-        return
-    end
-    
-    -- Cari kata jawaban
-    local nextWord = CariKataLanjutan(currentWord)
-    if not nextWord then
-        print("[WARN] Tidak ada kata untuk huruf: " .. string.sub(currentWord, -1))
-        return
-    end
-    
-    print("[FLASH] Kata: '" .. currentWord .. "' -> Jawab: '" .. nextWord .. "'")
-    
-    -- Cari input box
-    local inputBox = FindInputBox()
-    
-    if inputBox then
-        -- Flash type!
-        FlashType(inputBox, nextWord)
+    if textBox then
+        -- Fokus ke TextBox
+        pcall(function() textBox:CaptureFocus() end)
+        task.wait(0.05)
         
-        -- Coba klik tombol submit juga
-        local submitBtn = FindSubmitButton()
-        if submitBtn then
+        -- Isi jawaban
+        textBox.Text = jawaban
+        task.wait(0.05)
+        
+        -- Cara 1: ReleaseFocus (simulasi Enter)
+        pcall(function() textBox:ReleaseFocus(true) end)
+        task.wait(0.05)
+        
+        -- Cara 2: Klik tombol Masuk
+        if tombolMasuk then
+            pcall(function() tombolMasuk:Click() end)
             task.wait(0.05)
-            pcall(function() submitBtn:Click() end)
-            pcall(function() submitBtn.MouseButton1Click:Fire() end)
         end
         
-        lastProcessedWord = currentWord
-        lastAnswerTime = tick()
-        print("[SUCCESS] Jawaban terkirim: " .. nextWord)
+        -- Cara 3: VirtualInput Enter
+        pcall(function()
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, nil)
+            task.wait(0.03)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, nil)
+        end)
+        
+        print("[OK] Jawaban: " .. jawaban .. " (TextBox mode)")
+        return true
+        
+    elseif tombolMasuk then
+        -- Ada tombol tapi tidak ada textbox - game pakai keyboard custom
+        -- Coba inject text via properti game
+        print("[WARN] TextBox tidak ditemukan, coba klik Masuk saja")
+        pcall(function() tombolMasuk:Click() end)
+        return false
     else
-        -- Tidak ada TextBox - coba fire Remote langsung
-        if not foundSubmitRemote then
-            foundSubmitRemote = FindSubmitRemote()
-        end
-        if foundSubmitRemote then
-            pcall(function()
-                foundSubmitRemote:FireServer(nextWord)
-            end)
-            lastProcessedWord = currentWord
-            lastAnswerTime = tick()
-            print("[REMOTE] Jawaban via Remote: " .. nextWord)
-        else
-            print("[ERROR] Tidak ada TextBox dan Remote ditemukan!")
-        end
+        print("[ERROR] TextBox dan tombol Masuk tidak ditemukan!")
+        return false
     end
 end
 
 -- =================================================================
--- GUI (TIDAK DIUBAH - SAMA PERSIS)
+-- STATE
+-- =================================================================
+local ENABLED = false
+local kataSebelum = ""
+local lastJawabTime = 0
+local COOLDOWN = 0.8
+
+-- =================================================================
+-- LOOP UTAMA
+-- =================================================================
+local function MainLoop()
+    TrackLabels()
+    if not ENABLED then return end
+    if tick() - lastJawabTime < COOLDOWN then return end
+    
+    local wordLabel = CariKataGame()
+    if not wordLabel then return end
+    
+    local kataSekarang = wordLabel.Text:match("^%s*(.-)%s*$"):lower()
+    if kataSekarang == "" or kataSekarang == kataSebelum then return end
+    
+    -- Cari jawaban
+    local jawaban = CariKata(kataSekarang)
+    if not jawaban then
+        print("[SKIP] Tidak ada kata untuk huruf: " .. kataSekarang:sub(-1))
+        return
+    end
+    
+    print("[FLASH] '" .. kataSekarang .. "' -> '" .. jawaban .. "'")
+    
+    if SubmitJawaban(jawaban) then
+        kataSebelum = kataSekarang
+        lastJawabTime = tick()
+    end
+end
+
+-- =================================================================
+-- GUI (TIDAK DIUBAH)
 -- =================================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoSambungKataReal"
@@ -353,9 +283,7 @@ MainFrame.Draggable = true
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
 local Header = Instance.new("TextLabel")
 Header.Size = UDim2.new(1, -40, 0, 30)
@@ -435,9 +363,6 @@ Credit.TextSize = 11
 Credit.TextXAlignment = Enum.TextXAlignment.Right
 Credit.Parent = Content
 
--- =================================================================
--- MINIMIZE & CLOSE
--- =================================================================
 local minimized = false
 MinBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
@@ -457,17 +382,14 @@ CloseBtn.MouseButton1Click:Connect(function()
     ENABLED = false
 end)
 
--- =================================================================
--- TOGGLE ON/OFF
--- =================================================================
 ToggleBtn.MouseButton1Click:Connect(function()
     ENABLED = not ENABLED
     if ENABLED then
         ToggleBtn.Text = "ON"
         ToggleBtn.BackgroundColor3 = Color3.new(0, 0.7, 0)
-        lastProcessedWord = ""
-        lastAnswerTime = 0
-        print("[STATUS] Auto answer ENABLED - Flash Mode Active")
+        kataSebelum = ""
+        lastJawabTime = 0
+        print("[STATUS] Auto answer ENABLED")
     else
         ToggleBtn.Text = "OFF"
         ToggleBtn.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
@@ -476,41 +398,26 @@ ToggleBtn.MouseButton1Click:Connect(function()
 end)
 
 -- =================================================================
--- LOAD KAMUS DAN MULAI
+-- START
 -- =================================================================
 LoadKamus()
 
--- Phase 1: Tracking selama beberapa detik untuk kenali UI game
-print("[INIT] Tracking UI elemen selama " .. TRACKING_DURATION .. " detik...")
+-- Background tracking loop
 task.spawn(function()
-    local startTime = tick()
-    while tick() - startTime < TRACKING_DURATION do
-        UpdateTrackedLabels()
+    while true do
         task.wait(0.3)
-    end
-    scanInitialized = true
-    print("[INIT] Tracking selesai! " .. (function()
-        local c = 0
-        for _ in pairs(trackedLabels) do c = c + 1 end
-        return c
-    end)() .. " label ditemukan")
-    
-    -- Loop utama
-    while true do
-        task.wait(0.3)  -- lebih cepat dari sebelumnya (0.5 -> 0.3)
-        pcall(AutoAnswer)
+        pcall(TrackLabels)
     end
 end)
 
--- Tracking terus berjalan di background
+-- Main loop
 task.spawn(function()
     while true do
-        task.wait(0.5)
-        UpdateTrackedLabels()
+        task.wait(0.3)
+        pcall(MainLoop)
     end
 end)
 
-print("=== AUTO SAMBUNG KATA REAL READY ===")
+print("=== AUTO SAMBUNG KATA REAL v3 READY ===")
 print("Tekan tombol ON untuk memulai")
-print("Flash mode aktif - akan tracking UI dulu 5 detik")
-print("Jika tidak work, cek console (F9) untuk debug")
+print("Cek console [FLASH] dan [OK] untuk konfirmasi")
