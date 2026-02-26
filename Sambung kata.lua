@@ -1,167 +1,223 @@
 -- =================================================================
--- Nama Script : Auto Sambung Kata (Game Roblox)
--- Author      : Anonymous9x
--- Description : Otomatis mendeteksi kata dan mengisi jawaban
--- Fitur       : GUI hitam dengan border putih, toggle on/off
+-- AUTO SAMBUNG KATA REAL - Roblox Game
+-- Author: Anonymous9x
+-- Description: Auto detect word and fill answer instantly
+-- Metode: Scanning semua TextLabel di PlayerGui, auto type + Enter
 -- =================================================================
 
 -- Services
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
-local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
-local parentGui = CoreGui or LocalPlayer:WaitForChild("PlayerGui")
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local parentGui = CoreGui or PlayerGui
 
--- Hapus GUI lama jika ada
-if parentGui:FindFirstChild("AutoSambungKata") then
-    parentGui.AutoSambungKata:Destroy()
+-- Hapus GUI lama
+if parentGui:FindFirstChild("AutoSambungKataReal") then
+    parentGui.AutoSambungKataReal:Destroy()
 end
 
 -- =================================================================
--- KONFIGURASI
+-- KAMUS DATA (KBBI lengkap + kata umum)
 -- =================================================================
-local ENABLED = false
 local DICTIONARY_URL = "https://raw.githubusercontent.com/eenvyexe/KBBI/refs/heads/main/words.txt"
-local DICTIONARY = {}          -- Semua kata
-local WORDS_BY_FIRST_LETTER = {} -- Indeks kata berdasarkan huruf pertama
-local SCAN_INTERVAL = 0.5       -- Detik
-local lastWord = ""             -- Kata terakhir yang diproses
-local currentWordLabel = nil    -- Referensi ke label kata
-local inputTextBox = nil        -- Referensi ke kotak input
+local KAMUS = {}
+local KAMUS_BY_HURUF = {}  -- index berdasarkan huruf pertama
 
--- =================================================================
--- FUNGSI MEMUAT KAMUS
--- =================================================================
-local function loadDictionary()
+-- Load kamus
+local function LoadKamus()
     local success, response = pcall(function()
         return game:HttpGet(DICTIONARY_URL)
     end)
+    
     if success and response then
         local unique = {}
         for line in string.gmatch(response, "[^\r\n]+") do
-            local word = string.match(line, "([%a%-]+)")
-            if word and #word > 1 then
-                word = string.lower(word)
-                if not unique[word] then
-                    unique[word] = true
-                    table.insert(DICTIONARY, word)
-                    local first = string.sub(word, 1, 1)
-                    if not WORDS_BY_FIRST_LETTER[first] then
-                        WORDS_BY_FIRST_LETTER[first] = {}
+            local kata = string.match(line, "([%a%-]+)")
+            if kata and #kata > 1 then
+                kata = string.lower(kata)
+                if not unique[kata] then
+                    unique[kata] = true
+                    table.insert(KAMUS, kata)
+                    local hurufAwal = string.sub(kata, 1, 1)
+                    if not KAMUS_BY_HURUF[hurufAwal] then
+                        KAMUS_BY_HURUF[hurufAwal] = {}
                     end
-                    table.insert(WORDS_BY_FIRST_LETTER[first], word)
+                    table.insert(KAMUS_BY_HURUF[hurufAwal], kata)
                 end
             end
         end
+        print("[KAMUS] Loaded " .. #KAMUS .. " words")
         return true
     else
-        warn("Gagal memuat kamus, menggunakan daftar kecil cadangan.")
-        -- Fallback sederhana
-        local fallback = {"aku", "kamu", "dia", "makan", "minum", "tidur", "jalan", "rumah", "mobil", "buku", "pensil", "meja", "kursi"}
-        for _, w in ipairs(fallback) do
-            table.insert(DICTIONARY, w)
-            local first = string.sub(w, 1, 1)
-            if not WORDS_BY_FIRST_LETTER[first] then
-                WORDS_BY_FIRST_LETTER[first] = {}
+        -- Fallback kata umum
+        local fallback = {"aku","kamu","dia","mereka","kami","kita","siapa","apa","mana","kapan","mengapa","bagaimana","bisa","dapat","mau","akan","sedang","telah","sudah","belum","pernah","selalu","sering","jarang","kadang","mungkin","harus","wajib","boleh","dilarang","jangan","ayo","coba","lihat","dengar","rasa","cium","sentuh","pegang","ambil","beri","taruh","simpan","buang","buka","tutup","hidup","mati","nyala","padam","besar","kecil","panjang","pendek","tinggi","rendah","berat","ringan","cepat","lambat","kuat","lemah","terang","gelap","panas","dingin","basah","kering","bersih","kotor","baru","lama","muda","tua","kaya","miskin","pintar","bodoh","cantik","jelek","baik","buruk","senang","sedih","marah","takut","berani","malas","rajin","sabar","emosi"}
+        for _, kata in ipairs(fallback) do
+            table.insert(KAMUS, kata)
+            local hurufAwal = string.sub(kata, 1, 1)
+            if not KAMUS_BY_HURUF[hurufAwal] then
+                KAMUS_BY_HURUF[hurufAwal] = {}
             end
-            table.insert(WORDS_BY_FIRST_LETTER[first], w)
+            table.insert(KAMUS_BY_HURUF[hurufAwal], kata)
         end
+        print("[KAMUS] Using fallback dictionary")
         return false
     end
 end
 
--- =================================================================
--- FUNGSI MENCARI KATA BERIKUTNYA
--- =================================================================
-local function getNextWord(previous)
-    if not previous or previous == "" then return nil end
-    local lastChar = string.lower(string.sub(previous, -1, -1))
-    local candidates = WORDS_BY_FIRST_LETTER[lastChar]
-    if not candidates or #candidates == 0 then return nil end
-    -- Pilih kata acak yang tidak sama dengan sebelumnya (opsional)
-    local randomIndex = math.random(1, #candidates)
-    return candidates[randomIndex]
+-- Fungsi cari kata lanjutan
+local function CariKataLanjutan(kataSebelum)
+    if not kataSebelum or kataSebelum == "" then return nil end
+    local hurufTerakhir = string.lower(string.sub(kataSebelum, -1, -1))
+    local kandidat = KAMUS_BY_HURUF[hurufTerakhir]
+    if not kandidat or #kandidat == 0 then return nil end
+    -- Pilih kata acak yang tidak sama dengan sebelumnya
+    local maxAttempts = 20
+    for attempt = 1, maxAttempts do
+        local idx = math.random(1, #kandidat)
+        local calon = kandidat[idx]
+        if calon ~= kataSebelum then
+            return calon
+        end
+    end
+    return kandidat[math.random(1, #kandidat)]
 end
 
 -- =================================================================
--- FUNGSI MENDETEKSI ELEMEN GAME
+-- DETEKSI ELEMEN GAME (AGGRESSIVE)
 -- =================================================================
-local function findGameElements()
-    -- Coba cari label kata di PlayerGui (asumsi ada TextLabel besar)
-    for _, gui in ipairs(LocalPlayer:WaitForChild("PlayerGui"):GetChildren()) do
-        if gui:IsA("ScreenGui") then
+local function ScanGameElements()
+    local results = {
+        wordLabel = nil,
+        inputBox = nil,
+        submitButton = nil
+    }
+    
+    -- Scan semua ScreenGui di PlayerGui
+    for _, gui in ipairs(PlayerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled then
+            -- Cari TextLabel besar yang kemungkinan kata
             for _, v in ipairs(gui:GetDescendants()) do
-                if v:IsA("TextLabel") and v.Visible and #v.Text > 1 then
-                    -- Heuristik: kemungkinan kata adalah label dengan font besar dan teks tidak panjang
-                    if v.TextBounds.Y > 30 and string.match(v.Text, "^[%a]+$") then
-                        currentWordLabel = v
+                if v:IsA("TextLabel") and v.Visible and v.Text and #v.Text > 0 then
+                    -- Filter: teks hanya huruf, panjang antara 2-20 karakter
+                    if string.match(v.Text, "^[%a%s]+$") and #v.Text >= 2 and #v.Text <= 25 then
+                        local text = string.gsub(v.Text, "^%s*(.-)%s*$", "%1")
+                        if #text >= 2 then
+                            results.wordLabel = v
+                            break
+                        end
+                    end
+                end
+            end
+            
+            -- Cari TextBox (input)
+            for _, v in ipairs(gui:GetDescendants()) do
+                if v:IsA("TextBox") and v.Visible then
+                    results.inputBox = v
+                    break
+                end
+            end
+            
+            -- Cari tombol submit (TextButton dengan teks pendek)
+            for _, v in ipairs(gui:GetDescendants()) do
+                if v:IsA("TextButton") and v.Visible then
+                    local btnText = string.lower(v.Text)
+                    if btnText == "jawab" or btnText == "submit" or btnText == "kirim" or btnText == "ok" or btnText == "enter" then
+                        results.submitButton = v
                         break
                     end
                 end
             end
         end
-        if currentWordLabel then break end
+        if results.wordLabel and results.inputBox then break end
     end
-
-    -- Cari kotak input (TextBox)
-    if not inputTextBox then
-        for _, gui in ipairs(LocalPlayer:WaitForChild("PlayerGui"):GetChildren()) do
-            if gui:IsA("ScreenGui") then
-                for _, v in ipairs(gui:GetDescendants()) do
-                    if v:IsA("TextBox") and v.Visible then
-                        inputTextBox = v
-                        break
-                    end
-                end
-            end
-            if inputTextBox then break end
-        end
-    end
+    
+    return results
 end
 
 -- =================================================================
--- FUNGSI OTOMATIS ISI JAWABAN
+-- VARIABEL STATE
 -- =================================================================
-local function autoFill()
+local ENABLED = false
+local lastProcessedWord = ""
+local currentWordLabel = nil
+local currentInputBox = nil
+local currentSubmitBtn = nil
+local lastScanTime = 0
+local SCAN_COOLDOWN = 2  -- scan ulang setiap 2 detik jika elemen hilang
+
+-- =================================================================
+-- FUNGSI UTAMA AUTO ANSWER
+-- =================================================================
+local function AutoAnswer()
     if not ENABLED then return end
-    if not currentWordLabel or not inputTextBox then
-        findGameElements()
-        if not currentWordLabel or not inputTextBox then
-            return -- belum ditemukan, coba lagi nanti
-        end
+    
+    -- Scan elemen secara berkala
+    if not currentWordLabel or not currentInputBox or tick() - lastScanTime > SCAN_COOLDOWN then
+        local elements = ScanGameElements()
+        currentWordLabel = elements.wordLabel
+        currentInputBox = elements.inputBox
+        currentSubmitBtn = elements.submitButton
+        lastScanTime = tick()
+        
+        -- Debug
+        if currentWordLabel then print("[DEBUG] Word:", currentWordLabel.Text) end
+        if currentInputBox then print("[DEBUG] Input box ditemukan") end
     end
-
-    local word = currentWordLabel.Text
-    word = string.gsub(word, "^%s*(.-)%s*$", "%1") -- trim
-    if word == "" or word == lastWord then return end
-
-    local nextWord = getNextWord(word)
+    
+    if not currentWordLabel or not currentInputBox then
+        -- Elemen belum ditemukan
+        return
+    end
+    
+    -- Ambil kata saat ini
+    local currentWord = currentWordLabel.Text
+    currentWord = string.gsub(currentWord, "^%s*(.-)%s*$", "%1")
+    currentWord = string.lower(currentWord)
+    
+    if currentWord == "" or currentWord == lastProcessedWord then
+        return -- kata sama atau kosong
+    end
+    
+    -- Cari kata lanjutan
+    local nextWord = CariKataLanjutan(currentWord)
     if nextWord then
-        -- Ketik jawaban
-        inputTextBox.Text = nextWord
-        -- Simulasikan tekan Enter
+        -- Isi input box
+        currentInputBox.Text = nextWord
+        
+        -- Kirim event Enter (simulasi tekan tombol)
+        task.wait(0.1)
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, nil)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, nil)
-        lastWord = word
+        
+        -- Alternatif: klik tombol submit jika ada
+        if currentSubmitBtn then
+            task.wait(0.1)
+            currentSubmitBtn:Click()
+        end
+        
+        lastProcessedWord = currentWord
+        print("[ANSWER]", currentWord, "->", nextWord)
     end
 end
 
 -- =================================================================
--- MEMBUAT GUI
+-- GUI
 -- =================================================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AutoSambungKata"
+ScreenGui.Name = "AutoSambungKataReal"
 ScreenGui.Parent = parentGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Frame utama (hitam, border putih)
+-- Frame utama
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 220, 0, 140)
-MainFrame.Position = UDim2.new(0.5, -110, 0.5, -70)
+MainFrame.Size = UDim2.new(0, 240, 0, 150)
+MainFrame.Position = UDim2.new(0.5, -120, 0.5, -75)
 MainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
 MainFrame.BorderColor3 = Color3.new(1, 1, 1)
 MainFrame.BorderSizePixel = 2
@@ -170,12 +226,12 @@ MainFrame.Draggable = true
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
 
--- Sudut membulat (opsional)
+-- Sudut
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
--- Header (judul)
+-- Header
 local Header = Instance.new("TextLabel")
 Header.Size = UDim2.new(1, -40, 0, 30)
 Header.Position = UDim2.new(0, 10, 0, 5)
@@ -187,35 +243,31 @@ Header.TextSize = 18
 Header.TextXAlignment = Enum.TextXAlignment.Left
 Header.Parent = MainFrame
 
--- Tombol Close (X)
+-- Close button
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 25, 0, 25)
-CloseBtn.Position = UDim2.new(1, -30, 0, 5)
+CloseBtn.Position = UDim2.new(1, -60, 0, 5)
 CloseBtn.BackgroundColor3 = Color3.new(0.8, 0, 0)
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.new(1, 1, 1)
 CloseBtn.Font = Enum.Font.SourceSansBold
 CloseBtn.TextSize = 16
 CloseBtn.Parent = MainFrame
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 4)
-CloseCorner.Parent = CloseBtn
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 4)
 
--- Tombol Minimize (-)
+-- Minimize button
 local MinBtn = Instance.new("TextButton")
 MinBtn.Size = UDim2.new(0, 25, 0, 25)
-MinBtn.Position = UDim2.new(1, -60, 0, 5)
+MinBtn.Position = UDim2.new(1, -30, 0, 5)
 MinBtn.BackgroundColor3 = Color3.new(0.6, 0.6, 0.6)
 MinBtn.Text = "-"
 MinBtn.TextColor3 = Color3.new(1, 1, 1)
 MinBtn.Font = Enum.Font.SourceSansBold
 MinBtn.TextSize = 16
 MinBtn.Parent = MainFrame
-local MinCorner = Instance.new("UICorner")
-MinCorner.CornerRadius = UDim.new(0, 4)
-MinCorner.Parent = MinBtn
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 4)
 
--- Garis pemisah
+-- Separator
 local Separator = Instance.new("Frame")
 Separator.Size = UDim2.new(1, -20, 0, 1)
 Separator.Position = UDim2.new(0, 10, 0, 35)
@@ -223,38 +275,35 @@ Separator.BackgroundColor3 = Color3.new(1, 1, 1)
 Separator.BorderSizePixel = 0
 Separator.Parent = MainFrame
 
--- Konten dalam panel
-local ContentFrame = Instance.new("Frame")
-ContentFrame.Size = UDim2.new(1, -20, 1, -45)
-ContentFrame.Position = UDim2.new(0, 10, 0, 40)
-ContentFrame.BackgroundTransparency = 1
-ContentFrame.Parent = MainFrame
+-- Content
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, -20, 1, -45)
+Content.Position = UDim2.new(0, 10, 0, 40)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
 
--- Toggle On/Off
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 80, 0, 30)
-ToggleButton.Position = UDim2.new(0.5, -40, 0, 10)
-ToggleButton.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-ToggleButton.Text = "OFF"
-ToggleButton.TextColor3 = Color3.new(1, 1, 1)
-ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.TextSize = 16
-ToggleButton.Parent = ContentFrame
-local ToggleCorner = Instance.new("UICorner")
-ToggleCorner.CornerRadius = UDim.new(0, 4)
-ToggleCorner.Parent = ToggleButton
+-- Toggle button
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 100, 0, 35)
+ToggleBtn.Position = UDim2.new(0.5, -50, 0, 5)
+ToggleBtn.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+ToggleBtn.Text = "OFF"
+ToggleBtn.TextColor3 = Color3.new(1, 1, 1)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.TextSize = 18
+ToggleBtn.Parent = Content
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
--- Teks info
-local InfoText = Instance.new("TextLabel")
-InfoText.Size = UDim2.new(1, 0, 0, 40)
-InfoText.Position = UDim2.new(0, 0, 0, 45)
-InfoText.BackgroundTransparency = 1
-InfoText.Text = "Automatically fill in conjunctions"
-InfoText.TextColor3 = Color3.new(1, 1, 1)
-InfoText.Font = Enum.Font.SourceSans
-InfoText.TextSize = 12
-InfoText.TextWrapped = true
-InfoText.Parent = ContentFrame
+-- Info text
+local Info = Instance.new("TextLabel")
+Info.Size = UDim2.new(1, 0, 0, 30)
+Info.Position = UDim2.new(0, 0, 0, 45)
+Info.BackgroundTransparency = 1
+Info.Text = "Automatically fill in conjunctions"
+Info.TextColor3 = Color3.new(1, 1, 1)
+Info.Font = Enum.Font.SourceSans
+Info.TextSize = 13
+Info.Parent = Content
 
 -- Credit
 local Credit = Instance.new("TextLabel")
@@ -264,9 +313,9 @@ Credit.BackgroundTransparency = 1
 Credit.Text = "Created By Anonymous9x"
 Credit.TextColor3 = Color3.new(1, 1, 1)
 Credit.Font = Enum.Font.SourceSans
-Credit.TextSize = 10
+Credit.TextSize = 11
 Credit.TextXAlignment = Enum.TextXAlignment.Right
-Credit.Parent = ContentFrame
+Credit.Parent = Content
 
 -- =================================================================
 -- FUNGSI MINIMIZE
@@ -275,12 +324,12 @@ local minimized = false
 MinBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     if minimized then
-        MainFrame.Size = UDim2.new(0, 220, 0, 40)
-        ContentFrame.Visible = false
+        MainFrame.Size = UDim2.new(0, 240, 0, 40)
+        Content.Visible = false
         MinBtn.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 220, 0, 140)
-        ContentFrame.Visible = true
+        MainFrame.Size = UDim2.new(0, 240, 0, 150)
+        Content.Visible = true
         MinBtn.Text = "-"
     end
 end)
@@ -293,31 +342,34 @@ end)
 -- =================================================================
 -- TOGGLE ON/OFF
 -- =================================================================
-ToggleButton.MouseButton1Click:Connect(function()
+ToggleBtn.MouseButton1Click:Connect(function()
     ENABLED = not ENABLED
     if ENABLED then
-        ToggleButton.Text = "ON"
-        ToggleButton.BackgroundColor3 = Color3.new(0, 0.6, 0)
+        ToggleBtn.Text = "ON"
+        ToggleBtn.BackgroundColor3 = Color3.new(0, 0.7, 0)
+        -- Reset last processed agar langsung merespon
+        lastProcessedWord = ""
+        print("[STATUS] Auto answer ENABLED")
     else
-        ToggleButton.Text = "OFF"
-        ToggleButton.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+        ToggleBtn.Text = "OFF"
+        ToggleBtn.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+        print("[STATUS] Auto answer DISABLED")
     end
 end)
 
 -- =================================================================
--- INISIALISASI: LOAD KAMUS DAN MULAI LOOP
+-- LOAD KAMUS DAN MULAI LOOP
 -- =================================================================
-loadDictionary()
+LoadKamus()
 
 -- Loop utama
 task.spawn(function()
     while true do
-        task.wait(SCAN_INTERVAL)
-        if ENABLED then
-            pcall(autoFill)
-        end
+        task.wait(0.5)  -- cek setiap 0.5 detik
+        pcall(AutoAnswer)
     end
 end)
 
--- Notifikasi
-print("Auto Sambung Kata siap. Tekan tombol ON untuk memulai.")
+print("=== AUTO SAMBUNG KATA REAL READY ===")
+print("Tekan tombol ON untuk memulai")
+print("Jika tidak work, cek console (F9) untuk debug")
