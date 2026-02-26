@@ -1,13 +1,10 @@
 -- =================================================================
--- AUTO SAMBUNG KATA v7 - Anonymous9x
--- FIX MOBILE: Touch event + getconnections direct invoke
+-- AUTO SAMBUNG KATA v8 - Anonymous9x
+-- DELTA iOS ENGINE: getconnections direct function invoke
 -- =================================================================
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
-local VIM = game:GetService("VirtualInputManager")
-local UIS = game:GetService("UserInputService")
-
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local parentGui = CoreGui or PlayerGui
@@ -26,11 +23,11 @@ local function LoadKamus()
     local ok, res = pcall(function()
         return game:HttpGet("https://raw.githubusercontent.com/eenvyexe/KBBI/refs/heads/main/words.txt")
     end)
-    if ok and res then
+    if ok and res and #res > 100 then
         local unique = {}
         for line in res:gmatch("[^\r\n]+") do
             local kata = line:match("([%a]+)")
-            if kata and #kata > 1 then
+            if kata and #kata >= 2 then
                 kata = kata:lower()
                 if not unique[kata] then
                     unique[kata] = true
@@ -41,10 +38,53 @@ local function LoadKamus()
                 end
             end
         end
-        print("[KAMUS] " .. #KAMUS .. " kata")
+        print("[KAMUS] OK: " .. #KAMUS .. " kata")
     else
-        local fb = {"aku","kamu","dia","angin","bumi","api","langit","laut","hutan","gunung","sungai","danau","kota","desa","jalan","rumah","pintu","kursi","meja","buku","makan","minum","tidur","duduk","berjalan","berlari","naik","turun","masuk","keluar","pergi","datang","beli","jual","baca","tulis","bicara","tertawa","senyum","bahagia","gembira","indah","cantik","gagah","elok","anggun","mewah","sederhana","tulus","setia","jujur","adil","bijak","arif","cerdas","pandai","rajin","tekun","sabar","ikhlas","tabah","tegar","berani","percaya","harap","cinta","kasih","sayang","rindu","ingat","tahu","paham","pikir","rasa","hati","jiwa","hidup","tubuh","tangan","kaki","mata","telinga","hidung","mulut","rambut","wajah","leher","dada","perut","bahu","lutut","jari"}
+        local fb = {
+            "aku","kamu","dia","itu","ini","ada","dan","yang","dengan","untuk",
+            "angin","bumi","api","langit","laut","hutan","gunung","sungai","danau",
+            "kota","desa","jalan","rumah","pintu","kursi","meja","buku","makan",
+            "minum","tidur","duduk","berjalan","berlari","naik","turun","masuk",
+            "keluar","pergi","datang","beli","jual","baca","tulis","bicara",
+            "tertawa","senyum","bahagia","gembira","indah","cantik","gagah",
+            "tulus","setia","jujur","adil","bijak","cerdas","pandai","rajin",
+            "tekun","sabar","tabah","tegar","berani","cinta","kasih","sayang",
+            "rindu","ingat","tahu","paham","rasa","hati","jiwa","hidup",
+            "tangan","kaki","mata","telinga","hidung","mulut","rambut","wajah",
+            "nasi","air","ikan","ayam","daging","sayur","buah","gula","garam",
+            "ibu","ayah","anak","adik","kakak","nenek","kakek","teman","guru",
+            "nama","nomor","warna","merah","biru","hijau","putih","hitam","kuning",
+            "pagi","siang","malam","hari","bulan","tahun","waktu","saat","lama",
+            "besar","kecil","tinggi","rendah","panjang","pendek","berat","ringan",
+            "panas","dingin","basah","kering","bersih","kotor","baru","lama",
+            "rapi","baik","buruk","senang","sedih","marah","takut","lelah",
+            "dalam","luar","atas","bawah","depan","belakang","kiri","kanan",
+            "dekat","jauh","cepat","lambat","keras","pelan","penuh","kosong",
+            "umur","usaha","upaya","ujung","udara","ulang","uang","unggas",
+            "niat","nilai","negara","nyata","nada","napas",
+            "tanah","tumbuh","tulis","tujuan","tenang","terima","tolong",
+            "pohon","panjang","perlu","pikir","putus","pasang","paham","pintar",
+            "langkah","libur","lemah","lepas","letak","lurus","logam",
+            "keras","kuasa","kasur","kebun","kejar","kerja","kepala",
+            "harap","harga","hasil","hubung","habis","hadap",
+            "gempa","getaran","gerak","guna","gelap","gembira",
+            "jarak","jawab","jelas","jinak","jual","jaga","jenis",
+            "faham","fokus","fungsi",
+            "sama","sejuk","sehat","semua","sering","selalu","sudah",
+            "diam","dalam","dasar","dekat","dapat","damai",
+            "mulai","mudah","muda","mula","mimpi","maju","makan",
+            "bantu","bangsa","bawah","bayar","benar","besar","bijak",
+            "alam","alur","arah","awal","ambil","antar","aman","asli",
+            "cahaya","cepat","cerita","cinta","cobaan","campur",
+            "rasa","rajin","ringan","ruang","ramai","rendah",
+            "olah","obat","orang",
+            "kuat","kurang","kursi","kunci","kumpul","kulit","kembang",
+            "ingin","ikut","ilmu","iman","indah",
+            "wajah","waktu","wajar","warna","warga","warisan",
+            "zaman","zona",
+        }
         for _, kata in ipairs(fb) do
+            kata = kata:lower()
             table.insert(KAMUS, kata)
             local h = kata:sub(1,1)
             if not KAMUS_BY_HURUF[h] then KAMUS_BY_HURUF[h] = {} end
@@ -58,11 +98,20 @@ local function CariKataAwalan(awalan)
     awalan = awalan:lower()
     local hasil = {}
     for _, kata in ipairs(KAMUS) do
-        if kata:sub(1, #awalan) == awalan and not kata:find("%-") then
+        if kata:sub(1, #awalan) == awalan and not kata:find("%-") and #kata >= 2 then
             table.insert(hasil, kata)
         end
     end
-    if #hasil > 0 then return hasil[math.random(1, #hasil)] end
+    if #hasil > 0 then return hasil[math.random(1, math.min(#hasil, 50))] end
+    -- fallback: cari yang dimulai huruf pertama saja
+    local h = awalan:sub(1,1)
+    local list = KAMUS_BY_HURUF[h]
+    if list and #list > 0 then
+        for i = 1, 30 do
+            local c = list[math.random(1, #list)]
+            if not c:find("%-") then return c end
+        end
+    end
     return nil
 end
 
@@ -78,99 +127,81 @@ local function CariKataLanjut(kataSebelum)
 end
 
 -- =================================================================
--- CLICK ENGINE - MOBILE FOCUSED
+-- DELTA iOS: INVOKE LANGSUNG PAKAI getconnections
 -- =================================================================
+local function DeltaKlik(button)
+    if not button or not button.Parent then return false end
+    local berhasil = false
 
--- Method 1: getconnections (exploit feature - paling reliable)
-local function InvokeButtonDirect(button)
-    local ok = false
+    -- === CARA 1: getconnections MouseButton1Click ===
     pcall(function()
-        if getconnections then
-            local conns = getconnections(button.MouseButton1Click)
-            for _, conn in ipairs(conns) do
-                if conn.Function then
-                    conn.Function()
-                    ok = true
-                end
+        local conns = getconnections(button.MouseButton1Click)
+        if conns and #conns > 0 then
+            for _, c in ipairs(conns) do
+                pcall(c.Function)
             end
-            if not ok then
-                conns = getconnections(button.Activated)
-                for _, conn in ipairs(conns) do
-                    if conn.Function then
-                        conn.Function()
-                        ok = true
-                    end
-                end
-            end
+            berhasil = true
+            print("[DELTA] getconnections MouseButton1Click OK - " .. (button.Text or "?"))
         end
     end)
-    return ok
-end
 
--- Method 2: Touch event mobile
-local function TouchKlik(button)
-    if not button or not button.Parent then return false end
+    if berhasil then return true end
+
+    -- === CARA 2: getconnections Activated ===
     pcall(function()
-        local pos = button.AbsolutePosition
-        local sz = button.AbsoluteSize
-        local cx = pos.X + sz.X / 2
-        local cy = pos.Y + sz.Y / 2
-
-        -- Touch begin
-        VIM:SendTouchEvent(0, Enum.UserInputType.Touch, cx, cy, 0, 0, 1, true, game)
-        task.wait(0.05)
-        -- Touch end
-        VIM:SendTouchEvent(0, Enum.UserInputType.Touch, cx, cy, 0, 0, 1, false, game)
+        local conns = getconnections(button.Activated)
+        if conns and #conns > 0 then
+            for _, c in ipairs(conns) do
+                pcall(c.Function)
+            end
+            berhasil = true
+            print("[DELTA] getconnections Activated OK - " .. (button.Text or "?"))
+        end
     end)
-    return true
-end
 
--- Method 3: Mouse click (PC fallback)
-local function MouseKlik(button)
-    if not button or not button.Parent then return false end
+    if berhasil then return true end
+
+    -- === CARA 3: getconnections MouseButton1Down ===
     pcall(function()
-        local pos = button.AbsolutePosition
-        local sz = button.AbsoluteSize
-        local cx = pos.X + sz.X / 2
-        local cy = pos.Y + sz.Y / 2
-        VIM:SendMouseMoveEvent(cx, cy, game)
-        task.wait(0.02)
-        VIM:SendMouseButtonEvent(cx, cy, 0, true, game, 0)
-        task.wait(0.05)
-        VIM:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
+        local conns = getconnections(button.MouseButton1Down)
+        if conns and #conns > 0 then
+            for _, c in ipairs(conns) do
+                pcall(c.Function)
+            end
+            berhasil = true
+        end
     end)
-    return true
+
+    if berhasil then return true end
+
+    -- === CARA 4: Fire events langsung ===
+    pcall(function()
+        button.MouseButton1Click:Fire()
+        berhasil = true
+    end)
+    pcall(function()
+        button.Activated:Fire(LocalPlayer, UDim2.new(), 1)
+    end)
+    pcall(function()
+        button:Click()
+    end)
+
+    return berhasil
 end
 
--- Klik dengan SEMUA method
-local function KlikButton(button)
-    if not button or not button.Parent then return false end
+-- =================================================================
+-- SCAN KEYBOARD
+-- =================================================================
+local keyCache = {}
+local masukCache = nil
+local lastScanTime = 0
 
-    -- Coba getconnections dulu (paling powerful)
-    if InvokeButtonDirect(button) then
-        return true
+local function ScanKeyboard()
+    -- Cache 1 detik supaya cepat
+    if tick() - lastScanTime < 1 and next(keyCache) ~= nil then
+        return keyCache, masukCache
     end
 
-    -- Touch (mobile)
-    TouchKlik(button)
-    task.wait(0.03)
-
-    -- Mouse (PC)
-    MouseKlik(button)
-    task.wait(0.03)
-
-    -- Built-in click
-    pcall(function() button:Click() end)
-    pcall(function() button.MouseButton1Click:Fire() end)
-    pcall(function() button.Activated:Fire() end)
-
-    return true
-end
-
--- =================================================================
--- SCAN KEYBOARD & MASUK
--- =================================================================
-local function CariKeyboard()
     local keys = {}
     local tombolMasuk = nil
 
@@ -179,11 +210,13 @@ local function CariKeyboard()
             for _, v in ipairs(gui:GetDescendants()) do
                 if v:IsA("TextButton") and v.Visible then
                     local t = v.Text:match("^%s*(.-)%s*$")
+                    -- Huruf tunggal A-Z
                     if #t == 1 and t:match("^[a-zA-Z]$") then
                         keys[t:lower()] = v
                     end
+                    -- Tombol submit
                     local tl = t:lower()
-                    if tl == "masuk" or tl == "jawab" or tl == "kirim" or tl == "submit" or tl == "enter" or tl == "send" then
+                    if tl == "masuk" or tl == "jawab" or tl == "kirim" or tl == "submit" or tl == "enter" or tl == "send" or tl == "ok" then
                         tombolMasuk = v
                     end
                 end
@@ -191,64 +224,81 @@ local function CariKeyboard()
         end
     end
 
+    keyCache = keys
+    masukCache = tombolMasuk
+    lastScanTime = tick()
+
+    local jk = 0
+    for _ in pairs(keys) do jk = jk + 1 end
+    print("[SCAN] Keyboard: " .. jk .. " tombol | Masuk: " .. (tombolMasuk and tombolMasuk.Text or "NOT FOUND"))
+
     return keys, tombolMasuk
 end
 
 -- =================================================================
--- KETIK KATA - KLIK PER HURUF
+-- KETIK KATA
 -- =================================================================
 local function KetikKata(kata, keys, tombolMasuk)
-    print("[KETIK] Mulai ketik: '" .. kata .. "'")
+    kata = kata:lower()
+    print("[KETIK] >> " .. kata)
+
     for i = 1, #kata do
-        local huruf = kata:sub(i, i):lower()
+        local huruf = kata:sub(i, i)
         local tombol = keys[huruf]
+
         if tombol and tombol.Parent then
-            KlikButton(tombol)
-            task.wait(0.06)
+            DeltaKlik(tombol)
+            task.wait(0.07)
         else
-            print("[MISS] Huruf '" .. huruf .. "' tidak ada di keyboard")
+            print("[MISS] '" .. huruf .. "' tidak ditemukan")
         end
     end
 
-    task.wait(0.1)
+    task.wait(0.15)
 
     if tombolMasuk and tombolMasuk.Parent then
-        print("[MASUK] Klik tombol Masuk...")
-        KlikButton(tombolMasuk)
+        print("[SUBMIT] Klik Masuk...")
+        DeltaKlik(tombolMasuk)
+        print("[SUBMIT] Done!")
     else
-        -- Fallback: Enter key
-        pcall(function()
-            VIM:SendKeyEvent(true, Enum.KeyCode.Return, false, nil)
-            task.wait(0.05)
-            VIM:SendKeyEvent(false, Enum.KeyCode.Return, false, nil)
-        end)
+        print("[WARN] Tombol Masuk tidak ditemukan!")
     end
-    print("[KETIK] Selesai!")
 end
 
 -- =================================================================
--- DETEKSI KATA GAME
+-- DETEKSI KATA DARI GAME
 -- =================================================================
-local function DeteksiKataGame()
-    -- Priority 1: "Hurufnya adalah: XX"
+local SKIP = {
+    PURCHASED=1,ROBUX=1,BUY=1,PLAYER=1,PLAYERS=1,SCORE=1,LEVEL=1,
+    ROUND=1,WIN=1,LOSE=1,GAME=1,ADMIN=1,MASUK=1,JAWAB=1,
+    AUTO=1,FLASH=1,OFF=1,ON=1,KETIK=1,KATA=1,NORMAL=1,
+    SEARCH=1,TURN=1,OPPONENT=1,AI=1,GROQ=1,OUTPUT=1,
+}
+
+local function DeteksiKata()
     for _, gui in ipairs(PlayerGui:GetChildren()) do
         if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
             for _, v in ipairs(gui:GetDescendants()) do
                 if v:IsA("TextLabel") and v.Visible then
                     local txt = v.Text
-                    -- "Hurufnya adalah: RI" 
-                    local huruf = txt:match("[Hh]uruf[^:]*:%s*([%a]+)")
-                    if huruf then return huruf, "awalan" end
+
+                    -- "Hurufnya adalah: RI" / "Hurufnya adalah: R"
+                    local huruf = txt:match("[Hh]uruf[%w%s]*:%s*([A-Za-z]+)")
+                    if huruf and #huruf >= 1 and #huruf <= 5 then
+                        return huruf:lower(), "awalan"
+                    end
+
                     -- "Kata sebelumnya: RIANG"
-                    local kata = txt:match("[Kk]ata[^:]*:%s*([%a]+)")
-                    if kata then return kata, "lanjut" end
+                    local prev = txt:match("[Kk]ata[%w%s]*:%s*([A-Za-z]+)")
+                    if prev and #prev >= 2 then
+                        return prev:lower(), "lanjut"
+                    end
                 end
             end
         end
     end
 
-    -- Priority 2: Label ALL CAPS yang berubah
-    local SKIP = {PURCHASED=1,ROBUX=1,BUY=1,PLAYER=1,PLAYERS=1,SCORE=1,LEVEL=1,ROUND=1,WIN=1,LOSE=1,GAME=1,ADMIN=1,MASUK=1,JAWAB=1,AUTO=1,FLASH=1,OFF=1,ON=1}
+    -- Fallback: cari TextLabel ALL CAPS yang valid (kata game ditampilkan besar)
     for _, gui in ipairs(PlayerGui:GetChildren()) do
         if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
             for _, v in ipairs(gui:GetDescendants()) do
@@ -266,60 +316,66 @@ local function DeteksiKataGame()
 end
 
 -- =================================================================
--- STATE & MAIN LOOP
+-- MAIN STATE
 -- =================================================================
 local ENABLED = false
 local lastKata = ""
 local lastTime = 0
-local COOLDOWN = 2
+local COOLDOWN = 1.8
 local proses = false
+local LocalPlayer = Players.LocalPlayer
 
+-- =================================================================
+-- LOOP
+-- =================================================================
 local function MainLoop()
     if not ENABLED or proses then return end
     if tick() - lastTime < COOLDOWN then return end
 
-    local input, mode = DeteksiKataGame()
-    if not input or input == lastKata then return end
+    local input, mode = DeteksiKata()
+    if not input then return end
+    if input == lastKata then return end
 
     local jawaban
     if mode == "awalan" then
         jawaban = CariKataAwalan(input)
-        print("[DETECT] Awalan: '" .. input .. "'")
     else
         jawaban = CariKataLanjut(input)
-        print("[DETECT] Lanjut dari: '" .. input .. "'")
     end
 
     if not jawaban then
-        print("[SKIP] Tidak ada kata untuk: " .. input)
+        print("[SKIP] Tidak ada kata untuk: '" .. input .. "'")
         lastKata = input
         return
     end
 
-    print("[ANSWER] '" .. input .. "' -> '" .. jawaban .. "'")
+    print("==============================")
+    print("[FLASH] " .. input .. " -> " .. jawaban)
+    print("==============================")
 
     proses = true
     lastKata = input
 
     task.spawn(function()
-        local keys, tombolMasuk = CariKeyboard()
+        local keys, tombolMasuk = ScanKeyboard()
         local jk = 0
         for _ in pairs(keys) do jk = jk + 1 end
-        print("[KEY] " .. jk .. " tombol keyboard ditemukan")
 
-        if jk >= 10 then
-            KetikKata(jawaban, keys, tombolMasuk)
-        else
-            print("[ERROR] Keyboard tidak cukup terdeteksi!")
+        if jk < 10 then
+            print("[ERROR] Keyboard hanya " .. jk .. " tombol - kurang!")
+            proses = false
+            lastTime = tick()
+            return
         end
 
+        KetikKata(jawaban, keys, tombolMasuk)
         lastTime = tick()
         proses = false
     end)
 end
 
 -- =================================================================
--- GUI TIDAK DIUBAH
+-- GUI - TIDAK DIUBAH
 -- =================================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoSambungKataReal"
@@ -443,7 +499,17 @@ ToggleBtn.MouseButton1Click:Connect(function()
         lastKata = ""
         lastTime = 0
         proses = false
-        print("[ON] Mobile Touch Engine aktif!")
+        -- Test getconnections tersedia
+        if getconnections then
+            print("[DELTA] getconnections TERSEDIA - Full power mode!")
+        else
+            print("[WARN] getconnections tidak ada - pakai fallback")
+        end
+        print("[ON] Siap! Tunggu giliran kamu...")
+        -- Langsung scan keyboard sekali
+        task.spawn(function()
+            ScanKeyboard()
+        end)
     else
         ToggleBtn.Text = "OFF"
         ToggleBtn.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
@@ -464,5 +530,6 @@ task.spawn(function()
     end
 end)
 
-print("=== AUTO SAMBUNG KATA v7 - MOBILE TOUCH ENGINE ===")
-print("Tekan ON, lihat console [KETIK] dan [MASUK]")
+print("=== AUTO SAMBUNG KATA v8 - DELTA iOS ===")
+print("Tekan ON lalu tunggu giliran kamu")
+print("Lihat console: [FLASH], [KETIK], [DELTA], [SUBMIT]")
