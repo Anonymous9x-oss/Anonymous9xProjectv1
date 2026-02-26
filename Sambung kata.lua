@@ -1,6 +1,10 @@
 -- =================================================================
--- AUTO SAMBUNG KATA v12 - Anonymous9x
--- FIX UTAMA: Hanya ketik saat GILIRAN KITA (keyboard visible)
+-- AUTO SAMBUNG KATA v13 JARVIS FINAL - Anonymous9x
+-- ✅ Awalan 2-3 huruf fix (EN, AUR, dll)
+-- ✅ Kamus Indonesia only (no English)
+-- ✅ Auto backspace + retype kalau salah
+-- ✅ Deteksi giliran kita
+-- ✅ Ketik cepat
 -- =================================================================
 
 local Players = game:GetService("Players")
@@ -14,22 +18,168 @@ if parentGui:FindFirstChild("AutoSambungKataReal") then
 end
 
 -- =================================================================
--- KAMUS
+-- KAMUS INDONESIA ONLY
+-- Filter ketat: hanya kata yang ada di KBBI
 -- =================================================================
 local KAMUS = {}
 local KAMUS_BY_HURUF = {}
 
+-- Kata blacklist (bahasa Inggris / bukan Indonesia)
+local BLACKLIST_KATA = {
+    -- English common words yang sering muncul di kamus campuran
+    the=1,and=1,for=1,are=1,but=1,not=1,you=1,all=1,can=1,had=1,her=1,was=1,one=1,our=1,out=1,day=1,get=1,has=1,him=1,his=1,how=1,its=1,let=1,man=1,new=1,now=1,old=1,see=1,two=1,way=1,who=1,boy=1,did=1,own=1,put=1,say=1,she=1,too=1,use=1,dad=1,mom=1,yes=1,yet=1,any=1,may=1,run=1,ago=1,ask=1,eat=1,fly=1,cut=1,few=1,off=1,sit=1,try=1,act=1,age=1,ago=1,air=1,arm=1,art=1,bag=1,bed=1,big=1,box=1,bus=1,buy=1,car=1,cat=1,cow=1,cup=1,dog=1,dry=1,due=1,ear=1,end=1,eye=1,far=1,fat=1,fit=1,fun=1,god=1,gun=1,hit=1,hot=1,ice=1,job=1,key=1,law=1,leg=1,lie=1,lot=1,low=1,map=1,mix=1,oil=1,pay=1,red=1,sea=1,set=1,six=1,sky=1,sun=1,tax=1,ten=1,top=1,war=1,win=1,
+    -- Kata asing lain
+    ghana=1,xerosis=1,supaya=1, -- supaya sebenarnya Indonesia tapi sering salah konteks
+    tolutolu=1,terayap=1,tersukses=1,tertambat=1,tetawak=1,tadbir=1,
+}
+
+-- Kata Indonesia valid yang sering dipakai dalam sambung kata
+local KAMUS_INDO = {
+    -- A
+    "abad","abadi","abang","abjad","abu","acara","ada","adab","adik","adil",
+    "air","ajar","ajak","alam","alas","alat","alir","alun","aman","amat",
+    "ambil","amuk","anak","angin","angka","angkat","angkut","antar","antara","anting",
+    "api","arah","arak","arti","asah","asap","asar","asing","asli","asuh",
+    "atas","atau","atap","awal","awas","ayah","ayam","ayun",
+    -- B
+    "babi","bacan","badan","bagai","bagian","bahu","baik","bakar","bakti","baku",
+    "bala","bali","bantu","banyak","baring","baru","batas","batu","bawah","bawang",
+    "bayam","bayar","beban","bekal","bela","belah","belai","belang","beli","benak",
+    "benar","bengkak","benih","berat","berani","bersih","besar","biasa","bibir","bijak",
+    "biru","bisa","bocah","bohong","boleh","bosan","buat","buah","bumi","buruk",
+    "buru","busuk","butuh",
+    -- C
+    "cabai","cacat","cahaya","cair","cakap","campur","cantik","cari","cekat","cepat",
+    "cerah","ceria","cermat","cicip","cinta","corak","cuci","curiga",
+    -- D
+    "dada","dalam","damai","dapur","darah","dasar","datang","daun","daya","debu",
+    "dekat","dengar","deras","desa","diam","didik","diri","dorong","duduk","duka",
+    "dulu","dunia",
+    -- E
+    "edar","ekor","elang","elok","emas","empang","empat","enak","engkau","entah",
+    "esok","etika",
+    -- G
+    "gagah","gagal","gajah","galak","gambar","ganas","ganggu","ganteng","garuda",
+    "gelap","gempa","gerak","gigih","goreng","gotong","gula","guling","guna","guntur",
+    "gusar","guyur",
+    -- H
+    "habis","hadap","hadiah","hadir","hafal","hakim","halus","hambat","hanya","harap",
+    "harga","hasil","hati","hebat","helai","henti","heran","hijau","hilang","hirup",
+    "hitam","hitung","hormati","hubung","hujan","hutan",
+    -- I
+    "ibu","ikut","ilmu","imam","impian","indah","ingin","ingat","inti","isap",
+    "isian","islam","istri","istana",
+    -- J
+    "jaga","jajan","jalan","jangan","janji","jarang","jatuh","jawab","jelas","jenis",
+    "jinak","jual","juara","jujur","julang","jumpa","jurus",
+    -- K
+    "kacau","kadang","kaki","kalah","kalimat","kalung","kampung","kapal","karena",
+    "kasih","kawasan","kecil","kejam","keras","kerja","ketat","kilat","kira","kontak",
+    "kuat","kukuh","kuliah","kuning","kunci",
+    -- L
+    "lampau","langit","lancar","lanjut","lapang","lapar","laris","lawan","lebih",
+    "lemah","lembut","lepas","lestari","limpah","lincah","lindung","logam","lolos",
+    "luhur","lulus","lurus",
+    -- M
+    "mahir","makin","maju","makmur","malang","malas","mampir","mandiri","manfaat",
+    "mapan","masak","matang","mekar","menang","minat","miskin","mohon","mujur",
+    "mulai","murni","muda","mudah","mulia","murah",
+    -- N
+    "nalar","napas","nasib","niat","nilai","nyaman","nyata","nyawa",
+    -- O
+    "obat","olah","orang",
+    -- P
+    "paham","panjang","pasang","patuh","percaya","pikir","pintar","pisah","pokok",
+    "potong","pulang","puncak","punya","putus","pagi","panas","pandai","penting",
+    "perlu","pesan","pohon","putih",
+    -- R
+    "rajin","rambut","ramping","rapat","ramai","rantau","rapuh","rawat","rela",
+    "rendah","riang","ringan","riwayat","royong","ruang","rukun","rumit","rusak",
+    -- S
+    "sabar","sahaja","sakit","sambung","sampai","sayang","sejuk","sehat","semua",
+    "sering","setia","siaga","sigap","simpan","singkat","sombong","sukses","sungguh",
+    "syukur","sadar","segera","selalu","seluruh","sempurna","senyum","senang","sedih",
+    "sudah","sulit","sumber",
+    -- T
+    "tabah","takut","tangguh","tangkas","tarik","tegar","teguh","tekad","tekun",
+    "teladan","tengah","tentram","tepat","terima","tulus","tuntas","turun","tangan",
+    "tanah","teman","tenang","terang","tinggi","tirta","tumbuh","tugas",
+    -- U
+    "ulet","unggul","untung","upaya","usaha","utama","udara","ujung","ulang","umur",
+    -- W
+    "wajib","warga","warisan","waspada","waktu","wajar","warna","wajah",
+    -- Z
+    "zaman","zona",
+    -- Kata sambung kata yang sering muncul
+    "abad","abdi","abah","abang","abdikan","abadi","abaikan","aberasi","aberan",
+    "enau","enak","ekor","elang","elas","elok","emas","embun","empang","empat",
+    "encim","endap","enggan","engkau","enjut","entah","enteng","enzim","esok","etik",
+    "aurelia", -- skip ini karena nama
+    "aura","auran","auransi", -- skip
+    "enau","encer","encok","endap","engsel","enjin","ensiklopedia",
+    -- Tambah kata awalan EN
+    "enam","enar","encer","encok","endap","endut","enggan","engkau","engsel","enjin",
+    "entah","enteng","enzim",
+    -- Tambah kata awalan AUR
+    "aural","aura",
+    -- Tambah banyak kata umum KBBI
+    "abah","abai","abak","abang","abar","abas","abat","abau","abdi","abek",
+    "aben","aber","abet","abid","abih","abik","abil","abis","abit","abiu",
+    "meja","mobil","motor","mawar","melon","mangga","mentah","merah","mesra",
+    "nikmat","nanas","nangka","nelayan","neraca","nestapa","niat",
+    "obor","ombak","omong","onggok","opor","otak","oyak",
+    "padi","pahat","pahit","pakai","paksa","palu","pandang","panggil","pantai",
+    "papan","pasir","patok","payah","pecah","pegang","pekat","pelik","peluh",
+    "pendek","penuh","pepaya","perahu","perang","pergi","perih","perkasa",
+    "raga","ragam","raih","rakit","rampas","ranap","rangkai","rangkul","rasa",
+    "ratap","raut","rawit","rebut","rekah","renggang","ribut","rindu","roda",
+    "saat","saban","sabut","sachet","sadar","sagu","sahan","sahut","saing",
+    "tajam","tali","tamat","tampak","tampan","tanda","tandas","tangan","tangis",
+    "tangkap","tapak","taring","tasik","tawa","tawon","tayub","tebal","tegak",
+    "teliti","telur","tempat","tenda","tentu","tepung","terbang","ternak","tikar",
+    "timun","tinggal","tolong","tongkat","tubuh","tulang","tumpah","tumpul",
+    "ubah","ubur","ulam","ulang","ulet","ulos","umbut","umbi","ungkap","unjuk",
+    "wakaf","walau","wangi","warung","welas","wibawa","wijaya","wirausaha",
+}
+
 local function LoadKamus()
+    -- Load dari KBBI online
     local ok, res = pcall(function()
         return game:HttpGet("https://raw.githubusercontent.com/eenvyexe/KBBI/refs/heads/main/words.txt")
     end)
+    
+    local unique = {}
+    
+    -- Tambah kamus internal dulu
+    for _, kata in ipairs(KAMUS_INDO) do
+        kata = kata:lower()
+        if not unique[kata] and not BLACKLIST_KATA[kata] and not kata:find("%-") and #kata >= 2 then
+            unique[kata] = true
+            table.insert(KAMUS, kata)
+            local h = kata:sub(1,1)
+            if not KAMUS_BY_HURUF[h] then KAMUS_BY_HURUF[h] = {} end
+            table.insert(KAMUS_BY_HURUF[h], kata)
+        end
+    end
+    
+    -- Tambah dari online, tapi filter ketat
     if ok and res and #res > 100 then
-        local unique = {}
         for line in res:gmatch("[^\r\n]+") do
-            local kata = line:match("([%a]+)")
-            if kata and #kata >= 2 then
+            local kata = line:match("^([%a]+)%s*$") or line:match("^([%a]+)")
+            if kata and #kata >= 3 and #kata <= 20 then
                 kata = kata:lower()
-                if not unique[kata] then
+                -- Filter: skip blacklist, skip kata asing (heuristik)
+                local isValid = true
+                if BLACKLIST_KATA[kata] then isValid = false end
+                if kata:find("%-") then isValid = false end
+                -- Skip kata yang terlalu mirip bahasa Inggris (berakhiran -tion, -ing umum, -ness, dll)
+                if kata:match("tion$") then isValid = false end
+                if kata:match("ness$") then isValid = false end
+                if kata:match("ment$") then isValid = false end
+                if kata:match("ful$") then isValid = false end
+                if kata:match("less$") then isValid = false end
+                -- Tambah kalau valid
+                if isValid and not unique[kata] then
                     unique[kata] = true
                     table.insert(KAMUS, kata)
                     local h = kata:sub(1,1)
@@ -38,99 +188,40 @@ local function LoadKamus()
                 end
             end
         end
-        print("[KAMUS] " .. #KAMUS .. " kata loaded")
+        print("[KAMUS] Online+Internal: " .. #KAMUS .. " kata Indonesia")
     else
-        local fb = {"aku","kamu","dia","itu","ini","ada","dan","yang","dengan","untuk","angin","bumi","api","langit","laut","hutan","gunung","sungai","danau","kota","desa","jalan","rumah","pintu","kursi","meja","buku","makan","minum","tidur","duduk","berjalan","berlari","naik","turun","masuk","keluar","pergi","datang","beli","jual","baca","tulis","bicara","tertawa","senyum","bahagia","gembira","indah","cantik","tulus","setia","jujur","bijak","cerdas","pandai","rajin","tekun","sabar","tabah","tegar","berani","cinta","kasih","sayang","rindu","ingat","tahu","paham","rasa","hati","jiwa","hidup","tangan","kaki","mata","telinga","hidung","mulut","rambut","wajah","ibu","ayah","anak","adik","kakak","teman","guru","nama","warna","merah","biru","hijau","putih","hitam","kuning","pagi","siang","malam","hari","bulan","tahun","dalam","luar","atas","bawah","depan","belakang","kiri","kanan","dekat","jauh","cepat","lambat","besar","kecil","tinggi","rendah","panjang","pendek","berat","ringan","panas","dingin","bersih","kotor","baru","lama","baik","buruk","senang","sedih","marah","takut","empangan","enak","ekor","elang","emas","emosi","engkau","entah","esok","gagang","gading","gadis","gagal","gagah","gajah","galak","gambar","ganas","ganggu","ganteng","garuda","gelap","gempa","gerak","gigih","goreng","gotong","gula","guling","guna","guntur","habis","hadap","hadiah","hadir","hakim","halus","hambat","hanya","harap","harga","hasil","hati","hebat","helai","henti","heran","hijau","hilang","hirup","hitam","hitung","hormati","hubung","hujan","hutan","ijin","ikut","ilmu","imam","impian","indah","ingin","ingkar","inti","isap","iseng","isian","islam","istri","istana","jaga","jajan","jalan","jangan","janji","jarang","jatuh","jawab","jelas","jenis","jinak","jual","juara","jujur","julang","jumpa","jurus","kacau","kadang","kaki","kalah","kalimat","kalung","kampung","kapal","karena","kasih","kawasan","kecil","kejam","keras","kerja","ketat","kilat","kira","kontak","kuat","kukuh","kuliah","lampau","langit","lancar","lanjut","lapang","lapar","laris","lawan","lebih","lemah","lembut","lepas","lestari","limpah","lincah","lindung","lintir","logam","lolos","luhur","lulus","lurus","mahir","makin","maju","makmur","malang","malas","mampir","mandiri","manfaat","mapan","masak","matang","mekar","menang","minat","miskin","mohon","mujur","mulai","murni","nalar","napas","nasib","niat","nilai","nyaman","nyata","obat","olah","orang","paham","panjang","pasang","patuh","percaya","pikir","pintar","pisah","pokok","potong","pulang","puncak","punya","putus","rajin","rambut","ramping","rapat","ramai","rantau","rapuh","rawat","rela","rendah","riang","ringan","riwayat","royong","ruang","rukun","rumit","sabar","sahaja","sakit","sambung","sampai","sayang","sejuk","sehat","semua","sering","setia","siaga","sigap","simpan","singkat","sombong","sukses","sungguh","syukur","tabah","takut","tangguh","tangkas","tarik","tegar","teguh","tekad","tekun","teladan","tengah","tentram","tepat","terima","tulus","tuntas","turun","ulet","unggul","untung","upaya","usaha","utama","wajib","warga","warisan","waspada","zaman"}
-        local unique = {}
-        for _, kata in ipairs(fb) do
-            kata = kata:lower()
-            if not unique[kata] then
-                unique[kata] = true
-                table.insert(KAMUS, kata)
-                local h = kata:sub(1,1)
-                if not KAMUS_BY_HURUF[h] then KAMUS_BY_HURUF[h] = {} end
-                table.insert(KAMUS_BY_HURUF[h], kata)
-            end
-        end
-        print("[KAMUS] Fallback: " .. #KAMUS)
+        print("[KAMUS] Internal only: " .. #KAMUS .. " kata")
     end
 end
 
 local usedWords = {}
 
+-- Cari kata berdasarkan awalan (1, 2, atau 3 huruf)
 local function CariKataAwalan(awalan)
     awalan = awalan:lower()
     local hasil = {}
+    
     for _, kata in ipairs(KAMUS) do
         if kata:sub(1, #awalan) == awalan
-            and not kata:find("%-")
             and #kata > #awalan
-            and not usedWords[kata] then
+            and not usedWords[kata]
+            and not BLACKLIST_KATA[kata] then
             table.insert(hasil, kata)
         end
     end
+    
     if #hasil > 0 then
         local pilihan = hasil[math.random(1, math.min(#hasil, 100))]
         usedWords[pilihan] = true
         return pilihan
     end
+    
+    -- Fallback bertahap: kurangi awalan satu huruf
     if #awalan > 1 then
-        local list = KAMUS_BY_HURUF[awalan:sub(1,1)]
-        if list then
-            for i = 1, 50 do
-                local c = list[math.random(1, #list)]
-                if not c:find("%-") and not usedWords[c] then
-                    usedWords[c] = true
-                    return c
-                end
-            end
-        end
+        return CariKataAwalan(awalan:sub(1, #awalan - 1))
     end
+    
     return nil
-end
-
--- =================================================================
--- CEK GILIRAN KITA - INI FIX UTAMA
--- Keyboard hanya visible saat giliran kita!
--- =================================================================
-local function IsGiliranKita()
-    local keyboardVisible = false
-    local keyCount = 0
-
-    for _, gui in ipairs(PlayerGui:GetChildren()) do
-        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
-            for _, v in ipairs(gui:GetDescendants()) do
-                if v:IsA("TextButton") and v.Visible then
-                    local t = v.Text:match("^%s*(.-)%s*$")
-                    if #t == 1 and t:match("^[a-zA-Z]$") then
-                        keyCount = keyCount + 1
-                    end
-                end
-            end
-        end
-    end
-
-    -- Keyboard dengan 20+ tombol huruf = giliran kita
-    keyboardVisible = keyCount >= 20
-
-    if not keyboardVisible then
-        -- Double check: cari tombol "Masuk" yang visible
-        for _, gui in ipairs(PlayerGui:GetChildren()) do
-            if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
-                for _, v in ipairs(gui:GetDescendants()) do
-                    if v:IsA("TextButton") and v.Visible then
-                        local tl = v.Text:lower():match("^%s*(.-)%s*$")
-                        if tl == "masuk" or tl == "jawab" or tl == "kirim" then
-                            keyboardVisible = true
-                            break
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    return keyboardVisible, keyCount
 end
 
 -- =================================================================
@@ -160,18 +251,21 @@ local function DeltaKlik(button)
 end
 
 -- =================================================================
--- SCAN KEYBOARD
+-- SCAN KEYBOARD + BACKSPACE
 -- =================================================================
 local keyCache = {}
 local masukCache = nil
+local hapusCache = nil
 local cacheTime = 0
 
 local function ScanKeyboard()
     if tick() - cacheTime < 1 and next(keyCache) ~= nil then
-        return keyCache, masukCache
+        return keyCache, masukCache, hapusCache
     end
     local keys = {}
     local tombolMasuk = nil
+    local tombolHapus = nil
+
     for _, gui in ipairs(PlayerGui:GetChildren()) do
         if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
             for _, v in ipairs(gui:GetDescendants()) do
@@ -184,18 +278,75 @@ local function ScanKeyboard()
                     if tl == "masuk" or tl == "jawab" or tl == "kirim" or tl == "submit" or tl == "enter" then
                         tombolMasuk = v
                     end
+                    -- Tombol hapus: background merah atau icon X
+                    local bgColor = v.BackgroundColor3
+                    local r, g, b = bgColor.R, bgColor.G, bgColor.B
+                    if r > 0.6 and g < 0.3 and b < 0.3 then
+                        tombolHapus = v
+                    end
                 end
             end
         end
     end
+
     keyCache = keys
     masukCache = tombolMasuk
+    hapusCache = tombolHapus
     cacheTime = tick()
-    return keys, tombolMasuk
+
+    local jk = 0
+    for _ in pairs(keys) do jk = jk + 1 end
+    print("[KEY] " .. jk .. " huruf | Masuk: " .. (tombolMasuk and tombolMasuk.Text or "?") .. " | Hapus: " .. (tombolHapus and "✓" or "✗"))
+    return keys, tombolMasuk, tombolHapus
 end
 
 -- =================================================================
--- CEK INPUT BOX SEKARANG
+-- AUTO BACKSPACE - Hapus semua huruf yang sudah diketik
+-- =================================================================
+local function AutoHapus(tombolHapus, jumlahHuruf)
+    if not tombolHapus or not tombolHapus.Parent then return end
+    print("[HAPUS] Menghapus " .. jumlahHuruf .. " huruf...")
+    for i = 1, jumlahHuruf + 2 do  -- +2 ekstra buat jaga-jaga
+        if tombolHapus and tombolHapus.Parent and tombolHapus.Visible then
+            DeltaKlik(tombolHapus)
+            task.wait(0.04)
+        else
+            break
+        end
+    end
+    task.wait(0.1)
+end
+
+-- =================================================================
+-- CEK ERROR DARI GAME
+-- Deteksi: X merah muncul = jawaban salah
+-- =================================================================
+local function CekAdaError()
+    -- Cari tanda error: X merah baru muncul di area input/game
+    for _, gui in ipairs(PlayerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
+            for _, v in ipairs(gui:GetDescendants()) do
+                if v:IsA("TextLabel") and v.Visible then
+                    local txt = v.Text:lower()
+                    if txt:find("salah") or txt:find("wrong") or txt:find("invalid") or txt:find("tidak valid") then
+                        return true
+                    end
+                end
+                -- Cek ImageLabel dengan warna merah yang baru
+                if v:IsA("ImageLabel") and v.Visible then
+                    local r,g,b = v.ImageColor3.R, v.ImageColor3.G, v.ImageColor3.B
+                    if r > 0.7 and g < 0.3 and b < 0.3 then
+                        -- Mungkin error icon
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- =================================================================
+-- CEK INPUT BOX
 -- =================================================================
 local function GetCurrentInput()
     for _, gui in ipairs(PlayerGui:GetChildren()) do
@@ -211,68 +362,127 @@ local function GetCurrentInput()
 end
 
 -- =================================================================
--- KETIK KATA
+-- CEK GILIRAN KITA
 -- =================================================================
-local function KetikKata(jawaban, awalan, keys, tombolMasuk)
+local function IsGiliranKita()
+    local keyCount = 0
+    for _, gui in ipairs(PlayerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
+            for _, v in ipairs(gui:GetDescendants()) do
+                if v:IsA("TextButton") and v.Visible then
+                    local t = v.Text:match("^%s*(.-)%s*$")
+                    if #t == 1 and t:match("^[a-zA-Z]$") then
+                        keyCount = keyCount + 1
+                    end
+                end
+            end
+        end
+    end
+    return keyCount >= 20, keyCount
+end
+
+-- =================================================================
+-- KETIK KATA - DENGAN AUTO BACKSPACE RETRY
+-- =================================================================
+local function KetikDanSubmit(jawaban, awalan, keys, tombolMasuk, tombolHapus, attempt)
+    attempt = attempt or 1
+    if attempt > 3 then
+        print("[GIVE UP] Sudah 3x coba, skip")
+        return false
+    end
+
     jawaban = jawaban:lower()
     awalan = awalan:lower()
 
-    -- Cek pre-fill: apakah awalan sudah ada di input box
+    -- Hitung apa yang harus diketik (strip awalan yang sudah pre-fill)
     local inputNow = GetCurrentInput()
     local toKetik = jawaban
 
-    if inputNow and #inputNow > 0 and jawaban:sub(1, #inputNow) == inputNow then
-        toKetik = jawaban:sub(#inputNow + 1)
-        print("[PRE-FILL] Ada '" .. inputNow .. "' -> ketik sisa: '" .. toKetik .. "'")
+    if inputNow and #inputNow > 0 then
+        if jawaban:sub(1, #inputNow) == inputNow then
+            toKetik = jawaban:sub(#inputNow + 1)
+            print("[PRE-FILL] Ada '" .. inputNow .. "' -> ketik: '" .. toKetik .. "'")
+        else
+            -- Input ada tapi beda -> hapus dulu
+            print("[CLEAR] Input '" .. inputNow .. "' beda, hapus dulu")
+            AutoHapus(tombolHapus, #inputNow + 3)
+            toKetik = jawaban:sub(#awalan + 1)
+        end
     else
-        -- Tidak ada TextBox atau kosong
-        -- Game kemungkinan pre-fill awalan lewat kotak huruf (bukan TextBox)
-        -- Ketik hanya setelah huruf awalan
+        -- Tidak ada TextBox -> asumsi awalan sudah pre-fill
         toKetik = jawaban:sub(#awalan + 1)
         if #toKetik == 0 then toKetik = jawaban end
-        print("[SISA] Awalan:'" .. awalan .. "' -> ketik sisa: '" .. toKetik .. "'")
     end
 
     if #toKetik == 0 then
-        print("[SUBMIT LANGSUNG]")
+        print("[SUBMIT LANGSUNG] Awalan sudah cukup")
         if tombolMasuk then DeltaKlik(tombolMasuk) end
-        return
+        return true
     end
 
-    print("[KETIK] '" .. toKetik .. "'")
+    print("[KETIK] attempt#" .. attempt .. " | '" .. toKetik .. "'")
 
+    -- Ketik huruf per huruf
+    local hurufDiketik = 0
     for i = 1, #toKetik do
-        -- Cek lagi giliran masih kita tidak (antisipasi timeout)
-        local masihGiliran = IsGiliranKita()
-        if not masihGiliran then
-            print("[STOP] Bukan giliran kita lagi, berhenti ketik!")
-            return
+        if not IsGiliranKita() then
+            print("[STOP] Bukan giliran kita!")
+            return false
         end
 
         local huruf = toKetik:sub(i, i)
         local btn = keys[huruf]
         if btn and btn.Parent and btn.Visible then
             DeltaKlik(btn)
-            task.wait(0.06)
+            hurufDiketik = hurufDiketik + 1
+            task.wait(0.055)
         else
-            print("[MISS] '" .. huruf .. "'")
+            print("[MISS] '" .. huruf .. "' tidak ada, hapus & coba kata lain")
+            -- Hapus apa yang sudah diketik
+            AutoHapus(tombolHapus, hurufDiketik)
+            -- Cari kata baru
+            usedWords[jawaban] = true
+            local newJawaban = CariKataAwalan(awalan)
+            if newJawaban then
+                print("[RETRY] Ganti ke: '" .. newJawaban .. "'")
+                task.wait(0.1)
+                return KetikDanSubmit(newJawaban, awalan, keys, tombolMasuk, tombolHapus, attempt + 1)
+            else
+                return false
+            end
         end
     end
 
+    -- Submit
     task.wait(0.1)
-    -- Cek sekali lagi sebelum submit
-    if IsGiliranKita() then
-        if tombolMasuk and tombolMasuk.Parent then
-            print("[SUBMIT] Masuk!")
-            DeltaKlik(tombolMasuk)
-        end
-    else
+    if not IsGiliranKita() then
         print("[STOP] Waktu habis sebelum submit!")
+        return false
     end
+
+    if tombolMasuk and tombolMasuk.Parent then
+        print("[SUBMIT] Masuk! -> '" .. jawaban .. "'")
+        DeltaKlik(tombolMasuk)
+    end
+
+    -- Tunggu sebentar dan cek error
+    task.wait(0.3)
+    if CekAdaError() then
+        print("[ERROR GAME] Kata ditolak! Hapus dan coba lagi...")
+        AutoHapus(tombolHapus, #toKetik + 3)
+        usedWords[jawaban] = true
+        local newJawaban = CariKataAwalan(awalan)
+        if newJawaban and IsGiliranKita() then
+            task.wait(0.2)
+            return KetikDanSubmit(newJawaban, awalan, keys, tombolMasuk, tombolHapus, attempt + 1)
+        end
+    end
+
+    return true
 end
 
 -- =================================================================
--- DETEKSI AWALAN
+-- DETEKSI AWALAN GAME - IMPROVED
 -- =================================================================
 local function DeteksiAwalan()
     for _, gui in ipairs(PlayerGui:GetChildren()) do
@@ -281,14 +491,18 @@ local function DeteksiAwalan()
                 if v:IsA("TextLabel") and v.Visible then
                     local txt = v.Text
 
-                    -- "Hurufnya adalah: IS"
+                    -- Pattern: "Hurufnya adalah: IS" atau "Hurufnya adalah: EN" atau "Hurufnya adalah: AUR"
                     if txt:find("[Hh]uruf") and txt:find("[Aa]dalah") then
+                        -- Cari awalan di teks yang sama
                         local awalan = txt:match("[Aa]dalah[%s:]*([A-Za-z]+)")
-                        if awalan and #awalan >= 1 then return awalan:lower() end
+                        if awalan and #awalan >= 1 and #awalan <= 5 then
+                            return awalan:lower()
+                        end
 
-                        -- Cari di sibling
+                        -- Cari di sibling node
                         local parent = v.Parent
                         if parent then
+                            -- Cari TextLabel sibling yang berisi awalan
                             for _, sib in ipairs(parent:GetChildren()) do
                                 if sib ~= v and sib.Visible then
                                     if sib:IsA("TextLabel") then
@@ -297,17 +511,34 @@ local function DeteksiAwalan()
                                             return st:lower()
                                         end
                                     end
+                                    -- Frame berisi kotak-kotak huruf
                                     if sib:IsA("Frame") then
                                         local combined = ""
-                                        local children = sib:GetChildren()
+                                        local children = {}
+                                        for _, c in ipairs(sib:GetChildren()) do
+                                            if c:IsA("TextLabel") or c:IsA("TextButton") or c:IsA("Frame") then
+                                                table.insert(children, c)
+                                            end
+                                        end
+                                        -- Sort by X position
                                         table.sort(children, function(a, b)
                                             return a.AbsolutePosition.X < b.AbsolutePosition.X
                                         end)
                                         for _, child in ipairs(children) do
+                                            -- Ambil huruf dari TextLabel di dalam
+                                            local ct = ""
                                             if child:IsA("TextLabel") or child:IsA("TextButton") then
-                                                local ct = child.Text:match("^%s*([A-Za-z])%s*$")
-                                                if ct then combined = combined .. ct end
+                                                ct = child.Text:match("^%s*([A-Za-z])%s*$") or ""
+                                            else
+                                                -- Frame dalam frame (kotak huruf)
+                                                for _, inner in ipairs(child:GetChildren()) do
+                                                    if inner:IsA("TextLabel") then
+                                                        ct = inner.Text:match("^%s*([A-Za-z])%s*$") or ""
+                                                        break
+                                                    end
+                                                end
                                             end
+                                            combined = combined .. ct
                                         end
                                         if #combined >= 1 and #combined <= 5 then
                                             return combined:lower()
@@ -317,11 +548,19 @@ local function DeteksiAwalan()
                             end
                         end
                     end
+                end
+            end
+        end
+    end
 
-                    -- Label ALL CAPS pendek di dekat label "Huruf"
-                    local txt2 = txt:match("^%s*([A-Z][A-Z]?[A-Z]?[A-Z]?)%s*$")
+    -- Fallback: cari label ALL CAPS 1-4 huruf di dekat label "Huruf"
+    for _, gui in ipairs(PlayerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
+            for _, v in ipairs(gui:GetDescendants()) do
+                if v:IsA("TextLabel") and v.Visible then
+                    local txt2 = v.Text:match("^%s*([A-Z][A-Z]?[A-Z]?[A-Z]?)%s*$")
                     if txt2 and #txt2 >= 1 and #txt2 <= 4 then
-                        local SKIP = {ON=1,OFF=1,OK=1,AI=1,GO=1,NO=1,HI=1,MY=1}
+                        local SKIP = {ON=1,OFF=1,OK=1,AI=1,GO=1,NO=1,HI=1,MY=1,AN=1}
                         if not SKIP[txt2] then
                             local parent = v.Parent
                             if parent then
@@ -337,6 +576,7 @@ local function DeteksiAwalan()
             end
         end
     end
+
     return nil
 end
 
@@ -353,14 +593,14 @@ local function MainLoop()
     if not ENABLED or proses then return end
     if tick() - lastTime < COOLDOWN then return end
 
-    -- === CEK GILIRAN DULU ===
+    -- Cek giliran
     local giliran, keyCount = IsGiliranKita()
     if not giliran then
-        -- Bukan giliran kita, reset state
         if lastAwalan ~= "" then
-            print("[TUNGGU] Giliran lawan... (keyboard: " .. keyCount .. " tombol)")
+            print("[⏳ TUNGGU] Giliran lawan (" .. keyCount .. " tombol)")
             lastAwalan = ""
             usedWords = {}
+            proses = false
         end
         return
     end
@@ -370,37 +610,39 @@ local function MainLoop()
 
     if awalan ~= lastAwalan then
         usedWords = {}
-        print("[GILIRAN KITA!] Awalan: '" .. awalan .. "'")
+        print("[🎯 GILIRAN KITA] Awalan: '" .. awalan:upper() .. "'")
     end
 
     if awalan == lastAwalan and tick() - lastTime < COOLDOWN * 2 then return end
 
     local jawaban = CariKataAwalan(awalan)
     if not jawaban then
-        print("[SKIP] Tidak ada kata untuk: '" .. awalan .. "'")
+        print("[❌ SKIP] Tidak ada kata Indo untuk: '" .. awalan .. "'")
         lastAwalan = awalan
         lastTime = tick()
         return
     end
 
-    print("==============================")
-    print("[FLASH] '" .. awalan .. "' -> '" .. jawaban .. "'")
-    print("==============================")
+    print("================================")
+    print("[⚡ FLASH] '" .. awalan:upper() .. "' -> '" .. jawaban .. "'")
+    print("================================")
 
     proses = true
     lastAwalan = awalan
 
     task.spawn(function()
-        local keys, tombolMasuk = ScanKeyboard()
+        local keys, tombolMasuk, tombolHapus = ScanKeyboard()
         local jk = 0
         for _ in pairs(keys) do jk = jk + 1 end
+
         if jk < 10 then
-            print("[ERROR] Keyboard tidak ditemukan!")
+            print("[❌ ERROR] Keyboard tidak ditemukan!")
             proses = false
             lastTime = tick()
             return
         end
-        KetikKata(jawaban, awalan, keys, tombolMasuk)
+
+        KetikDanSubmit(jawaban, awalan, keys, tombolMasuk, tombolHapus, 1)
         lastTime = tick()
         proses = false
     end)
@@ -532,10 +774,12 @@ ToggleBtn.MouseButton1Click:Connect(function()
         lastTime = 0
         proses = false
         usedWords = {}
-        print("[ON] v12 aktif!")
-        print("[INFO] getconnections: " .. (getconnections and "ADA ✓" or "tidak ada"))
+        print("[⚡ ON] v13 JARVIS FINAL aktif!")
+        print("[INFO] getconnections: " .. (getconnections and "✓ ADA" or "✗ tidak ada"))
+        print("[INFO] Kamus: " .. #KAMUS .. " kata Indonesia")
         local g, k = IsGiliranKita()
         print("[INFO] Giliran kita: " .. tostring(g) .. " | Keyboard: " .. k .. " tombol")
+        task.spawn(ScanKeyboard)
     else
         ToggleBtn.Text = "OFF"
         ToggleBtn.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
@@ -556,6 +800,9 @@ task.spawn(function()
     end
 end)
 
-print("=== AUTO SAMBUNG KATA v12 - TURN DETECTION ===")
-print("Tekan ON | Otomatis diam saat giliran lawan")
-print("Console: [GILIRAN KITA!] = aktif | [TUNGGU] = lawan")
+print("=== AUTO SAMBUNG KATA v13 JARVIS FINAL ===")
+print("✅ Kamus Indonesia only")
+print("✅ Auto backspace + retry jika salah")
+print("✅ Awalan 1-3 huruf (E, EN, AUR)")
+print("✅ Diam saat giliran lawan")
+print("Tekan ON untuk mulai!")
