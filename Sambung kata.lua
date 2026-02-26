@@ -1,13 +1,11 @@
 -- =================================================================
--- AUTO SAMBUNG KATA REAL v3 - Anonymous9x
--- FIX: Tidak pakai Remote ngaco, fokus TextBox + tombol Masuk
+-- AUTO SAMBUNG KATA REAL v4 - Anonymous9x
+-- FIX FINAL: Klik keyboard custom huruf per huruf
 -- =================================================================
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -45,7 +43,7 @@ local function LoadKamus()
         end
         print("[KAMUS] Loaded " .. #KAMUS .. " words")
     else
-        local fallback = {"aku","kamu","dia","mereka","kami","kita","siapa","apa","mana","kapan","mengapa","bagaimana","bisa","dapat","mau","akan","sedang","telah","sudah","belum","pernah","selalu","sering","jarang","kadang","mungkin","harus","wajib","boleh","dilarang","jangan","ayo","coba","lihat","dengar","rasa","sentuh","ambil","beri","simpan","buang","buka","tutup","hidup","mati","besar","kecil","panjang","pendek","tinggi","rendah","berat","ringan","cepat","lambat","kuat","lemah","terang","gelap","panas","dingin","basah","kering","bersih","kotor","baru","lama","muda","tua","kaya","miskin","pintar","cantik","baik","buruk","senang","sedih","marah","takut","berani","malas","rajin","angin","bumi","api","langit","laut","hutan","gunung","sungai","danau","kota","desa","jalan","rumah","pintu","kursi","meja","buku","pena","kertas","makan","minum","masak","cuci","tidur","duduk","berjalan","berlari","naik","turun","masuk","keluar","pergi","datang","beli","jual","baca","tulis","bicara","tertawa","senyum","bahagia","gembira","indah","cantik","gagah","elok","anggun","mewah","sederhana","tulus","setia","jujur","adil","bijak","arif","cerdas","pandai","rajin","tekun","sabar","ikhlas","tabah","tegar","berani","percaya","harap","cinta","kasih","sayang","rindu","kenang","ingat","lupa","tahu","paham","mengerti","pikir","rasa","hati","jiwa","roh","hidup","nyawa","tubuh","tangan","kaki","mata","telinga","hidung","mulut","lidah","gigi","rambut","wajah","leher","dada","perut","punggung","bahu","siku","lutut","jari","kuku"}
+        local fallback = {"aku","kamu","dia","mereka","kami","kita","angin","bumi","api","langit","laut","hutan","gunung","sungai","danau","kota","desa","jalan","rumah","pintu","kursi","meja","buku","pena","kertas","makan","minum","masak","cuci","tidur","duduk","berjalan","berlari","naik","turun","masuk","keluar","pergi","datang","beli","jual","baca","tulis","bicara","tertawa","senyum","bahagia","gembira","indah","cantik","gagah","elok","anggun","mewah","sederhana","tulus","setia","jujur","adil","bijak","arif","cerdas","pandai","rajin","tekun","sabar","ikhlas","tabah","tegar","berani","percaya","harap","cinta","kasih","sayang","rindu","kenang","ingat","lupa","tahu","paham","mengerti","pikir","rasa","hati","jiwa","roh","hidup","nyawa","tubuh","tangan","kaki","mata","telinga","hidung","mulut","lidah","gigi","rambut","wajah","leher","dada","perut","punggung","bahu","siku","lutut","jari","kuku","alam","udara","cahaya","suara","warna","rasa","aroma","tekstur","bentuk","ukuran","jumlah","banyak","sedikit","semua","beberapa","setiap","tiap","masing","bersama","sendiri","antara","dalam","luar","atas","bawah","depan","belakang","kiri","kanan","tengah","samping","sekitar","dekat","jauh","sini","sana","situ","dimana","kemana","darimana"}
         for _, kata in ipairs(fallback) do
             table.insert(KAMUS, kata)
             local h = string.sub(kata, 1, 1)
@@ -61,24 +59,109 @@ local function CariKata(kataSebelum)
     local huruf = string.lower(string.sub(kataSebelum, -1))
     local list = KAMUS_BY_HURUF[huruf]
     if not list or #list == 0 then return nil end
-    for i = 1, 40 do
+    -- Hanya ambil kata tanpa tanda hubung (keyboard custom tidak bisa ketik -)
+    for i = 1, 60 do
         local calon = list[math.random(1, #list)]
-        if calon ~= kataSebelum then return calon end
+        if calon ~= kataSebelum and not calon:find("%-") then
+            return calon
+        end
     end
-    return list[1]
+    return nil
 end
 
 -- =================================================================
--- SCAN ELEMEN GAME
+-- SCAN KEYBOARD CUSTOM
+-- Cari semua TextButton single huruf A-Z
 -- =================================================================
+local function CariKeyboardCustom()
+    local keys = {}  -- keys["a"] = TextButton, dst
+    local tombolMasuk = nil
+    local tombolHapus = nil
 
--- Kata-kata yang BUKAN kata game (blacklist)
+    for _, gui in ipairs(PlayerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
+            for _, v in ipairs(gui:GetDescendants()) do
+                if v:IsA("TextButton") and v.Visible then
+                    local t = v.Text:match("^%s*(.-)%s*$")
+                    
+                    -- Huruf tunggal = tombol keyboard
+                    if #t == 1 and t:match("^[a-zA-Z]$") then
+                        keys[t:lower()] = v
+                    end
+                    
+                    -- Tombol Masuk
+                    local tl = t:lower()
+                    if tl == "masuk" or tl == "jawab" or tl == "kirim" or tl == "submit" or tl == "enter" or tl == "send" then
+                        tombolMasuk = v
+                    end
+                end
+            end
+        end
+    end
+
+    return keys, tombolMasuk
+end
+
+-- =================================================================
+-- KETIK KATA PAKAI KEYBOARD CUSTOM
+-- =================================================================
+local function KetikKata(kata, keys, tombolMasuk)
+    if not kata or kata == "" then return false end
+    
+    local berhasil = true
+    for i = 1, #kata do
+        local huruf = kata:sub(i, i):lower()
+        local tombol = keys[huruf]
+        
+        if tombol and tombol.Parent then
+            -- Klik tombol huruf
+            pcall(function()
+                tombol.MouseButton1Down:Fire()
+                task.wait(0.02)
+                tombol.MouseButton1Up:Fire()
+                task.wait(0.02)
+                tombol.MouseButton1Click:Fire()
+            end)
+            task.wait(0.04)  -- jeda antar huruf (flash speed)
+        else
+            print("[MISS] Huruf '" .. huruf .. "' tidak ditemukan di keyboard")
+            berhasil = false
+        end
+    end
+    
+    -- Tekan Masuk
+    if tombolMasuk and tombolMasuk.Parent then
+        task.wait(0.05)
+        pcall(function()
+            tombolMasuk.MouseButton1Down:Fire()
+            task.wait(0.02)
+            tombolMasuk.MouseButton1Up:Fire()
+            task.wait(0.02)
+            tombolMasuk.MouseButton1Click:Fire()
+        end)
+        print("[SUBMIT] Masuk ditekan")
+    else
+        -- Fallback: Enter via VirtualInput
+        pcall(function()
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, nil)
+            task.wait(0.03)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, nil)
+        end)
+    end
+    
+    return berhasil
+end
+
+-- =================================================================
+-- SCAN KATA GAME
+-- =================================================================
 local BLACKLIST = {
     purchased=1,robux=1,buy=1,sale=1,shop=1,store=1,free=1,item=1,
     player=1,players=1,score=1,level=1,round=1,time=1,timer=1,
     loading=1,lobby=1,waiting=1,start=1,win=1,lose=1,game=1,
     play=1,chat=1,rank=1,invite=1,join=1,leave=1,server=1,
-    topbarplus=1,admin=1,running=1,ready=1,flash=1,mode=1,
+    topbarplus=1,admin=1,running=1,ready=1,flash=1,output=1,
+    masuk=1,jawab=1,kirim=1,submit=1,enter=1,
 }
 
 local function IsKataValid(text)
@@ -90,39 +173,7 @@ local function IsKataValid(text)
     return true
 end
 
--- Cari TextBox input game
-local function CariTextBox()
-    for _, gui in ipairs(PlayerGui:GetChildren()) do
-        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
-            for _, v in ipairs(gui:GetDescendants()) do
-                if v:IsA("TextBox") and v.Visible then
-                    return v
-                end
-            end
-        end
-    end
-    return nil
-end
-
--- Cari tombol Masuk / Submit
-local function CariTombolMasuk()
-    for _, gui in ipairs(PlayerGui:GetChildren()) do
-        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
-            for _, v in ipairs(gui:GetDescendants()) do
-                if v:IsA("TextButton") and v.Visible then
-                    local t = v.Text:lower():match("^%s*(.-)%s*$")
-                    if t == "masuk" or t == "jawab" or t == "kirim" or t == "submit" or t == "ok" or t == "send" or t == "enter" then
-                        return v
-                    end
-                end
-            end
-        end
-    end
-    return nil
-end
-
--- Track TextLabel yang berubah = kata game
-local labelHistory = {}  -- [label] = {text, changes}
+local labelHistory = {}
 
 local function TrackLabels()
     for _, gui in ipairs(PlayerGui:GetChildren()) do
@@ -139,38 +190,31 @@ local function TrackLabels()
             end
         end
     end
-    -- Bersihkan label mati
     for lbl in pairs(labelHistory) do
-        if not lbl or not lbl.Parent then
-            labelHistory[lbl] = nil
-        end
+        if not lbl or not lbl.Parent then labelHistory[lbl] = nil end
     end
 end
 
--- Cari kata game dari label yang paling sering berubah
 local function CariKataGame()
+    -- Prioritas: label yang paling sering berubah dan valid
     local best, bestScore = nil, -1
     for lbl, data in pairs(labelHistory) do
         if lbl and lbl.Parent and lbl.Visible then
             local txt = lbl.Text:match("^%s*(.-)%s*$")
-            if IsKataValid(txt) then
-                if data.changes > bestScore then
-                    bestScore = data.changes
-                    best = lbl
-                end
+            if IsKataValid(txt) and data.changes > bestScore then
+                bestScore = data.changes
+                best = lbl
             end
         end
     end
-    -- Fallback: scan biasa jika tidak ada yang pernah berubah
+    -- Fallback scan biasa
     if not best then
         for _, gui in ipairs(PlayerGui:GetChildren()) do
             if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
                 for _, v in ipairs(gui:GetDescendants()) do
                     if v:IsA("TextLabel") and v.Visible then
                         local txt = v.Text:match("^%s*(.-)%s*$")
-                        if IsKataValid(txt) then
-                            return v
-                        end
+                        if IsKataValid(txt) then return v end
                     end
                 end
             end
@@ -180,88 +224,58 @@ local function CariKataGame()
 end
 
 -- =================================================================
--- SUBMIT JAWABAN
--- =================================================================
-local function SubmitJawaban(jawaban)
-    local textBox = CariTextBox()
-    local tombolMasuk = CariTombolMasuk()
-    
-    if textBox then
-        -- Fokus ke TextBox
-        pcall(function() textBox:CaptureFocus() end)
-        task.wait(0.05)
-        
-        -- Isi jawaban
-        textBox.Text = jawaban
-        task.wait(0.05)
-        
-        -- Cara 1: ReleaseFocus (simulasi Enter)
-        pcall(function() textBox:ReleaseFocus(true) end)
-        task.wait(0.05)
-        
-        -- Cara 2: Klik tombol Masuk
-        if tombolMasuk then
-            pcall(function() tombolMasuk:Click() end)
-            task.wait(0.05)
-        end
-        
-        -- Cara 3: VirtualInput Enter
-        pcall(function()
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, nil)
-            task.wait(0.03)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, nil)
-        end)
-        
-        print("[OK] Jawaban: " .. jawaban .. " (TextBox mode)")
-        return true
-        
-    elseif tombolMasuk then
-        -- Ada tombol tapi tidak ada textbox - game pakai keyboard custom
-        -- Coba inject text via properti game
-        print("[WARN] TextBox tidak ditemukan, coba klik Masuk saja")
-        pcall(function() tombolMasuk:Click() end)
-        return false
-    else
-        print("[ERROR] TextBox dan tombol Masuk tidak ditemukan!")
-        return false
-    end
-end
-
--- =================================================================
 -- STATE
 -- =================================================================
 local ENABLED = false
 local kataSebelum = ""
 local lastJawabTime = 0
-local COOLDOWN = 0.8
+local COOLDOWN = 1.5  -- lebih panjang karena ketik per huruf perlu waktu
+local sedangKetik = false
 
 -- =================================================================
 -- LOOP UTAMA
 -- =================================================================
 local function MainLoop()
-    TrackLabels()
-    if not ENABLED then return end
+    if not ENABLED or sedangKetik then return end
     if tick() - lastJawabTime < COOLDOWN then return end
-    
+
     local wordLabel = CariKataGame()
     if not wordLabel then return end
-    
+
     local kataSekarang = wordLabel.Text:match("^%s*(.-)%s*$"):lower()
     if kataSekarang == "" or kataSekarang == kataSebelum then return end
-    
-    -- Cari jawaban
+
     local jawaban = CariKata(kataSekarang)
     if not jawaban then
-        print("[SKIP] Tidak ada kata untuk huruf: " .. kataSekarang:sub(-1))
+        print("[SKIP] Tidak ada kata untuk huruf: '" .. kataSekarang:sub(-1) .. "'")
+        kataSebelum = kataSekarang  -- skip, jangan stuck
         return
     end
-    
-    print("[FLASH] '" .. kataSekarang .. "' -> '" .. jawaban .. "'")
-    
-    if SubmitJawaban(jawaban) then
+
+    print("[FLASH] '" .. kataSekarang .. "' -> ketik: '" .. jawaban .. "'")
+
+    -- Cari keyboard
+    local keys, tombolMasuk = CariKeyboardCustom()
+    local jumlahKey = 0
+    for _ in pairs(keys) do jumlahKey = jumlahKey + 1 end
+    print("[KEY] Keyboard custom: " .. jumlahKey .. " tombol ditemukan")
+
+    if jumlahKey == 0 then
+        print("[ERROR] Keyboard custom tidak ditemukan!")
+        return
+    end
+
+    -- Ketik dalam thread terpisah agar tidak blocking
+    sedangKetik = true
+    task.spawn(function()
+        local ok = KetikKata(jawaban, keys, tombolMasuk)
+        if ok then
+            print("[OK] Selesai ketik: " .. jawaban)
+        end
         kataSebelum = kataSekarang
         lastJawabTime = tick()
-    end
+        sedangKetik = false
+    end)
 end
 
 -- =================================================================
@@ -389,10 +403,12 @@ ToggleBtn.MouseButton1Click:Connect(function()
         ToggleBtn.BackgroundColor3 = Color3.new(0, 0.7, 0)
         kataSebelum = ""
         lastJawabTime = 0
-        print("[STATUS] Auto answer ENABLED")
+        sedangKetik = false
+        print("[STATUS] Auto answer ENABLED - Custom Keyboard Mode")
     else
         ToggleBtn.Text = "OFF"
         ToggleBtn.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+        sedangKetik = false
         print("[STATUS] Auto answer DISABLED")
     end
 end)
@@ -402,7 +418,6 @@ end)
 -- =================================================================
 LoadKamus()
 
--- Background tracking loop
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -410,7 +425,6 @@ task.spawn(function()
     end
 end)
 
--- Main loop
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -418,6 +432,7 @@ task.spawn(function()
     end
 end)
 
-print("=== AUTO SAMBUNG KATA REAL v3 READY ===")
-print("Tekan tombol ON untuk memulai")
-print("Cek console [FLASH] dan [OK] untuk konfirmasi")
+print("=== AUTO SAMBUNG KATA v4 READY - CUSTOM KEYBOARD MODE ===")
+print("Tekan ON untuk mulai")
+print("Lihat console [KEY] untuk cek keyboard terdeteksi")
+print("Lihat [OK] untuk konfirmasi berhasil ketik")
