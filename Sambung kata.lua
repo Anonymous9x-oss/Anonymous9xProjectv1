@@ -461,16 +461,17 @@ end
 RunService.RenderStepped:Connect(MainLoop)
 
 -- =================================================================
--- GUI MINIMALIS
+-- GUI MINIMALIS (Revisi sesuai permintaan)
 -- =================================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoSambungKataAdaptif"
 ScreenGui.Parent = parentGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
+-- Frame utama diperbesar sedikit agar teks peringatan muat
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 150)
-MainFrame.Position = UDim2.new(0.5, -120, 0.5, -75)
+MainFrame.Size = UDim2.new(0, 260, 0, 200)  -- sedikit lebih lebar dan tinggi
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -100)
 MainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
 MainFrame.BorderColor3 = Color3.new(1, 1, 1)
 MainFrame.BorderSizePixel = 2
@@ -479,11 +480,12 @@ MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
+-- Header dengan nama baru
 local Header = Instance.new("TextLabel")
 Header.Size = UDim2.new(1, -40, 0, 30)
 Header.Position = UDim2.new(0, 10, 0, 5)
 Header.BackgroundTransparency = 1
-Header.Text = "Auto Sambung Ano9x"
+Header.Text = "Sambung Kata Ano9x"  -- <-- diubah
 Header.TextColor3 = Color3.new(1, 1, 1)
 Header.Font = Enum.Font.SourceSansBold
 Header.TextSize = 18
@@ -529,21 +531,26 @@ ToggleBtn.TextSize = 18
 ToggleBtn.Parent = Content
 Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
+-- Info dengan teks peringatan (lebih besar)
 local Info = Instance.new("TextLabel")
-Info.Size = UDim2.new(1, 0, 0, 30)
+Info.Size = UDim2.new(1, 0, 0, 70)  -- tinggi 70 agar muat 3-4 baris
 Info.Position = UDim2.new(0, 0, 0, 45)
 Info.BackgroundTransparency = 1
-Info.Text = "Auto Stable Mode | just for fun"
+Info.Text = "If there is a system error or typing error, please click the off button first, then delete it manually, and please turn it on again."
 Info.TextColor3 = Color3.new(1, 1, 1)
 Info.Font = Enum.Font.SourceSans
 Info.TextSize = 13
+Info.TextWrapped = true
+Info.TextXAlignment = Enum.TextXAlignment.Left
+Info.TextYAlignment = Enum.TextYAlignment.Top
 Info.Parent = Content
 
+-- Credit dengan teks baru
 local Credit = Instance.new("TextLabel")
 Credit.Size = UDim2.new(1, 0, 0, 20)
-Credit.Position = UDim2.new(0, 0, 1, -20)
+Credit.Position = UDim2.new(0, 0, 1, -25)  -- naik sedikit
 Credit.BackgroundTransparency = 1
-Credit.Text = "Anonymous9x"
+Credit.Text = "Created Anonymous9x"  -- <-- diubah
 Credit.TextColor3 = Color3.new(1, 1, 1)
 Credit.Font = Enum.Font.SourceSans
 Credit.TextSize = 11
@@ -554,11 +561,11 @@ local minimized = false
 MinBtn.MouseButton1Click:Connect(function()
     minimized = not minimized
     if minimized then
-        MainFrame.Size = UDim2.new(0, 240, 0, 40)
+        MainFrame.Size = UDim2.new(0, 260, 0, 40)
         Content.Visible = false
         MinBtn.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 240, 0, 150)
+        MainFrame.Size = UDim2.new(0, 260, 0, 200)
         Content.Visible = true
         MinBtn.Text = "-"
     end
