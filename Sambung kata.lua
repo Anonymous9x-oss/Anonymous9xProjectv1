@@ -1,7 +1,6 @@
 -- =================================================================
--- AUTO SAMBUNG KATA v16 - Anonymous9x (FIX TOTAL)
--- Berbasis v12 yang terbukti work, dengan kecepatan maksimal
--- Dilengkapi debug console untuk memantau proses
+-- AUTO SAMBUNG KATA v12 - Anonymous9x
+-- FIX UTAMA: Hanya ketik saat GILIRAN KITA (keyboard visible)
 -- =================================================================
 
 local Players = game:GetService("Players")
@@ -15,7 +14,7 @@ if parentGui:FindFirstChild("AutoSambungKataReal") then
 end
 
 -- =================================================================
--- KAMUS (dari v12)
+-- KAMUS
 -- =================================================================
 local KAMUS = {}
 local KAMUS_BY_HURUF = {}
@@ -63,7 +62,10 @@ local function CariKataAwalan(awalan)
     awalan = awalan:lower()
     local hasil = {}
     for _, kata in ipairs(KAMUS) do
-        if kata:sub(1, #awalan) == awalan and not kata:find("%-") and #kata > #awalan and not usedWords[kata] then
+        if kata:sub(1, #awalan) == awalan
+            and not kata:find("%-")
+            and #kata > #awalan
+            and not usedWords[kata] then
             table.insert(hasil, kata)
         end
     end
@@ -88,49 +90,77 @@ local function CariKataAwalan(awalan)
 end
 
 -- =================================================================
--- CEK GILIRAN KITA (v12 style)
+-- CEK GILIRAN KITA - INI FIX UTAMA
+-- Keyboard hanya visible saat giliran kita!
 -- =================================================================
 local function IsGiliranKita()
+    local keyboardVisible = false
     local keyCount = 0
+
     for _, gui in ipairs(PlayerGui:GetChildren()) do
         if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
             for _, v in ipairs(gui:GetDescendants()) do
                 if v:IsA("TextButton") and v.Visible then
                     local t = v.Text:match("^%s*(.-)%s*$")
-                    if t and #t == 1 and t:match("^[a-zA-Z]$") then
+                    if #t == 1 and t:match("^[a-zA-Z]$") then
                         keyCount = keyCount + 1
                     end
                 end
             end
         end
     end
-    -- Debug: cetak setiap detik? tidak, cukup di loop utama nanti
-    return keyCount >= 20, keyCount
-end
 
--- =================================================================
--- KLIK TOMBOL (cepat)
--- =================================================================
-local function KlikTombol(button)
-    if not button then return end
-    if getconnections then
-        for _, ev in ipairs({"Activated", "MouseButton1Click"}) do
-            local conns = getconnections(button[ev])
-            if conns and #conns > 0 then
-                for _, c in ipairs(conns) do
-                    pcall(c.Function)
+    -- Keyboard dengan 20+ tombol huruf = giliran kita
+    keyboardVisible = keyCount >= 20
+
+    if not keyboardVisible then
+        -- Double check: cari tombol "Masuk" yang visible
+        for _, gui in ipairs(PlayerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
+                for _, v in ipairs(gui:GetDescendants()) do
+                    if v:IsA("TextButton") and v.Visible then
+                        local tl = v.Text:lower():match("^%s*(.-)%s*$")
+                        if tl == "masuk" or tl == "jawab" or tl == "kirim" then
+                            keyboardVisible = true
+                            break
+                        end
+                    end
                 end
-                return
             end
         end
     end
-    pcall(function() button.MouseButton1Click:Fire() end)
-    pcall(function() button.Activated:Fire() end)
-    pcall(function() button:Click() end)
+
+    return keyboardVisible, keyCount
 end
 
 -- =================================================================
--- SCAN KEYBOARD (tombol huruf dan masuk)
+-- GETCONNECTIONS ENGINE
+-- =================================================================
+local function DeltaKlik(button)
+    if not button or not button.Parent then return false end
+    local ok = false
+    pcall(function()
+        if getconnections then
+            for _, ev in ipairs({"Activated", "MouseButton1Click", "MouseButton1Down"}) do
+                local conns = getconnections(button[ev])
+                if conns and #conns > 0 then
+                    for _, c in ipairs(conns) do pcall(function() c.Function() end) end
+                    ok = true
+                    return
+                end
+            end
+        end
+    end)
+    if not ok then
+        pcall(function() button.MouseButton1Click:Fire() end)
+        pcall(function() button.Activated:Fire() end)
+        pcall(function() button:Click() end)
+    end
+    return ok
+end
+
+-- =================================================================
+-- SCAN KEYBOARD
 -- =================================================================
 local keyCache = {}
 local masukCache = nil
@@ -147,11 +177,11 @@ local function ScanKeyboard()
             for _, v in ipairs(gui:GetDescendants()) do
                 if v:IsA("TextButton") and v.Visible then
                     local t = v.Text:match("^%s*(.-)%s*$")
-                    if t and #t == 1 and t:match("^[a-zA-Z]$") then
+                    if #t == 1 and t:match("^[a-zA-Z]$") then
                         keys[t:lower()] = v
                     end
-                    local tl = t and t:lower()
-                    if tl and (tl == "masuk" or tl == "jawab" or tl == "kirim" or tl == "submit" or tl == "enter") then
+                    local tl = t:lower()
+                    if tl == "masuk" or tl == "jawab" or tl == "kirim" or tl == "submit" or tl == "enter" then
                         tombolMasuk = v
                     end
                 end
@@ -165,7 +195,84 @@ local function ScanKeyboard()
 end
 
 -- =================================================================
--- DETEKSI AWALAN (v12 style, diperkuat)
+-- CEK INPUT BOX SEKARANG
+-- =================================================================
+local function GetCurrentInput()
+    for _, gui in ipairs(PlayerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "AutoSambungKataReal" then
+            for _, v in ipairs(gui:GetDescendants()) do
+                if v:IsA("TextBox") and v.Visible then
+                    return v.Text:lower():match("^%s*(.-)%s*$") or ""
+                end
+            end
+        end
+    end
+    return ""
+end
+
+-- =================================================================
+-- KETIK KATA
+-- =================================================================
+local function KetikKata(jawaban, awalan, keys, tombolMasuk)
+    jawaban = jawaban:lower()
+    awalan = awalan:lower()
+
+    -- Cek pre-fill: apakah awalan sudah ada di input box
+    local inputNow = GetCurrentInput()
+    local toKetik = jawaban
+
+    if inputNow and #inputNow > 0 and jawaban:sub(1, #inputNow) == inputNow then
+        toKetik = jawaban:sub(#inputNow + 1)
+        print("[PRE-FILL] Ada '" .. inputNow .. "' -> ketik sisa: '" .. toKetik .. "'")
+    else
+        -- Tidak ada TextBox atau kosong
+        -- Game kemungkinan pre-fill awalan lewat kotak huruf (bukan TextBox)
+        -- Ketik hanya setelah huruf awalan
+        toKetik = jawaban:sub(#awalan + 1)
+        if #toKetik == 0 then toKetik = jawaban end
+        print("[SISA] Awalan:'" .. awalan .. "' -> ketik sisa: '" .. toKetik .. "'")
+    end
+
+    if #toKetik == 0 then
+        print("[SUBMIT LANGSUNG]")
+        if tombolMasuk then DeltaKlik(tombolMasuk) end
+        return
+    end
+
+    print("[KETIK] '" .. toKetik .. "'")
+
+    for i = 1, #toKetik do
+        -- Cek lagi giliran masih kita tidak (antisipasi timeout)
+        local masihGiliran = IsGiliranKita()
+        if not masihGiliran then
+            print("[STOP] Bukan giliran kita lagi, berhenti ketik!")
+            return
+        end
+
+        local huruf = toKetik:sub(i, i)
+        local btn = keys[huruf]
+        if btn and btn.Parent and btn.Visible then
+            DeltaKlik(btn)
+            task.wait(0.06)
+        else
+            print("[MISS] '" .. huruf .. "'")
+        end
+    end
+
+    task.wait(0.1)
+    -- Cek sekali lagi sebelum submit
+    if IsGiliranKita() then
+        if tombolMasuk and tombolMasuk.Parent then
+            print("[SUBMIT] Masuk!")
+            DeltaKlik(tombolMasuk)
+        end
+    else
+        print("[STOP] Waktu habis sebelum submit!")
+    end
+end
+
+-- =================================================================
+-- DETEKSI AWALAN
 -- =================================================================
 local function DeteksiAwalan()
     for _, gui in ipairs(PlayerGui:GetChildren()) do
@@ -173,15 +280,13 @@ local function DeteksiAwalan()
             for _, v in ipairs(gui:GetDescendants()) do
                 if v:IsA("TextLabel") and v.Visible then
                     local txt = v.Text
-                    if txt and type(txt) == "string" then
-                        -- Pola "Hurufnya adalah: EN" atau "Huruf: EN"
-                        if txt:find("[Hh]uruf") and txt:find("[Aa]dalah") then
-                            local awalan = txt:match("[Aa]dalah[%s:]*([A-Za-z]+)")
-                            if awalan and #awalan >= 1 then
-                                return awalan:lower()
-                            end
-                        end
-                        -- Cek di sibling (kotak huruf)
+
+                    -- "Hurufnya adalah: IS"
+                    if txt:find("[Hh]uruf") and txt:find("[Aa]dalah") then
+                        local awalan = txt:match("[Aa]dalah[%s:]*([A-Za-z]+)")
+                        if awalan and #awalan >= 1 then return awalan:lower() end
+
+                        -- Cari di sibling
                         local parent = v.Parent
                         if parent then
                             for _, sib in ipairs(parent:GetChildren()) do
@@ -194,22 +299,35 @@ local function DeteksiAwalan()
                                     end
                                     if sib:IsA("Frame") then
                                         local combined = ""
-                                        local children = {}
-                                        for _, c in ipairs(sib:GetChildren()) do
-                                            if c:IsA("TextLabel") or c:IsA("TextButton") then
-                                                table.insert(children, c)
-                                            end
-                                        end
+                                        local children = sib:GetChildren()
                                         table.sort(children, function(a, b)
                                             return a.AbsolutePosition.X < b.AbsolutePosition.X
                                         end)
                                         for _, child in ipairs(children) do
-                                            local ct = child.Text:match("^%s*([A-Za-z])%s*$")
-                                            if ct then combined = combined .. ct end
+                                            if child:IsA("TextLabel") or child:IsA("TextButton") then
+                                                local ct = child.Text:match("^%s*([A-Za-z])%s*$")
+                                                if ct then combined = combined .. ct end
+                                            end
                                         end
                                         if #combined >= 1 and #combined <= 5 then
                                             return combined:lower()
                                         end
+                                    end
+                                end
+                            end
+                        end
+                    end
+
+                    -- Label ALL CAPS pendek di dekat label "Huruf"
+                    local txt2 = txt:match("^%s*([A-Z][A-Z]?[A-Z]?[A-Z]?)%s*$")
+                    if txt2 and #txt2 >= 1 and #txt2 <= 4 then
+                        local SKIP = {ON=1,OFF=1,OK=1,AI=1,GO=1,NO=1,HI=1,MY=1}
+                        if not SKIP[txt2] then
+                            local parent = v.Parent
+                            if parent then
+                                for _, sib in ipairs(parent:GetChildren()) do
+                                    if sib:IsA("TextLabel") and sib.Text:lower():find("huruf") then
+                                        return txt2:lower()
                                     end
                                 end
                             end
@@ -223,79 +341,43 @@ local function DeteksiAwalan()
 end
 
 -- =================================================================
--- KETIK KATA (cepat, tanpa banyak pengecekan)
--- =================================================================
-local function KetikKata(jawaban, awalan, keys, tombolMasuk)
-    jawaban = jawaban:lower()
-    awalan = awalan:lower()
-    local toKetik = jawaban:sub(#awalan + 1)
-    if #toKetik == 0 then
-        -- Awalan sudah cukup, langsung submit
-        if tombolMasuk then
-            KlikTombol(tombolMasuk)
-            print("[SUBMIT LANGSUNG]")
-        end
-        return
-    end
-    print("[KETIK] Sisa: '" .. toKetik .. "'")
-    for i = 1, #toKetik do
-        local huruf = toKetik:sub(i, i)
-        local btn = keys[huruf]
-        if btn then
-            KlikTombol(btn)
-            task.wait(0.02) -- super cepat
-        else
-            print("[ERROR] Tombol '" .. huruf .. "' tidak ditemukan!")
-            break
-        end
-    end
-    if tombolMasuk then
-        task.wait(0.05)
-        KlikTombol(tombolMasuk)
-        print("[SUBMIT] " .. jawaban)
-    end
-end
-
--- =================================================================
--- MAIN LOOP (dengan debug)
+-- MAIN STATE
 -- =================================================================
 local ENABLED = false
 local lastAwalan = ""
 local lastTime = 0
-local COOLDOWN = 0.8
+local COOLDOWN = 1.5
 local proses = false
 
 local function MainLoop()
     if not ENABLED or proses then return end
     if tick() - lastTime < COOLDOWN then return end
 
+    -- === CEK GILIRAN DULU ===
     local giliran, keyCount = IsGiliranKita()
     if not giliran then
+        -- Bukan giliran kita, reset state
         if lastAwalan ~= "" then
-            print("[TUNGGU] Giliran lawan (keyboard: " .. keyCount .. ")")
+            print("[TUNGGU] Giliran lawan... (keyboard: " .. keyCount .. " tombol)")
             lastAwalan = ""
             usedWords = {}
         end
         return
     end
 
-    -- Giliran kita
     local awalan = DeteksiAwalan()
-    if not awalan or awalan == "" then
-        -- Jika tidak ada awalan, mungkin game belum menampilkan? Tunggu sebentar
-        return
-    end
+    if not awalan or awalan == "" then return end
 
     if awalan ~= lastAwalan then
         usedWords = {}
-        print("[GILIRAN KITA!] Awalan: '" .. awalan .. "' (keyboard: " .. keyCount .. ")")
+        print("[GILIRAN KITA!] Awalan: '" .. awalan .. "'")
     end
 
-    if awalan == lastAwalan and tick() - lastTime < COOLDOWN * 1.5 then return end
+    if awalan == lastAwalan and tick() - lastTime < COOLDOWN * 2 then return end
 
     local jawaban = CariKataAwalan(awalan)
     if not jawaban then
-        print("[SKIP] Tidak ada kata untuk '" .. awalan .. "'")
+        print("[SKIP] Tidak ada kata untuk: '" .. awalan .. "'")
         lastAwalan = awalan
         lastTime = tick()
         return
@@ -310,8 +392,10 @@ local function MainLoop()
 
     task.spawn(function()
         local keys, tombolMasuk = ScanKeyboard()
-        if not tombolMasuk then
-            print("[ERROR] Tombol masuk tidak ditemukan!")
+        local jk = 0
+        for _ in pairs(keys) do jk = jk + 1 end
+        if jk < 10 then
+            print("[ERROR] Keyboard tidak ditemukan!")
             proses = false
             lastTime = tick()
             return
@@ -323,7 +407,7 @@ local function MainLoop()
 end
 
 -- =================================================================
--- GUI (sama seperti v12)
+-- GUI TIDAK DIUBAH
 -- =================================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoSambungKataReal"
@@ -346,7 +430,7 @@ local Header = Instance.new("TextLabel")
 Header.Size = UDim2.new(1, -40, 0, 30)
 Header.Position = UDim2.new(0, 10, 0, 5)
 Header.BackgroundTransparency = 1
-Header.Text = "Auto Sambung Kata v16"
+Header.Text = "Auto Sambung Kata"
 Header.TextColor3 = Color3.new(1, 1, 1)
 Header.Font = Enum.Font.SourceSansBold
 Header.TextSize = 18
@@ -403,7 +487,7 @@ local Info = Instance.new("TextLabel")
 Info.Size = UDim2.new(1, 0, 0, 30)
 Info.Position = UDim2.new(0, 0, 0, 45)
 Info.BackgroundTransparency = 1
-Info.Text = "Auto ketik super cepat v16"
+Info.Text = "Automatically fill in conjunctions"
 Info.TextColor3 = Color3.new(1, 1, 1)
 Info.Font = Enum.Font.SourceSans
 Info.TextSize = 13
@@ -448,7 +532,8 @@ ToggleBtn.MouseButton1Click:Connect(function()
         lastTime = 0
         proses = false
         usedWords = {}
-        print("[ON] v16 aktif! Debug console aktif.")
+        print("[ON] v12 aktif!")
+        print("[INFO] getconnections: " .. (getconnections and "ADA ✓" or "tidak ada"))
         local g, k = IsGiliranKita()
         print("[INFO] Giliran kita: " .. tostring(g) .. " | Keyboard: " .. k .. " tombol")
     else
@@ -463,14 +548,14 @@ end)
 -- START
 -- =================================================================
 LoadKamus()
+
 task.spawn(function()
     while true do
         task.wait(0.2)
-        -- Tanpa pcall agar error terlihat
-        MainLoop()
+        pcall(MainLoop)
     end
 end)
 
-print("=== AUTO SAMBUNG KATA v16 (FIX TOTAL) ===")
-print("Jika masih tidak bekerja, perhatikan console untuk error.")
-print("Tekan ON untuk mulai")
+print("=== AUTO SAMBUNG KATA v12 - TURN DETECTION ===")
+print("Tekan ON | Otomatis diam saat giliran lawan")
+print("Console: [GILIRAN KITA!] = aktif | [TUNGGU] = lawan")
