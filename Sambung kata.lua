@@ -483,7 +483,7 @@ local Header = Instance.new("TextLabel")
 Header.Size = UDim2.new(1, -40, 0, 30)
 Header.Position = UDim2.new(0, 10, 0, 5)
 Header.BackgroundTransparency = 1
-Header.Text = "Auto Sambung v17"
+Header.Text = "Auto Sambung Ano9x"
 Header.TextColor3 = Color3.new(1, 1, 1)
 Header.Font = Enum.Font.SourceSansBold
 Header.TextSize = 18
@@ -533,7 +533,7 @@ local Info = Instance.new("TextLabel")
 Info.Size = UDim2.new(1, 0, 0, 30)
 Info.Position = UDim2.new(0, 0, 0, 45)
 Info.BackgroundTransparency = 1
-Info.Text = "Adaptif | Blacklist otomatis"
+Info.Text = "Auto Stable Mode | just for fun"
 Info.TextColor3 = Color3.new(1, 1, 1)
 Info.Font = Enum.Font.SourceSans
 Info.TextSize = 13
@@ -578,7 +578,7 @@ ToggleBtn.MouseButton1Click:Connect(function()
         lastTime = 0
         usedWords = {}
         failedWords = {}
-        print("[v17 ON] Mode adaptif, blacklist kata gagal")
+        print("[v1 ON] Mode adaptif, blacklist kata gagal")
     else
         ToggleBtn.Text = "OFF"
         ToggleBtn.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
@@ -590,5 +590,5 @@ end)
 -- INIT
 -- =================================================================
 LoadKamus()
-print("=== AUTO SAMBUNG KATA v17 ADAPTIF ===")
+print("=== AUTO SAMBUNG KATA v1 ADAPTIF ===")
 print("Ketik ON | Blacklist otomatis | Deteksi kegagalan")
