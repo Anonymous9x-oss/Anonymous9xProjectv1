@@ -5,8 +5,7 @@
     ║      Delta Mobile / iOS ONLY             ║
     ║      Execute again to toggle OFF         ║
     ╚══════════════════════════════════════════╝
-
-    ENGINE COVERAGE:
+    ENGINE:
     [1] Health Loop      — Heartbeat: Health locked at MAX
     [2] ForceField       — Invisible FF, blocks projectile/explosion
     [3] Kill Part Scan   — Disable CanTouch on kill/lava/acid/spike/etc
@@ -22,45 +21,48 @@ local RunService   = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local LocalPlayer  = Players.LocalPlayer
 
--- Toggle Gate
 if _G.GodModeActive == nil then _G.GodModeActive = false end
 _G.GodModeActive = not _G.GodModeActive
 local ENTERING = _G.GodModeActive
 
 -- ================================================================================
---  SHARED NOTIF BUILDER — reused by main notif AND respawn notif
---  height: total px height of the panel (pass 90 for main, 68 for respawn)
+--  NOTIFICATION BUILDER
+--  Panel BG is SOLID — never blinks.
+--  Only internal elements (text, strokes, bolts) animate.
+--  Entry:  lightning-strike glitch materialise (no slide from top).
+--  Exit:   glitch-dissolve in place (no slide out).
 -- ================================================================================
-local function buildNotif(guiName, mainText, subText, entering, panelH, displaySecs)
+local function buildNotif(guiName, mainText, subText, entering, displaySecs)
 
     pcall(function()
         local old = game.CoreGui:FindFirstChild(guiName)
         if old then old:Destroy() end
     end)
 
-    -- Palette
     local PAL = entering and {
         panel  = Color3.fromRGB(10,  6,   0),
         stroke = Color3.fromRGB(255, 200,  40),
-        strokeB= Color3.fromRGB(220,  80,   0),
-        main   = Color3.fromRGB(255, 230, 120),
-        sub    = Color3.fromRGB(255, 155,  25),
-        aberR  = Color3.fromRGB(255,  30,   0),
+        strokeB= Color3.fromRGB(200,  70,   0),
+        main   = Color3.fromRGB(255, 228, 110),
+        sub    = Color3.fromRGB(255, 148,  20),
+        aberR  = Color3.fromRGB(255,  20,   0),
         aberB  = Color3.fromRGB(  0, 200, 255),
-        bolt   = Color3.fromRGB(255, 255, 200),
-        scan   = Color3.fromRGB(255, 190,  10),
-        bar    = Color3.fromRGB(255, 180,   0),
+        bolt   = Color3.fromRGB(255, 255, 190),
+        bar    = Color3.fromRGB(255, 175,   0),
+        sep    = Color3.fromRGB(255, 180,  10),
+        cred   = Color3.fromRGB(150, 130,  90),
     } or {
-        panel  = Color3.fromRGB(  3,   6,  18),
-        stroke = Color3.fromRGB( 70, 155, 255),
-        strokeB= Color3.fromRGB( 20,  55, 200),
-        main   = Color3.fromRGB(155, 210, 255),
-        sub    = Color3.fromRGB( 70, 135, 230),
-        aberR  = Color3.fromRGB(190,  30, 255),
-        aberB  = Color3.fromRGB(  0, 220, 255),
-        bolt   = Color3.fromRGB(200, 228, 255),
-        scan   = Color3.fromRGB( 50, 115, 255),
-        bar    = Color3.fromRGB( 60, 140, 255),
+        panel  = Color3.fromRGB(  3,   5,  18),
+        stroke = Color3.fromRGB( 65, 148, 255),
+        strokeB= Color3.fromRGB( 15,  50, 200),
+        main   = Color3.fromRGB(150, 205, 255),
+        sub    = Color3.fromRGB( 65, 128, 225),
+        aberR  = Color3.fromRGB(185,  20, 255),
+        aberB  = Color3.fromRGB(  0, 215, 255),
+        bolt   = Color3.fromRGB(195, 225, 255),
+        bar    = Color3.fromRGB( 55, 135, 255),
+        sep    = Color3.fromRGB( 55, 120, 255),
+        cred   = Color3.fromRGB( 90, 120, 170),
     }
 
     -- ScreenGui
@@ -72,31 +74,32 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
     pcall(function() gui.Parent = game.CoreGui end)
     if not gui.Parent then gui.Parent = LocalPlayer.PlayerGui end
 
-    -- Wrapper (slide target) — panelH is the full height
+    -- Wrapper — placed at final position immediately, never slides
+    local PANEL_H = 92
     local wrap = Instance.new("Frame")
     wrap.Name                   = "Wrap"
-    wrap.Size                   = UDim2.new(0, 298, 0, panelH)
-    wrap.Position               = UDim2.new(0.5, 0, 0, -(panelH + 30))
+    wrap.Size                   = UDim2.new(0, 298, 0, PANEL_H)
+    wrap.Position               = UDim2.new(0.5, 0, 0, 18)   -- final resting position
     wrap.AnchorPoint            = Vector2.new(0.5, 0)
     wrap.BackgroundTransparency = 1
     wrap.ClipsDescendants       = false
     wrap.ZIndex                 = 10
     wrap.Parent                 = gui
 
-    -- Panel BG — fills the full wrap
+    -- ── SOLID panel background — never flickers ────────────────────────────────
     local panel = Instance.new("Frame")
-    panel.Size                  = UDim2.new(1, 0, 1, 0)
-    panel.BackgroundColor3      = PAL.panel
-    panel.BackgroundTransparency = 0.08
-    panel.BorderSizePixel       = 0
-    panel.ZIndex                = 10
-    panel.Parent                = wrap
+    panel.Size                   = UDim2.new(1, 0, 1, 0)
+    panel.BackgroundColor3       = PAL.panel
+    panel.BackgroundTransparency = 1    -- starts invisible for entry anim
+    panel.BorderSizePixel        = 0
+    panel.ZIndex                 = 10
+    panel.Parent                 = wrap
     Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 7)
 
     local borderStroke = Instance.new("UIStroke")
     borderStroke.Color       = PAL.stroke
     borderStroke.Thickness   = 1.8
-    borderStroke.Transparency = 0.04
+    borderStroke.Transparency = 1      -- starts invisible
     borderStroke.Parent      = panel
 
     -- Top accent line
@@ -104,43 +107,45 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
     topLine.Size             = UDim2.new(0.86, 0, 0, 2)
     topLine.Position         = UDim2.new(0.07, 0, 0, 0)
     topLine.BackgroundColor3 = PAL.stroke
+    topLine.BackgroundTransparency = 1
     topLine.BorderSizePixel  = 0
     topLine.ZIndex           = 14
     topLine.Parent           = wrap
-    Instance.new("UICorner", topLine).CornerRadius = UDim.new(1,0)
+    Instance.new("UICorner", topLine).CornerRadius = UDim.new(1, 0)
 
     -- Bottom dim line
     local botLine = Instance.new("Frame")
     botLine.Size             = UDim2.new(0.50, 0, 0, 1)
     botLine.Position         = UDim2.new(0.25, 0, 1, -1)
     botLine.BackgroundColor3 = PAL.sub
-    botLine.BackgroundTransparency = 0.35
+    botLine.BackgroundTransparency = 1
     botLine.BorderSizePixel  = 0
     botLine.ZIndex           = 14
     botLine.Parent           = wrap
-    Instance.new("UICorner", botLine).CornerRadius = UDim.new(1,0)
+    Instance.new("UICorner", botLine).CornerRadius = UDim.new(1, 0)
 
     -- Left / Right power bars
     local leftBar = Instance.new("Frame")
     leftBar.Size             = UDim2.new(0, 3, 0.65, 0)
     leftBar.Position         = UDim2.new(0, 0, 0.175, 0)
     leftBar.BackgroundColor3 = PAL.bar
+    leftBar.BackgroundTransparency = 1
     leftBar.BorderSizePixel  = 0
     leftBar.ZIndex           = 15
     leftBar.Parent           = wrap
-    Instance.new("UICorner", leftBar).CornerRadius = UDim.new(1,0)
+    Instance.new("UICorner", leftBar).CornerRadius = UDim.new(1, 0)
 
     local rightBar = leftBar:Clone()
     rightBar.Position = UDim2.new(1, -3, 0.175, 0)
     rightBar.Parent   = wrap
 
-    -- Corner tick marks (HUD)
+    -- Corner HUD ticks
     local function tick(parent, ax, ay)
         local hw = Instance.new("Frame")
         hw.Size             = UDim2.new(0, 9, 0, 2)
         hw.Position         = UDim2.new(ax, ax==0 and 1 or -10, ay, ay==0 and 1 or -3)
         hw.BackgroundColor3 = PAL.stroke
-        hw.BackgroundTransparency = 0.15
+        hw.BackgroundTransparency = 1
         hw.BorderSizePixel  = 0
         hw.ZIndex           = 17
         hw.Parent           = parent
@@ -148,27 +153,22 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
         vw.Size             = UDim2.new(0, 2, 0, 9)
         vw.Position         = UDim2.new(ax, ax==0 and 1 or -3, ay, ay==0 and 1 or -10)
         vw.BackgroundColor3 = PAL.stroke
-        vw.BackgroundTransparency = 0.15
+        vw.BackgroundTransparency = 1
         vw.BorderSizePixel  = 0
         vw.ZIndex           = 17
         vw.Parent           = parent
+        return hw, vw
     end
-    tick(wrap, 0, 0) tick(wrap, 1, 0)
-    tick(wrap, 0, 1) tick(wrap, 1, 1)
-
-    -- CRT scanlines
-    for i = 0, 5 do
-        local sl = Instance.new("Frame")
-        sl.Size             = UDim2.new(1, -4, 0, 1)
-        sl.Position         = UDim2.new(0, 2, 0, 5 + i * 14)
-        sl.BackgroundColor3 = PAL.scan
-        sl.BackgroundTransparency = 0.83
-        sl.BorderSizePixel  = 0
-        sl.ZIndex           = 15
-        sl.Parent           = wrap
+    local tickFrames = {}
+    local function addTick(ax, ay)
+        local a, b = tick(wrap, ax, ay)
+        table.insert(tickFrames, a)
+        table.insert(tickFrames, b)
     end
+    addTick(0,0) addTick(1,0) addTick(0,1) addTick(1,1)
 
-    -- Drawn lightning bolt zigzags
+    -- Drawn lightning bolt zigzags (pure Frame geometry)
+    local boltSegments = {}
     local function makeBolt(parent, ox, oy)
         local segs = {
             {dx=5,  dy=0,  r= 52, w=11, h=2},
@@ -182,10 +182,11 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
             seg.Position         = UDim2.new(0, ox + s.dx, 0, oy + s.dy)
             seg.Rotation         = s.r
             seg.BackgroundColor3 = PAL.bolt
-            seg.BackgroundTransparency = 0.12
+            seg.BackgroundTransparency = 1
             seg.BorderSizePixel  = 0
             seg.ZIndex           = 16
             seg.Parent           = parent
+            table.insert(boltSegments, seg)
         end
     end
     makeBolt(wrap,  6,  10)
@@ -202,7 +203,7 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
     aberR.Font               = Enum.Font.GothamBlack
     aberR.TextSize           = 15
     aberR.TextColor3         = PAL.aberR
-    aberR.TextTransparency   = 0.70
+    aberR.TextTransparency   = 1
     aberR.TextXAlignment     = Enum.TextXAlignment.Center
     aberR.ZIndex             = 11
     aberR.Parent             = wrap
@@ -215,7 +216,7 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
     aberB.Font               = Enum.Font.GothamBlack
     aberB.TextSize           = 15
     aberB.TextColor3         = PAL.aberB
-    aberB.TextTransparency   = 0.70
+    aberB.TextTransparency   = 1
     aberB.TextXAlignment     = Enum.TextXAlignment.Center
     aberB.ZIndex             = 11
     aberB.Parent             = wrap
@@ -230,7 +231,8 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
     mainLbl.TextSize           = 15
     mainLbl.TextColor3         = PAL.main
     mainLbl.TextStrokeColor3   = PAL.strokeB
-    mainLbl.TextStrokeTransparency = 0.0
+    mainLbl.TextStrokeTransparency = 1
+    mainLbl.TextTransparency   = 1
     mainLbl.TextXAlignment     = Enum.TextXAlignment.Center
     mainLbl.ZIndex             = 18
     mainLbl.Parent             = wrap
@@ -238,7 +240,7 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
     local lStroke = Instance.new("UIStroke")
     lStroke.Color       = PAL.stroke
     lStroke.Thickness   = 1.1
-    lStroke.Transparency = 0.18
+    lStroke.Transparency = 1
     lStroke.Parent      = mainLbl
 
     -- Sub text
@@ -250,38 +252,148 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
     subLbl.Font               = Enum.Font.GothamSemibold
     subLbl.TextSize           = 10
     subLbl.TextColor3         = PAL.sub
-    subLbl.TextTransparency   = 0.08
+    subLbl.TextTransparency   = 1
     subLbl.TextXAlignment     = Enum.TextXAlignment.Center
     subLbl.ZIndex             = 18
     subLbl.Parent             = wrap
 
-    -- ── Credit INSIDE the panel — bottom area ──────────────────────────────────
-    -- Thin separator line above credit
+    -- Separator above credit
     local sepLine = Instance.new("Frame")
     sepLine.Size             = UDim2.new(0.7, 0, 0, 1)
     sepLine.Position         = UDim2.new(0.15, 0, 1, -18)
-    sepLine.BackgroundColor3 = PAL.stroke
-    sepLine.BackgroundTransparency = 0.6
+    sepLine.BackgroundColor3 = PAL.sep
+    sepLine.BackgroundTransparency = 1
     sepLine.BorderSizePixel  = 0
     sepLine.ZIndex           = 17
     sepLine.Parent           = wrap
-    Instance.new("UICorner", sepLine).CornerRadius = UDim.new(1,0)
+    Instance.new("UICorner", sepLine).CornerRadius = UDim.new(1, 0)
 
+    -- Credit — INSIDE panel, 16px from bottom
     local cred = Instance.new("TextLabel")
     cred.Size               = UDim2.new(1, -16, 0, 14)
-    cred.Position           = UDim2.new(0, 8, 1, -16)   -- 16px from bottom, inside wrap
+    cred.Position           = UDim2.new(0, 8, 1, -16)
     cred.BackgroundTransparency = 1
     cred.Text               = "By  Anonymous9x"
     cred.Font               = Enum.Font.Gotham
     cred.TextSize           = 8
-    cred.TextColor3         = Color3.fromRGB(140, 140, 140)
-    cred.TextTransparency   = 0.20
+    cred.TextColor3         = PAL.cred
+    cred.TextTransparency   = 1
     cred.TextXAlignment     = Enum.TextXAlignment.Center
     cred.ZIndex             = 18
     cred.Parent             = wrap
 
     -- ============================================================
-    --  Effects loop
+    --  Helper: set all elements to fully visible (called after entry anim)
+    -- ============================================================
+    local function revealAll()
+        -- Panel solid, never blinks after this
+        panel.BackgroundTransparency = 0.08
+        borderStroke.Transparency   = 0.05
+        topLine.BackgroundTransparency  = 0.0
+        botLine.BackgroundTransparency  = 0.35
+        leftBar.BackgroundTransparency  = 0.0
+        rightBar.BackgroundTransparency = 0.0
+        for _, f in ipairs(tickFrames) do
+            f.BackgroundTransparency = 0.15
+        end
+        for _, s in ipairs(boltSegments) do
+            s.BackgroundTransparency = 0.15
+        end
+        sepLine.BackgroundTransparency = 0.55
+        mainLbl.TextTransparency      = 0.0
+        mainLbl.TextStrokeTransparency = 0.0
+        subLbl.TextTransparency       = 0.08
+        cred.TextTransparency         = 0.20
+        aberR.TextTransparency        = 0.68
+        aberB.TextTransparency        = 0.68
+        lStroke.Transparency          = 0.18
+    end
+
+    local function hideAll()
+        panel.BackgroundTransparency = 1
+        borderStroke.Transparency   = 1
+        topLine.BackgroundTransparency  = 1
+        botLine.BackgroundTransparency  = 1
+        leftBar.BackgroundTransparency  = 1
+        rightBar.BackgroundTransparency = 1
+        for _, f in ipairs(tickFrames) do f.BackgroundTransparency = 1 end
+        for _, s in ipairs(boltSegments) do s.BackgroundTransparency = 1 end
+        sepLine.BackgroundTransparency = 1
+        mainLbl.TextTransparency = 1
+        mainLbl.TextStrokeTransparency = 1
+        subLbl.TextTransparency = 1
+        cred.TextTransparency = 1
+        aberR.TextTransparency = 1
+        aberB.TextTransparency = 1
+        lStroke.Transparency = 1
+    end
+
+    -- ============================================================
+    --  ENTRY ANIMATION — Lightning strike materialise
+    --  Sequence of rapid flash-in bursts with X-jitter,
+    --  like electricity building then locking into place.
+    --  Panel stays invisible until the final snap.
+    -- ============================================================
+    local CENTER_X = UDim2.new(0.5, 0, 0, 18)
+
+    local function snapX(offsetPx)
+        wrap.Position = UDim2.new(0.5, offsetPx, 0, 18)
+    end
+
+    -- Entry sequence (all via task.delay, total ~0.28s)
+    task.delay(0.00, function()
+        -- Flash 1: only border + bolts appear briefly, offset left
+        snapX(-10)
+        borderStroke.Transparency = 0.1
+        for _, s in ipairs(boltSegments) do s.BackgroundTransparency = 0.0 end
+        for _, f in ipairs(tickFrames)   do f.BackgroundTransparency = 0.0 end
+    end)
+    task.delay(0.05, function()
+        -- Flash 1 off
+        hideAll()
+        snapX(7)
+    end)
+    task.delay(0.09, function()
+        -- Flash 2: panel half-visible, text scrambled position, offset right
+        panel.BackgroundTransparency = 0.35
+        borderStroke.Transparency   = 0.0
+        topLine.BackgroundTransparency = 0.0
+        for _, s in ipairs(boltSegments) do s.BackgroundTransparency = 0.05 end
+        mainLbl.TextTransparency = 0.5
+        mainLbl.TextStrokeTransparency = 0.5
+        aberR.TextTransparency = 0.5
+        aberB.TextTransparency = 0.5
+    end)
+    task.delay(0.14, function()
+        -- Flash 2 off, shift left again
+        hideAll()
+        snapX(-4)
+    end)
+    task.delay(0.17, function()
+        -- Flash 3: bigger reveal, almost full, minor jitter
+        panel.BackgroundTransparency = 0.15
+        borderStroke.Transparency   = 0.05
+        topLine.BackgroundTransparency = 0.0
+        botLine.BackgroundTransparency = 0.35
+        for _, s in ipairs(boltSegments) do s.BackgroundTransparency = 0.1 end
+        for _, f in ipairs(tickFrames)   do f.BackgroundTransparency = 0.2 end
+        mainLbl.TextTransparency = 0.2
+        mainLbl.TextStrokeTransparency = 0.2
+        subLbl.TextTransparency  = 0.4
+        aberR.TextTransparency   = 0.6
+        aberB.TextTransparency   = 0.6
+        lStroke.Transparency     = 0.3
+    end)
+    task.delay(0.21, function()
+        -- FINAL SNAP — lock everything solid, center position
+        wrap.Position = CENTER_X
+        revealAll()
+        -- Start idle effects loop now that panel is locked
+    end)
+
+    -- ============================================================
+    --  IDLE EFFECTS — only text & internal elements animate.
+    --  Panel BG is NEVER touched here.
     -- ============================================================
     local t           = 0
     local gTimer      = 0
@@ -296,7 +408,7 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
         for _ = 1, n do
             local i = math.random(1, #chars)
             if chars[i] ~= " " then
-                chars[i] = GCHARS[math.random(1,#GCHARS)]
+                chars[i] = GCHARS[math.random(1, #GCHARS)]
             end
         end
         return table.concat(chars)
@@ -307,40 +419,48 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
         t      += dt
         gTimer += dt
 
-        local fast = (math.sin(t * 6)   + 1) / 2
-        local slow = (math.sin(t * 1.6) + 1) / 2
+        local fast = (math.sin(t * 6)   + 1) / 2   -- 0-1 fast
+        local slow = (math.sin(t * 1.6) + 1) / 2   -- 0-1 slow
 
-        borderStroke.Transparency = 0.04 + fast * 0.55
-        lStroke.Transparency      = 0.02 + fast * 0.60
+        -- Border stroke pulses (not the panel BG)
+        borderStroke.Transparency = 0.05 + fast * 0.50
+        lStroke.Transparency      = 0.10 + fast * 0.55
 
-        leftBar.BackgroundTransparency  = fast * 0.65
-        rightBar.BackgroundTransparency = fast * 0.65
+        -- Power bars inner pulse (semi-transparent flicker, not the panel)
+        leftBar.BackgroundTransparency  = fast * 0.60
+        rightBar.BackgroundTransparency = fast * 0.60
 
-        topLine.BackgroundTransparency = slow * 0.45
-        botLine.BackgroundTransparency = 0.30 + fast * 0.50
+        -- Top line breathe
+        topLine.BackgroundTransparency = slow * 0.40
+        botLine.BackgroundTransparency = 0.30 + fast * 0.45
 
-        if math.random() < 0.035 then
-            panel.BackgroundTransparency = 0.65
-        else
-            panel.BackgroundTransparency = 0.08 + slow * 0.07
+        -- Tick marks flicker lightly
+        for _, f in ipairs(tickFrames) do
+            f.BackgroundTransparency = 0.10 + fast * 0.55
         end
 
-        local jitter = fast * 2.8
+        -- Bolt segments crackle
+        for _, s in ipairs(boltSegments) do
+            s.BackgroundTransparency = 0.08 + fast * 0.68
+        end
+
+        -- Sep line breathe
+        sepLine.BackgroundTransparency = 0.45 + slow * 0.35
+
+        -- Credit fade breathe
+        cred.TextTransparency = 0.15 + slow * 0.28
+
+        -- Chromatic aberration jitter (text effect only)
+        local jitter = fast * 2.6
         aberR.Position = UDim2.new(0,  jitter, 0, 10)
         aberB.Position = UDim2.new(0, -jitter, 0,  8)
-        aberR.TextTransparency = 0.60 + slow * 0.25
-        aberB.TextTransparency = 0.60 + slow * 0.25
+        aberR.TextTransparency = 0.58 + slow * 0.22
+        aberB.TextTransparency = 0.58 + slow * 0.22
 
-        for _, child in ipairs(wrap:GetChildren()) do
-            if child:IsA("Frame") and math.abs(child.Rotation) > 10 then
-                child.BackgroundTransparency = 0.08 + fast * 0.72
-            end
-        end
+        -- Sub text breathe
+        subLbl.TextTransparency = 0.05 + slow * 0.32
 
-        subLbl.TextTransparency = 0.05 + slow * 0.38
-        sepLine.BackgroundTransparency = 0.5 + slow * 0.35
-        cred.TextTransparency = 0.15 + slow * 0.30
-
+        -- Text glitch burst every ~0.85s
         if gTimer > 0.85 then
             gTimer    = 0
             glitching = true
@@ -351,7 +471,6 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
                 aberB.Text   = origText
             end)
         end
-
         if glitching then
             local g      = scramble(origText)
             mainLbl.Text = g
@@ -360,54 +479,72 @@ local function buildNotif(guiName, mainText, subText, entering, panelH, displayS
         end
     end)
 
-    -- Slide IN
-    TweenService:Create(wrap,
-        TweenInfo.new(0.36, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        { Position = UDim2.new(0.5, 0, 0, 18) }
-    ):Play()
-
-    -- Auto dismiss
+    -- ============================================================
+    --  EXIT ANIMATION — glitch dissolve in place (no slide)
+    --  Panel flickers out, text scrambles then fades.
+    -- ============================================================
     task.delay(displaySecs, function()
         effectConn:Disconnect()
         mainLbl.Text = origText
-        local out = TweenService:Create(wrap,
-            TweenInfo.new(0.30, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            { Position = UDim2.new(0.5, 0, 0, -(panelH + 40)) }
-        )
-        out:Play()
-        out.Completed:Connect(function()
+        aberR.Text   = origText
+        aberB.Text   = origText
+
+        -- Glitch-dissolve sequence
+        local steps = {
+            -- {delay, xOffset, panelT, textT}
+            {0.00,  5,  0.35, 0.35},
+            {0.05, -7,  0.65, 0.55},
+            {0.09,  3,  0.25, 0.20},
+            {0.13, -4,  0.80, 0.70},
+            {0.17,  0,  1.00, 1.00},
+        }
+
+        for _, step in ipairs(steps) do
+            task.delay(step[1], function()
+                if not gui or not gui.Parent then return end
+                snapX(step[2])
+                panel.BackgroundTransparency = step[3]
+                borderStroke.Transparency   = step[3]
+                mainLbl.TextTransparency    = step[4]
+                mainLbl.TextStrokeTransparency = step[4]
+                subLbl.TextTransparency     = step[4]
+                aberR.TextTransparency      = math.min(1, step[4] + 0.15)
+                aberB.TextTransparency      = math.min(1, step[4] + 0.15)
+                cred.TextTransparency       = step[4]
+                topLine.BackgroundTransparency  = step[3]
+                botLine.BackgroundTransparency  = step[3]
+                leftBar.BackgroundTransparency  = step[3]
+                rightBar.BackgroundTransparency = step[3]
+                sepLine.BackgroundTransparency  = step[3]
+                lStroke.Transparency = step[4]
+                for _, f in ipairs(tickFrames)   do f.BackgroundTransparency = step[3] end
+                for _, s in ipairs(boltSegments) do s.BackgroundTransparency = step[3] end
+                -- scramble text on first few steps
+                if step[4] < 0.9 and step[4] > 0 then
+                    mainLbl.Text = scramble(origText)
+                    aberR.Text   = mainLbl.Text
+                    aberB.Text   = mainLbl.Text
+                end
+            end)
+        end
+
+        task.delay(0.22, function()
             pcall(function() gui:Destroy() end)
         end)
     end)
 end
 
--- Main toggle notif (taller: 92px to fit credit comfortably inside)
+-- Convenience wrappers
 local function showMainNotif(entering)
     if entering then
-        buildNotif(
-            "__GodNotif9x",
-            "GOD MODE ACTIVATED",
-            "PROTECTION SYSTEMS  ONLINE",
-            true, 92, 3.0
-        )
+        buildNotif("__GodNotif9x", "GOD MODE ACTIVATED",   "PROTECTION SYSTEMS  ONLINE", true,  3.0)
     else
-        buildNotif(
-            "__GodNotif9x",
-            "NORMAL MODE RESTORED",
-            "ALL SYSTEMS  OFFLINE",
-            false, 92, 3.0
-        )
+        buildNotif("__GodNotif9x", "NORMAL MODE RESTORED", "ALL SYSTEMS  OFFLINE",        false, 3.0)
     end
 end
 
--- Respawn notif (same height, gold palette, different text)
 local function showRespawnNotif()
-    buildNotif(
-        "__GodRespawnNotif9x",
-        "GOD MODE RE-APPLIED",
-        "AUTO REACTIVATED  ON RESPAWN",
-        true, 92, 2.8
-    )
+    buildNotif("__GodRespawnNotif9x", "GOD MODE RE-APPLIED", "AUTO REACTIVATED  ON RESPAWN", true, 2.8)
 end
 
 -- ================================================================================
@@ -461,7 +598,7 @@ end
 
 local function addConn(c) table.insert(_connections, c) end
 
-local function enableGodMode(isRespawn)
+local function enableGodMode()
     local char = LocalPlayer.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -470,11 +607,9 @@ local function enableGodMode(isRespawn)
     hum.MaxHealth = math.huge
     hum.Health    = math.huge
 
-    -- Remove any old FF first
     for _, v in ipairs(char:GetChildren()) do
         if v.Name == "_GodFF" then v:Destroy() end
     end
-
     local ff = Instance.new("ForceField")
     ff.Visible = false
     ff.Name    = "_GodFF"
@@ -484,7 +619,6 @@ local function enableGodMode(isRespawn)
         disableKillPart(part)
     end
 
-    -- Health + state clamp loop
     addConn(RunService.Heartbeat:Connect(function()
         local c2 = LocalPlayer.Character
         if not c2 then return end
@@ -498,7 +632,6 @@ local function enableGodMode(isRespawn)
         end
     end))
 
-    -- Anti-void loop
     addConn(RunService.Heartbeat:Connect(function()
         local c2 = LocalPlayer.Character
         if not c2 then return end
@@ -508,24 +641,17 @@ local function enableGodMode(isRespawn)
         end
     end))
 
-    -- New kill part watcher
     addConn(workspace.DescendantAdded:Connect(function(p)
         if _G.GodModeActive then disableKillPart(p) end
     end))
 
-    -- Re-apply on respawn + show respawn notif
     addConn(LocalPlayer.CharacterAdded:Connect(function()
         task.wait(0.18)
         if _G.GodModeActive then
-            enableGodMode(true)     -- isRespawn = true
-            showRespawnNotif()      -- fire the re-apply notif
+            enableGodMode()
+            showRespawnNotif()
         end
     end))
-
-    -- Show respawn notif if this call was triggered by a respawn
-    if isRespawn then
-        -- already called by the caller above
-    end
 end
 
 local function disableGodMode()
@@ -545,11 +671,6 @@ local function disableGodMode()
     end
 end
 
--- ── Run ──────────────────────────────────────────────────────────────────────
-if ENTERING then
-    enableGodMode(false)
-else
-    disableGodMode()
-end
-
+-- Run
+if ENTERING then enableGodMode() else disableGodMode() end
 showMainNotif(ENTERING)
