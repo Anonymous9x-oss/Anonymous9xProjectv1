@@ -1,5 +1,5 @@
 --[[
-    Ano9x Skybox&Crash
+    Anonymous9x Skybox
     Delta Mobile / Delta iOS
     FE Animation Skybox Engine
 ]]
@@ -313,7 +313,7 @@ TLine.BackgroundColor3 = Color3.fromRGB(38, 38, 38); TLine.BorderSizePixel = 0; 
 
 local TTxt = Instance.new("TextLabel", TBar)
 TTxt.Size = UDim2.new(1, -64, 1, 0); TTxt.Position = UDim2.new(0, 10, 0, 0)
-TTxt.BackgroundTransparency = 1; TTxt.Text = "Ano9x Skybox&Crash"
+TTxt.BackgroundTransparency = 1; TTxt.Text = "Anonymous9x Skybox"
 TTxt.TextColor3 = Color3.fromRGB(235, 235, 235); TTxt.TextScaled = true
 TTxt.Font = Enum.Font.GothamBold; TTxt.TextXAlignment = Enum.TextXAlignment.Left; TTxt.ZIndex = 11
 
@@ -566,8 +566,7 @@ end
 -- BUILD PANEL CONTENTS
 -- ============================================================
 
-SecLabel("EMOTE / SKYBOX")
-local EmBox = EmoteBox(32)
+SecLabel("SKYBOX & CRASH")
 local ActiveBtn = BigBtn("ACTIVE", 42)
 local StopBtn   = SecBtn("STOP",   32)
 Sep()
@@ -586,7 +585,7 @@ SecLabel("EXTRAS")
 local GravBtn, TpBtn = Row2("Anti Gravity  OFF", "TP Up", 38)
 Sep()
 
-InfoBox("Ano9x Skybox&Crash  |  Delta Mobile & Delta iOS\nFE Emote Engine — gunakan R6 blocky avatar\nID default: 93224413172183", 50)
+InfoBox("Anonymous9x Skybox  |  Delta Mobile & Delta iOS\nFE Emote Engine — gunakan R6 blocky avatar\nID default: 93224413172183", 50)
 
 curY = curY + PD
 Scroll.CanvasSize = UDim2.new(0, 0, 0, curY)
@@ -596,7 +595,7 @@ Scroll.CanvasSize = UDim2.new(0, 0, 0, curY)
 -- ============================================================
 
 ActiveBtn.MouseButton1Click:Connect(function()
-    local id = EmBox.Text
+    local id = DEFAULT_ID
     Notif("Mengaktifkan Skybox...", Color3.fromRGB(148, 0, 185))
     task.spawn(function()
         local ok, err = doPlay(id)
@@ -689,5 +688,5 @@ end)
 -- INIT
 -- ============================================================
 task.wait(0.4)
-Notif("Ano9x Skybox&Crash loaded.", Color3.fromRGB(148, 0, 188))
+Notif("Anonymous9x Skybox loaded.", Color3.fromRGB(148, 0, 188))
 print("[Ano9x] Loaded. Canvas height: " .. curY .. "px")
