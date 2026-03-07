@@ -585,7 +585,7 @@ SecLabel("EXTRAS")
 local GravBtn, TpBtn = Row2("Anti Gravity  OFF", "TP Up", 38)
 Sep()
 
-InfoBox("Anonymous9x Skybox  |  Delta Mobile & Delta iOS\nFE Emote Engine — gunakan R6 blocky avatar\nID default: 93224413172183", 50)
+InfoBox("Anonymous9x Skybox  |  Delta Mobile & Delta iOS\nConditions: Purchase a supported Ava/Body to use Skybox.\nJoin DC Anonymous9x!", 50)
 
 curY = curY + PD
 Scroll.CanvasSize = UDim2.new(0, 0, 0, curY)
