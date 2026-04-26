@@ -1,10 +1,45 @@
---[[ TOGGLE ON/OFF - By @Anonymous9x ]]--
-if _G.AnonymousWalkActive then
-    _G.AnonymousWalkActive = false   -- matikan
-    return -- stop eksekusi sekarang
-else
-    _G.AnonymousWalkActive = true    -- nyalakan
-end
+--[[ UI NOTIF MODERN + INFO - By @Anonymous9x ]]--
+local player = game:GetService("Players").LocalPlayer
+local TweenService = game:GetService("TweenService")
+
+local pg = player:WaitForChild("PlayerGui")
+pcall(function() pg:WaitForChild("WalkNotif"):Destroy() end)
+
+local sgui = Instance.new("ScreenGui", pg)
+sgui.Name = "WalkNotif"
+
+local frame = Instance.new("Frame", sgui)
+frame.Size = UDim2.new(0, 280, 0, 100) -- sedikit lebih tinggi biar muat 3 baris
+frame.Position = UDim2.new(0.5, -140, 0, 30)
+frame.BackgroundColor3 = Color3.new(0, 0, 0)
+frame.BorderSizePixel = 2
+frame.BorderColor3 = Color3.new(1, 1, 1)
+frame.BackgroundTransparency = 0
+
+local label = Instance.new("TextLabel", frame)
+label.Size = UDim2.new(1, 0, 1, 0)
+label.Text = "Car walk ON\nRespawn to disable\nBy @Anonymous9x"
+label.Font = Enum.Font.GothamBold
+label.TextColor3 = Color3.new(1, 1, 1)
+label.TextSize = 18
+label.TextWrapped = true
+label.BackgroundTransparency = 1
+
+-- Tahan 4 detik biar kebaca
+task.wait(4)
+
+-- Fade out elegan
+local fadeFrame = TweenService:Create(frame, TweenInfo.new(1), {BackgroundTransparency = 1})
+local fadeBorder = TweenService:Create(frame, TweenInfo.new(1), {BorderTransparency = 1})
+local fadeLabel = TweenService:Create(label, TweenInfo.new(1), {TextTransparency = 1})
+
+fadeFrame:Play()
+fadeBorder:Play()
+fadeLabel:Play()
+
+task.wait(1.5)
+sgui:Destroy()
+
 
 script = Instance.new("LocalScript")
 
@@ -20,7 +55,7 @@ repeat wait()
 until true == false
 
 game:WaitForChild("Players").LocalPlayer:WaitForChild("PlayerScripts").ChildAdded:Connect(function(c)
-	if c.Name == "PlayerScriptsLoader"and _G.AnonymousWalkActive then
+	if c.Name == "PlayerScriptsLoader"then
 		c.Disabled = true
 	end
 end)
