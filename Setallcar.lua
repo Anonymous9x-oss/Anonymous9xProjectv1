@@ -1,67 +1,43 @@
---[[ TOGGLE RESPAWN + UI MODERN - By @Anonymous9x ]]--
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local TweenService = game:GetService("TweenService")
+--[[ TOGGLE & UI NOTIF - By @Anonymous9x ]]--
+local thisScript = script  -- simpen referensi script asli sebelum ditimpa
 
--- Flag global (ON pertama kali)
-if _G.WalkOnWaterActive == nil then
-	_G.WalkOnWaterActive = true
-end
+-- cek apakah ada instance sebelumnya
+if _G.AnonymousWalkInstance then
+	
+	-- ========== MODE ON ==========
+	_G.AnonymousWalkInstance = thisScript
+	_G.WalkActive = true
 
--- Fungsi tampil notif modern
-local function showNotification(stateText)
-	local pg = player:WaitForChild("PlayerGui")
-	-- Hapus notif lama kalo ada
-	pcall(function() pg:WaitForChild("WalkNotif"):Destroy() end)
-
+	-- tampilkan notif ON
+	local plr = game:GetService("Players").LocalPlayer
+	local pg = plr:WaitForChild("PlayerGui")
 	local sgui = Instance.new("ScreenGui", pg)
-	sgui.Name = "WalkNotif"
-
+	sgui.Name = "NotifWalk"
 	local frame = Instance.new("Frame", sgui)
-	frame.Size = UDim2.new(0, 280, 0, 80)
-	frame.Position = UDim2.new(0.5, -140, 0, 30)
+	frame.Size = UDim2.new(0, 300, 0, 80)
+	frame.Position = UDim2.new(0.5, -150, 0, 20)
 	frame.BackgroundColor3 = Color3.new(0, 0, 0)
 	frame.BorderSizePixel = 2
 	frame.BorderColor3 = Color3.new(1, 1, 1)
 	frame.BackgroundTransparency = 0
+	local txt = Instance.new("TextLabel", frame)
+	txt.Size = UDim2.new(1, 0, 1, 0)
+	txt.Text = "Walk ON(Respawn To Off)\nBy @Anonymous9x"
+	txt.Font = Enum.Font.GothamBold
+	txt.TextColor3 = Color3.new(1, 1, 1)
+	txt.TextSize = 18
+	txt.TextWrapped = true
+	txt.BackgroundTransparency = 1
 
-	local label = Instance.new("TextLabel", frame)
-	label.Size = UDim2.new(1, 0, 1, 0)
-	label.Text = stateText .. "\nBy @Anonymous9x"
-	label.Font = Enum.Font.GothamBold
-	label.TextColor3 = Color3.new(1, 1, 1)
-	label.TextSize = 18
-	label.TextWrapped = true
-	label.BackgroundTransparency = 1
-
-	-- Hilang setelah 5 detik (fade out)
-	local fadeFrame = TweenService:Create(frame, TweenInfo.new(1), {BackgroundTransparency = 1})
-	local fadeBorder = TweenService:Create(frame, TweenInfo.new(1), {BorderTransparency = 1})
-	local fadeLabel = TweenService:Create(label, TweenInfo.new(1), {TextTransparency = 1})
-	task.wait(4) -- diam 4 detik dulu
-	fadeFrame:Play()
-	fadeBorder:Play()
-	fadeLabel:Play()
-	task.wait(1.5)
+	-- fade out setelah 2 detik
+	game:GetService("TweenService"):Create(txt, TweenInfo.new(1), {TextTransparency = 1}):Play()
+	game:GetService("TweenService"):Create(frame, TweenInfo.new(2), {BackgroundTransparency = 1}):Play()
+	game:GetService("TweenService"):Create(frame, TweenInfo.new(2), {BorderTransparency = 1}):Play()
+	task.wait(2.5)
 	sgui:Destroy()
-end
 
--- Toggle state & tampilkan notif
-local function toggleState()
-	_G.WalkOnWaterActive = not _G.WalkOnWaterActive
-	showNotification(_G.WalkOnWaterActive and "Car walk ON" or "Car walk OFF")
+	-- lanjut ke kode asli di bawah ini, jadi script berjalan normal
 end
-
--- Saat pertama jalan, tampilin notif ON (jika aktif)
-if _G.WalkOnWaterActive then
-	showNotification("Car walk ON")
-end
-
--- Setelah karakter pertama muncul, pasang deteksi respawn selanjutnya
-local firstChar = player.Character or player.CharacterAdded:Wait()
-player.CharacterAdded:Connect(function(char)
-	toggleState()
-end)
 
 script = Instance.new("LocalScript")
 
