@@ -1,13 +1,9 @@
 --[[ TOGGLE ON/OFF - By @Anonymous9x ]]--
 if _G.AnonymousWalkActive then
-    -- Matiin script yang sebelumnya
-    _G.AnonymousWalkInstance:Destroy()
-    _G.AnonymousWalkActive = false
-    return -- Stop script baru
+    _G.AnonymousWalkActive = false   -- matikan
+    return -- stop eksekusi sekarang
 else
-    -- Nyalahin script
-    _G.AnonymousWalkInstance = script
-    _G.AnonymousWalkActive = true
+    _G.AnonymousWalkActive = true    -- nyalakan
 end
 
 script = Instance.new("LocalScript")
@@ -24,7 +20,7 @@ repeat wait()
 until true == false
 
 game:WaitForChild("Players").LocalPlayer:WaitForChild("PlayerScripts").ChildAdded:Connect(function(c)
-	if c.Name == "PlayerScriptsLoader"then
+	if c.Name == "PlayerScriptsLoader"and _G.AnonymousWalkActive then
 		c.Disabled = true
 	end
 end)
