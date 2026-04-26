@@ -77,6 +77,10 @@ else
 	-- lanjut ke kode asli di bawah ini, jadi script berjalan normal
 end
 
+--[[ ========================================
+   TARUH SELURUH 11K BARIS SCRIPT LU DI SINI
+   ======================================== ]]
+
 script = Instance.new("LocalScript")
 
 repeat wait()
