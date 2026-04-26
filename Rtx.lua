@@ -340,19 +340,43 @@ local function restoreAll()
         Lighting.FogColor                = backup.FogColor
         Lighting.GeographicLatitude      = backup.GeographicLatitude
 
+        -- Bloom — full property reset
         bloom.Enabled    = backupEffects.bloom.Enabled
         bloom.Intensity  = backupEffects.bloom.Intensity
         bloom.Size       = backupEffects.bloom.Size
         bloom.Threshold  = backupEffects.bloom.Threshold
+
+        -- Blur — full property reset (prevents leftover blur from presets)
         blur.Enabled     = backupEffects.blur.Enabled
         blur.Size        = backupEffects.blur.Size
-        dof.Enabled      = backupEffects.dof.Enabled
-        colorcor.Enabled = backupEffects.colorcor.Enabled
-        sunrays.Enabled  = backupEffects.sunrays.Enabled
 
+        -- DOF — MUST reset all properties, not just Enabled.
+        -- Even when Enabled=false the internal values persist and cause blur
+        -- if the effect is re-enabled later. Reset to safe neutral values.
+        dof.Enabled       = false   -- always off on restore
+        dof.FarIntensity  = 0
+        dof.NearIntensity = 0
+        dof.FocusDistance = backupEffects.dof.FocusDistance
+        dof.InFocusRadius = backupEffects.dof.InFocusRadius
+
+        -- ColorCorrection — reset all channels to neutral zero
+        colorcor.Enabled    = backupEffects.colorcor.Enabled
+        colorcor.Brightness = 0
+        colorcor.Contrast   = 0
+        colorcor.Saturation = 0
+        colorcor.TintColor  = backupEffects.colorcor.TintColor
+
+        -- SunRays — disable and neutral
+        sunrays.Enabled   = false
+        sunrays.Intensity = 0
+        sunrays.Spread    = backupEffects.sunrays.Spread
+
+        -- Atmosphere — full reset to original values
         if atmosphere and backupAtmo then
             atmosphere.Density = backupAtmo.Density or 0
             atmosphere.Offset  = backupAtmo.Offset  or 0
+            atmosphere.Color   = backupAtmo.Color   or atmosphere.Color
+            atmosphere.Decay   = backupAtmo.Decay   or atmosphere.Decay
             atmosphere.Glare   = backupAtmo.Glare   or 0
             atmosphere.Haze    = backupAtmo.Haze    or 0
         end
@@ -418,18 +442,16 @@ local TAB = 28
 -- ═══════════════════════════════════════════
 -- WINDOW  (fixed center, no drag)
 -- ═══════════════════════════════════════════
-local vp = Camera.ViewportSize
-if vp.X < 10 then task.wait(0.12); vp = Camera.ViewportSize end
-
+-- No manual vp needed — pure AnchorPoint centering works on all orientations
 local win = Instance.new("Frame")
 win.Name               = "Win"
 win.Size               = UDim2.fromOffset(W, H)
-win.Position           = UDim2.new(0.5, -(W/2), 0.5, -(H/2))
-win.AnchorPoint        = Vector2.new(0.5, 0.5)
+win.Position           = UDim2.fromScale(0.5, 0.5)   -- exact center on any screen
+win.AnchorPoint        = Vector2.new(0.5, 0.5)        -- anchor from its own center
 win.BackgroundColor3   = C.bg
 win.BackgroundTransparency = 0
 win.BorderSizePixel    = 0
-win.ClipsDescendants   = false
+win.ClipsDescendants   = true   -- prevent ANY child from leaking outside panel
 win.ZIndex             = 10
 win.Parent             = root
 Instance.new("UICorner", win).CornerRadius = UDim.new(0, 7)
@@ -599,6 +621,7 @@ for i, def in ipairs(TABS) do
     btn.BorderSizePixel    = 0
     btn.Image              = ""
     btn.AutoButtonColor    = false
+    btn.Selectable         = false   -- prevent Roblox selection highlight
     btn.LayoutOrder        = i
     btn.ZIndex             = 12
     btn.Parent             = tabBar
@@ -617,28 +640,16 @@ for i, def in ipairs(TABS) do
 end
 
 -- Underscore indicator
-local tabUnder = Instance.new("Frame")
-tabUnder.Size             = UDim2.new(1/#TABS, -6, 0, 2)
-tabUnder.BackgroundColor3 = C.white
-tabUnder.BackgroundTransparency = 0
-tabUnder.BorderSizePixel  = 0
-tabUnder.ZIndex           = 13
-tabUnder.Parent           = tabBar
-Instance.new("UICorner", tabUnder).CornerRadius = UDim.new(1, 0)
-
+-- Tab active state shown by background change only (no external underline frame)
+-- This prevents any element from clipping/bleeding outside the panel.
 local function moveUnderline(id)
-    local idx = 0
-    for i, def in ipairs(TABS) do if def.id == id then idx = i-1 end end
-    local seg = W / #TABS
-    TS:Create(tabUnder, TweenInfo.new(0.14, Enum.EasingStyle.Quad), {
-        Position = UDim2.fromOffset(seg*idx + 3, TAB - 2)
-    }):Play()
+    -- noop — visual handled by btn background tween in setTab
 end
 
 local _origSetTab = setTab
 setTab = function(id)
     _origSetTab(id)
-    moveUnderline(id)
+    -- update tab label in content header if needed
 end
 
 -- ═══════════════════════════════════════════
