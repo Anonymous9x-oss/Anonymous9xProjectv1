@@ -73,6 +73,17 @@ pcall(function() if dofOrig     then dofOrig.Enabled    = false end end)
 pcall(function() if colorOrig   then colorOrig.Enabled  = false end end)
 pcall(function() if sunrayOrig  then sunrayOrig.Enabled = false end end)
 
+-- CRITICAL: disable and zero cloned effects immediately on load.
+-- Without this the cloned instances inherit original values (DOF intensity,
+-- blur size etc) and cause immediate blur when script executes.
+pcall(function()
+    bloom.Enabled    = false; bloom.Intensity = 0; bloom.Size = 0
+    blur.Enabled     = false; blur.Size = 0
+    dof.Enabled      = false; dof.FarIntensity=0; dof.NearIntensity=0
+    colorcor.Enabled = false; colorcor.Brightness=0; colorcor.Contrast=0; colorcor.Saturation=0
+    sunrays.Enabled  = false; sunrays.Intensity=0
+end)
+
 pcall(function()
     atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
     if not atmosphere then
@@ -1122,20 +1133,46 @@ task.spawn(function()
 end)
 
 mkDiv(presetPanel, po())
-mkBtn(presetPanel, {title="Disable Shader  /  Restore Original", ord=po(), cb=function()
-    restoreAll()
-    selectedPreset = nil
-    for _, nm in ipairs(PRESET_ORDER) do
-        local prev = gridF:FindFirstChild("PC_"..nm)
-        if prev then
-            local ps = prev:FindFirstChildOfClass("UIStroke")
-            if ps then ps.Color=C.border; ps.Thickness=1 end
-            local pl = prev:FindFirstChildOfClass("TextLabel")
-            if pl then pl.TextColor3 = C.sec end
-            TS:Create(prev,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play()
-        end
-    end
-end})
+
+-- Info + how to use + creator
+mkSec(presetPanel, "How to Use", po())
+mkTextCard(presetPanel, {
+    "1. Pick a preset from the grid above",
+    "  Tap any shader card to apply it live",
+    "2. Fine-tune in the Adjust tab",
+    "  Bloom, Blur, DOF, Atmosphere + more",
+    "3. Close panel — shader keeps running",
+    "  GUI can be closed, effects stay on",
+    "4. Execute script again to fully unload",
+    "  Second execute removes all effects",
+}, po())
+
+mkSec(presetPanel, "Cinematic Recommendations", po())
+mkTextCard(presetPanel, {
+    "Solo cinematic footage:",
+    "  Evening    — golden hour, warm glow",
+    "  Morning    — soft mist, sunrise bloom",
+    "  Night      — moody dark atmosphere",
+    "Gameplay / competitive:",
+    "  Midday     — clear, high visibility",
+    "  Default    — original game lighting",
+    "Dramatic / showcase:",
+    "  Midnight   — deepest shadows + bloom",
+    "  Afternoon  — sharp contrast, vivid",
+}, po())
+
+mkSec(presetPanel, "Creator", po())
+mkTextCard(presetPanel, {
+    "@Anonymous9x",
+    "  Building tools no one dares to make,",
+    "  Every script a risk we gladly take.",
+    "  Shadows taught the code, bytes learned",
+    "  the name — Anonymous9x, we stake",
+    "  our claim.",
+    "",
+    "  Website : anonymous9x-site.pages.dev",
+    "  YouTube : @anonymous9xch",
+}, po())
 
 -- ═══════════════════════════════════════════
 -- ADJUST TAB
@@ -1250,30 +1287,90 @@ mkTextCard(infoPanel, {
 
 mkDiv(infoPanel, io2())
 
-mkBtn(infoPanel, {title="Disable Shader  /  Restore All", ord=io2(), cb=function()
-    restoreAll()
-    selectedPreset = nil
-end})
+mkTextCard(infoPanel, {
+    "To remove all effects:",
+    "  Execute the script a second time.",
+    "  The toggle guard at the top will",
+    "  detect the loaded state and call",
+    "  restoreAll() automatically.",
+}, io2())
 
 -- ═══════════════════════════════════════════
 -- MINIMIZE / CLOSE
 -- ═══════════════════════════════════════════
-local isMini = false
+local isMini   = false
+local _drag    = false
+local _dragRef = nil
+local _startIP = nil
+local _startWP = nil
+
+-- Drag (active when minimized — header only):
+-- Use global UIS so it works on Delta mobile (Frame.InputBegan can miss touches)
+UIS.InputBegan:Connect(function(inp, gp)
+    if gp then return end
+    if not isMini then return end  -- drag only when minimized
+    local isT = inp.UserInputType == Enum.UserInputType.Touch
+    local isM = inp.UserInputType == Enum.UserInputType.MouseButton1
+    if not (isT or isM) then return end
+    -- Check touch/click is inside header bounds
+    local ap = hdr.AbsolutePosition
+    local az = hdr.AbsoluteSize
+    local px, py = inp.Position.X, inp.Position.Y
+    if px < ap.X or px > ap.X+az.X or py < ap.Y or py > ap.Y+az.Y then return end
+    -- Exclude button zone (right 56px)
+    if px > ap.X + az.X - 56 then return end
+    _drag    = true
+    _dragRef = inp
+    _startIP = Vector2.new(px, py)
+    _startWP = Vector2.new(win.AbsolutePosition.X, win.AbsolutePosition.Y)
+end)
+
+UIS.InputChanged:Connect(function(inp)
+    if not _drag then return end
+    local isT = inp.UserInputType == Enum.UserInputType.Touch
+    local isM = inp.UserInputType == Enum.UserInputType.MouseMove
+    if not (isT or isM) then return end
+    if isT and inp ~= _dragRef then return end
+    local d = Vector2.new(inp.Position.X, inp.Position.Y) - _startIP
+    local vp2 = Camera.ViewportSize
+    win.Position = UDim2.fromOffset(
+        math.clamp(_startWP.X + d.X, 0, vp2.X - W),
+        math.clamp(_startWP.Y + d.Y, 0, vp2.Y - HDR))
+end)
+
+UIS.InputEnded:Connect(function(inp)
+    if inp == _dragRef or inp.UserInputType == Enum.UserInputType.MouseButton1 then
+        _drag = false; _dragRef = nil
+    end
+end)
 
 minBtn.MouseButton1Click:Connect(function()
     isMini = not isMini
-    local targetH = isMini and (HDR + TAB) or H
-    TS:Create(win, TweenInfo.new(0.18, Enum.EasingStyle.Quad),
-        {Size = UDim2.fromOffset(W, targetH)}):Play()
-    for _, p in pairs(tabPanels) do p.Visible = not isMini and p.Visible end
-    if not isMini then
-        task.delay(0.20, function() setTab(activeTab) end)
+    if isMini then
+        -- Collapse: hide tabBar + all panels, shrink to header only
+        tabBar.Visible = false
+        for _, p in pairs(tabPanels) do p.Visible = false end
+        TS:Create(win, TweenInfo.new(0.16, Enum.EasingStyle.Quad),
+            {Size = UDim2.fromOffset(W, HDR)}):Play()
+        -- Return panel to center when collapsing (reset any drag offset)
+        TS:Create(win, TweenInfo.new(0.16, Enum.EasingStyle.Quad),
+            {Position = UDim2.fromScale(0.5, 0.5)}):Play()
+    else
+        -- Expand: show tabBar + panels, restore full height
+        tabBar.Visible = true
+        TS:Create(win, TweenInfo.new(0.20, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+            {Size = UDim2.fromOffset(W, H)}):Play()
+        task.delay(0.22, function() setTab(activeTab) end)
+        -- Re-center after expand
+        TS:Create(win, TweenInfo.new(0.20, Enum.EasingStyle.Quad),
+            {Position = UDim2.fromScale(0.5, 0.5)}):Play()
     end
     minBtn:FindFirstChildOfClass("TextLabel").Text = isMini and "+" or "−"
 end)
 
 closeBtn.MouseButton1Click:Connect(function()
-    restoreAll()
+    -- Shader stays ON — closing GUI does NOT remove effects.
+    -- To fully unload: execute the script again (toggle guard at top).
     _G._A9RTXLoaded = false
     pcall(function() root:Destroy() end)
 end)
