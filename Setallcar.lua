@@ -1,3 +1,15 @@
+--[[ TOGGLE ON/OFF - By @Anonymous9x ]]--
+if _G.AnonymousWalkActive then
+    -- Matiin script yang sebelumnya
+    _G.AnonymousWalkInstance:Destroy()
+    _G.AnonymousWalkActive = false
+    return -- Stop script baru
+else
+    -- Nyalahin script
+    _G.AnonymousWalkInstance = script
+    _G.AnonymousWalkActive = true
+end
+
 script = Instance.new("LocalScript")
 
 repeat wait()
