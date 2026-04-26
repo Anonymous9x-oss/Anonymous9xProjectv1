@@ -35,7 +35,7 @@ spawn(function()
     -- Label teks putih
     local label = Instance.new("TextLabel", frame)
     label.Size = UDim2.new(1, 0, 1, 0)
-    label.Text = "Car walk ON\nRespawn to disable\nBy @Anonymous9x"
+    label.Text = "Spiderman Walk ON\nRespawn to disable\nBy @Anonymous9x"
     label.Font = Enum.Font.GothamBold
     label.TextColor3 = Color3.new(1, 1, 1)
     label.TextSize = 18
