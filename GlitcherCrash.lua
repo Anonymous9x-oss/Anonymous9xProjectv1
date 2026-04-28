@@ -52,10 +52,10 @@ local MODES = {
         FadeIn       = 0,
         FadeOut      = 0,
     },
-    Speed = {
+    Custom = {
         StopOnMove   = false,
-        TimePosition = 9.99,   -- very high forces max position
-        Speed        = 12.00,  -- above engine cap for max velocity
+        TimePosition = 9.99,
+        Speed        = 12.00,
         Weight       = 0.79,
         FadeIn       = 6.00,
         FadeOut      = 6.00,
@@ -177,8 +177,8 @@ end)
 local spinConn   = nil
 local spinActive = 0   -- 0 = off, 1 = spin1, 2 = spin2
 
-local SPIN1_DEG = 380   -- degrees per second (moderate FE spin)
-local SPIN2_DEG = 1200  -- degrees per second (super fast FE spin)
+local SPIN1_DEG = 2800  -- degrees per second (SUPER FAST — fastest)
+local SPIN2_DEG = 1200  -- degrees per second (fast)
 
 local function stopSpin()
     if spinConn then spinConn:Disconnect(); spinConn = nil end
@@ -502,32 +502,32 @@ Sep()
 SecLabel("SELECT MODE")
 local CrashBtn, CrashStroke = ModeBtn("Mode Crash",  40)
 local WideBtn,  WideStroke  = ModeBtn("Mode Wide",   40)
-local SpeedBtn, SpeedStroke = ModeBtn("Mode Speed",  40)
+local CustomBtn, CustomStroke = ModeBtn("Mode Custom", 40)
 Sep()
 
 -- ── SPIN
 SecLabel("SPIN FE")
-local Spin1Btn, Spin2Btn = Row2("Spin 1  — Medium", "Spin 2  — Super Fast", 40)
+local Spin1Btn, Spin2Btn = Row2("Spin 1  — Fastest", "Spin 2  — Fast", 40)
 local StopSpinBtn = SecBtn("Stop Spin", 30)
 Sep()
 
 -- ── INFO BOX (long, English)
 InfoBox(
 [[HOW TO USE:
-1. Select a mode first (Crash / Wide / Speed).
+1. Select a mode first (Crash / Wide / Custom).
 2. Press ACTIVE to start the glitch.
 3. Press STOP to deactivate.
 
-MODE CRASH — Best for crashing players nearby. Get as close as possible to target player, activate, and their client will struggle to resolve the physics collision. Works better in crowded areas.
+MODE CRASH — Best for crashing players nearby. Get as close as possible to the target, activate, and their client will struggle to resolve the physics collision. Works best in crowded areas.
 
-MODE WIDE — Stretches your avatar across the entire map. All players on the server will see your glitch covering the sky and surrounding area. Great for anti-visual and map-wide chaos.
+MODE WIDE — Stretches your avatar across the entire map. All players will see your glitch covering the sky and surrounding area. Great for anti-visual and map-wide chaos.
 
-MODE SPEED — Extremely fast animation with maximum time offset. Creates an intense flickering effect. Best for visual disruption and making your avatar unrecognizable on screen.
+MODE CUSTOM — The laser appears static/still on its own — this is normal. To make it move and look insane, combine it with Spin 1 or Spin 2. Adjust the experience to your liking using the spin speed.
 
-SPIN FE — Spin 1 gives a smooth, visible spin visible to all players. Spin 2 is ultra-fast, makes your avatar appear as a blur. Both spins can be combined with any glitch mode simultaneously for extra chaos. Press the spin button again or press Stop Spin to stop.
+SPIN FE — Spin 1 is the FASTEST spin, makes your avatar a full blur visible to all players. Spin 2 is fast but smoother. Both spins work simultaneously with any glitch mode. Press the button again or press Stop Spin to stop.
 
-TIP: Combine Mode Wide + Spin 2 for maximum skybox coverage and visual crash effect.]],
-    390
+TIP: Combine Mode Wide + Spin 1 for maximum skybox coverage and visual crash effect.]],
+    410
 )
 
 CreditBox(24)
@@ -545,9 +545,9 @@ local MODE_ON_STR = Color3.fromRGB(200, 0, 255)
 local MODE_OFF_STR = Color3.fromRGB(60, 0, 80)
 
 local modeButtons = {
-    {btn = CrashBtn, stroke = CrashStroke, key = "Crash"},
-    {btn = WideBtn,  stroke = WideStroke,  key = "Wide"},
-    {btn = SpeedBtn, stroke = SpeedStroke, key = "Speed"},
+    {btn = CrashBtn,  stroke = CrashStroke,  key = "Crash"},
+    {btn = WideBtn,   stroke = WideStroke,   key = "Wide"},
+    {btn = CustomBtn, stroke = CustomStroke, key = "Custom"},
 }
 
 local function setModeVisuals(activeKey)
@@ -575,7 +575,7 @@ end
 
 CrashBtn.MouseButton1Click:Connect(function() applyMode("Crash") end)
 WideBtn.MouseButton1Click:Connect(function()  applyMode("Wide")  end)
-SpeedBtn.MouseButton1Click:Connect(function() applyMode("Speed") end)
+CustomBtn.MouseButton1Click:Connect(function() applyMode("Custom") end)
 
 -- ============================================================
 -- ACTIVE / STOP
@@ -622,10 +622,10 @@ local function refreshSpinBtns()
     local s2on = (spinActive == 2)
     Spin1Btn.BackgroundColor3 = s1on and SPIN_ON_BG or SPIN_OFF_BG
     Spin1Btn.TextColor3       = s1on and SPIN_ON_TC or SPIN_OFF_TC
-    Spin1Btn.Text             = s1on and "Spin 1  — ON" or "Spin 1  — Medium"
+    Spin1Btn.Text             = s1on and "Spin 1  — ON" or "Spin 1  — Fastest"
     Spin2Btn.BackgroundColor3 = s2on and SPIN_ON_BG or SPIN_OFF_BG
     Spin2Btn.TextColor3       = s2on and SPIN_ON_TC or SPIN_OFF_TC
-    Spin2Btn.Text             = s2on and "Spin 2  — ON" or "Spin 2  — Super Fast"
+    Spin2Btn.Text             = s2on and "Spin 2  — ON" or "Spin 2  — Fast"
 end
 
 Spin1Btn.MouseButton1Click:Connect(function()
@@ -634,7 +634,7 @@ Spin1Btn.MouseButton1Click:Connect(function()
         Notif("Spin 1 stopped.", Color3.fromRGB(82, 82, 82))
     else
         startSpin(1); refreshSpinBtns()
-        Notif("Spin 1 active — Medium speed.", Color3.fromRGB(148, 0, 185))
+        Notif("Spin 1 active — Fastest speed.", Color3.fromRGB(148, 0, 185))
     end
 end)
 
@@ -644,7 +644,7 @@ Spin2Btn.MouseButton1Click:Connect(function()
         Notif("Spin 2 stopped.", Color3.fromRGB(82, 82, 82))
     else
         startSpin(2); refreshSpinBtns()
-        Notif("Spin 2 active — Super fast!", Color3.fromRGB(168, 0, 208))
+        Notif("Spin 2 active — Fast.", Color3.fromRGB(168, 0, 208))
     end
 end)
 
