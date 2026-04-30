@@ -2,7 +2,7 @@
     ANONYMOUS9x VIP - MAIN GUI (UPGRADED v2.1)
     FIX: LOADING ANIMATION POSITION & TEXT SEQUENCE
     MOD: REMOVED KEY SYSTEM, ADDED ANIMATED BACKGROUND + TOGGLE
-    V4 FINAL REVISI TERAKHIR: +JEDA 5.5 DETIK SEBELUM WHITE FLASH
+    V3: HEAVY MATRIX RAIN, GLITCH TEXT SCRAMBLE, BLINKING BORDERS
 --]]
 
 -- Main Configuration
@@ -97,11 +97,11 @@ Instance.new("UICorner", AppWindow).CornerRadius = UDim.new(0, 10)
 AddStroke(AppWindow, 2)
 
 -- ==================== ANIMATED BACKGROUND SYSTEM ====================
-local AnimBackgroundEnabled = true
-local animatedCards = {}
-local cardStrokes = {}
+local AnimBackgroundEnabled = true  -- default aktif
+local animatedCards = {}  -- simpan referensi card
+local cardStrokes = {}   -- simpan stroke border tiap card
 
--- Frame background animasi
+-- Frame background animasi (di belakang semua elemen)
 local AnimBG = Instance.new("Frame", AppWindow)
 AnimBG.Name = "AnimBG"
 AnimBG.Size = UDim2.new(1, 0, 1, 0)
@@ -115,32 +115,18 @@ RainContainer.BackgroundTransparency = 1
 RainContainer.ZIndex = 0
 RainContainer.ClipsDescendants = true
 
--- Dua label untuk teks sinematik
-local WhoIsText = Instance.new("TextLabel", AnimBG)
-WhoIsText.Name = "WhoIsText"
-WhoIsText.AnchorPoint = Vector2.new(0.5, 0.5)
-WhoIsText.Size = UDim2.new(0.4, 0, 0, 30)
-WhoIsText.Position = UDim2.new(0.5, 0, 0.5, 0)
-WhoIsText.BackgroundTransparency = 1
-WhoIsText.Text = "Who is"
-WhoIsText.TextColor3 = Color3.fromRGB(200, 200, 200)
-WhoIsText.Font = Enum.Font.GothamBlack
-WhoIsText.TextSize = 20
-WhoIsText.TextTransparency = 1
-WhoIsText.ZIndex = 5
-
-local AnonText = Instance.new("TextLabel", AnimBG)
-AnonText.Name = "AnonText"
-AnonText.AnchorPoint = Vector2.new(0.5, 0.5)
-AnonText.Size = UDim2.new(0.9, 0, 0, 55)
-AnonText.Position = UDim2.new(0.5, 0, 0.5, 0)
-AnonText.BackgroundTransparency = 1
-AnonText.Text = "Anonymous9x?"
-AnonText.TextColor3 = Color3.fromRGB(200, 200, 200)
-AnonText.Font = Enum.Font.GothamBlack
-AnonText.TextSize = 34
-AnonText.TextTransparency = 1
-AnonText.ZIndex = 5
+-- Glitch text
+local GlitchText = Instance.new("TextLabel", AnimBG)
+GlitchText.Size = UDim2.new(0.8, 0, 0, 36)
+GlitchText.Position = UDim2.new(0.1, 0, 0.44, 0)
+GlitchText.BackgroundTransparency = 1
+GlitchText.Text = "Who is Anonymous9x?"
+GlitchText.TextColor3 = Color3.fromRGB(200, 200, 200)
+GlitchText.Font = Enum.Font.GothamBlack
+GlitchText.TextSize = 22
+GlitchText.TextTransparency = 1
+GlitchText.TextXAlignment = Enum.TextXAlignment.Center
+GlitchText.ZIndex = 5
 
 -- White flash effect
 local WhiteFlash = Instance.new("Frame", AnimBG)
@@ -149,25 +135,25 @@ WhiteFlash.BackgroundColor3 = Color3.new(1, 1, 1)
 WhiteFlash.BackgroundTransparency = 1
 WhiteFlash.ZIndex = 10
 
--- Matrix rain: heavy downpour, random characters (printable ASCII)
+-- Matrix rain: heavy downpour, random characters (alphanumeric + symbols)
 local charPool = {}
-for c = 33, 126 do
+for c = 33, 126 do   -- printable ASCII (33-126)
     table.insert(charPool, string.char(c))
 end
 local rainChars = {}
-for i = 1, 120 do
+for i = 1, 120 do   -- super banyak
     local lbl = Instance.new("TextLabel", RainContainer)
     lbl.Size = UDim2.new(0, 14, 0, 14)
     lbl.BackgroundTransparency = 1
-    lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+    lbl.TextColor3 = Color3.fromRGB(180, 180, 180)   -- abu-abu
     lbl.Font = Enum.Font.Code
-    lbl.TextSize = 10 + math.random(6)
+    lbl.TextSize = 10 + math.random(6)  -- variasi
     lbl.Text = charPool[math.random(#charPool)]
     lbl.Position = UDim2.new(math.random(), 0, math.random(), 0)
     lbl.ZIndex = 0
     rainChars[#rainChars + 1] = {
         label = lbl,
-        speed = 2 + math.random()*4,
+        speed = 2 + math.random()*4,    -- lebih cepat
         changeInterval = math.random(3, 10)
     }
 end
@@ -199,70 +185,63 @@ local function startRainLoop()
     end)
 end
 
--- ==================== CINEMATIC TEXT SEQUENCE (REVISI FINAL) ====================
-local function startCinematicTextSequence()
+-- Glitch text animation cycle
+local function startGlitchCycle()
     task.spawn(function()
+        local baseText = "Who is Anonymous9x?"
+        local prefixLength = 7   -- "Who is " (7 karakter)
         while true do
             if not AnimBackgroundEnabled then task.wait(0.5) continue end
             
-            -- FASE 1: "Who is" zoom in → fade out
-            WhoIsText.TextTransparency = 1
-            WhoIsText.Size = UDim2.new(0.4, 0, 0, 30)   -- reset kecil
-            WhoIsText.Visible = true
-            local tweenZoom = TweenService:Create(WhoIsText, TweenInfo.new(0.4, Enum.EasingStyle.Back), {Size = UDim2.new(0.7, 0, 0, 45)})
-            local tweenFadeIn = TweenService:Create(WhoIsText, TweenInfo.new(0.2), {TextTransparency = 0.2})
-            tweenZoom:Play()
-            tweenFadeIn:Play()
-            tweenZoom.Completed:Wait()
-            task.wait(0.8)
-            -- fade out halus
-            local tweenFadeOut = TweenService:Create(WhoIsText, TweenInfo.new(0.3), {TextTransparency = 1})
-            tweenFadeOut:Play()
-            tweenFadeOut.Completed:Wait()
-            WhoIsText.Visible = false
-
-            -- FASE 2: "Anonymous9x?" muncul besar → scramble → JEDA 5.5 DETIK → white flash
-            AnonText.Text = "Anonymous9x?"
-            AnonText.TextTransparency = 0.2
-            AnonText.Visible = true
-
-            -- Scramble karakter (10 putaran cepat)
-            for _ = 1, 10 do
-                local scrambled = ""
-                for i = 1, #AnonText.Text do
+            -- Munculkan teks dengan entrance glitch kecil
+            GlitchText.TextTransparency = 0.8
+            GlitchText.Text = baseText
+            for i = 1, 3 do
+                GlitchText.Position = UDim2.new(0.08 + math.random(-3,3)*0.01, 0, 0.43 + math.random(-2,2)*0.01, 0)
+                task.wait(0.05)
+            end
+            GlitchText.Position = UDim2.new(0.1, 0, 0.44, 0)
+            local tweenIn = TweenService:Create(GlitchText, TweenInfo.new(0.3), {TextTransparency = 0.3})
+            tweenIn:Play()
+            tweenIn.Completed:Wait()
+            
+            task.wait(2)
+            
+            -- Exit glitch: scramble "Anonymous9x?" saja (karakter ke-8 sampai akhir)
+            for _ = 1, 8 do   -- 8 kali scramble cepat
+                local scrambled = baseText:sub(1, prefixLength)
+                for j = prefixLength+1, #baseText do
                     scrambled = scrambled .. charPool[math.random(#charPool)]
                 end
-                AnonText.Text = scrambled
-                task.wait(0.03)
+                GlitchText.Text = scrambled
+                task.wait(0.04)
             end
-            AnonText.Text = "Anonymous9x?"   -- kembali normal
-
-            -- JEDA 5.5 DETIK AGAR USER BISA BACA "Anonymous9x?"
-            task.wait(5.5)
-
-            -- White flash cinematic langsung
+            GlitchText.Text = baseText
+            
+            -- White flash cinematic
             WhiteFlash.BackgroundTransparency = 1
             local tweenFlash = TweenService:Create(WhiteFlash, TweenInfo.new(0.15), {BackgroundTransparency = 0})
             tweenFlash:Play()
             tweenFlash.Completed:Wait()
-            AnonText.TextTransparency = 1
-            AnonText.Visible = false
+            GlitchText.TextTransparency = 1
             local tweenOut = TweenService:Create(WhiteFlash, TweenInfo.new(0.3), {BackgroundTransparency = 1})
             tweenOut:Play()
             tweenOut.Completed:Wait()
-
-            task.wait(0.8)   -- jeda sebelum loop
+            
+            task.wait(0.8)
         end
     end)
 end
 
--- Border blink animation (random double blinks)
+-- Border blink animation (random double blinks, etc.)
 local function startBorderBlink()
     task.spawn(function()
-        local dimColor = Color3.fromRGB(60,60,60)
+        local dimColor = Color3.fromRGB(60,60,60)   -- gelap saat blink
         while true do
             if not AnimBackgroundEnabled then task.wait(0.5) continue end
-            task.wait(math.random(1, 3))
+            local waitTime = math.random(1, 3)   -- diam 1-3 detik
+            task.wait(waitTime)
+            -- Randomly do single or double blink
             local blinks = math.random(1,2)
             for _ = 1, blinks do
                 for _, stroke in ipairs(cardStrokes) do
@@ -278,7 +257,7 @@ local function startBorderBlink()
     end)
 end
 
--- Update visual mode (transparency, hide/show)
+-- Fungsi untuk update transparansi semua elemen sesuai mode
 local function updateVisualMode()
     for _, card in ipairs(animatedCards) do
         if AnimBackgroundEnabled then
@@ -299,8 +278,6 @@ local function updateVisualMode()
         for _, stroke in ipairs(cardStrokes) do
             stroke.Color = Config.Theme.Border
         end
-        WhoIsText.Visible = false
-        AnonText.Visible = false
     end
 end
 
@@ -336,7 +313,9 @@ local function RunLoadingScreen()
     LoadingText.ZIndex = 2002
     
     local dotsConnection
-    dotsConnection = RunService.Heartbeat:Connect(function() end)
+    
+    dotsConnection = RunService.Heartbeat:Connect(function()
+    end)
     
     return LoadingFrame, LoadingText, dotsConnection
 end
@@ -599,8 +578,8 @@ end)
 
 -- Mulai animasi
 startRainLoop()
+startGlitchCycle()
 startBorderBlink()
-startCinematicTextSequence()
 updateVisualMode()
 
 -- Initialize
