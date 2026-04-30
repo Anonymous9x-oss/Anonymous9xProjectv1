@@ -2,8 +2,7 @@
     ANONYMOUS9x VIP - MAIN GUI (UPGRADED v2.1)
     FIX: LOADING ANIMATION POSITION & TEXT SEQUENCE
     MOD: REMOVED KEY SYSTEM, ADDED ANIMATED BACKGROUND + TOGGLE
-    V4 FINAL: CINEMATIC TEXT SEQUENCE – ZOOM "Who is" → SCRAMBLE "Anonymous9x?" → WHITE FLASH
-              (REMOVED SCAN LINE)
+    V4 FINAL REVISI TERAKHIR: +JEDA 5.5 DETIK SEBELUM WHITE FLASH
 --]]
 
 -- Main Configuration
@@ -120,20 +119,20 @@ RainContainer.ClipsDescendants = true
 local WhoIsText = Instance.new("TextLabel", AnimBG)
 WhoIsText.Name = "WhoIsText"
 WhoIsText.AnchorPoint = Vector2.new(0.5, 0.5)
-WhoIsText.Size = UDim2.new(0.4, 0, 0, 30)   -- mulai kecil
+WhoIsText.Size = UDim2.new(0.4, 0, 0, 30)
 WhoIsText.Position = UDim2.new(0.5, 0, 0.5, 0)
 WhoIsText.BackgroundTransparency = 1
 WhoIsText.Text = "Who is"
 WhoIsText.TextColor3 = Color3.fromRGB(200, 200, 200)
 WhoIsText.Font = Enum.Font.GothamBlack
 WhoIsText.TextSize = 20
-WhoIsText.TextTransparency = 1   -- mulai transparan
+WhoIsText.TextTransparency = 1
 WhoIsText.ZIndex = 5
 
 local AnonText = Instance.new("TextLabel", AnimBG)
 AnonText.Name = "AnonText"
 AnonText.AnchorPoint = Vector2.new(0.5, 0.5)
-AnonText.Size = UDim2.new(0.9, 0, 0, 55)   -- cukup besar
+AnonText.Size = UDim2.new(0.9, 0, 0, 55)
 AnonText.Position = UDim2.new(0.5, 0, 0.5, 0)
 AnonText.BackgroundTransparency = 1
 AnonText.Text = "Anonymous9x?"
@@ -156,7 +155,7 @@ for c = 33, 126 do
     table.insert(charPool, string.char(c))
 end
 local rainChars = {}
-for i = 1, 120 do   -- super banyak
+for i = 1, 120 do
     local lbl = Instance.new("TextLabel", RainContainer)
     lbl.Size = UDim2.new(0, 14, 0, 14)
     lbl.BackgroundTransparency = 1
@@ -200,13 +199,13 @@ local function startRainLoop()
     end)
 end
 
--- Cinematic text sequence (NEW - tanpa scan line)
+-- ==================== CINEMATIC TEXT SEQUENCE (REVISI FINAL) ====================
 local function startCinematicTextSequence()
     task.spawn(function()
         while true do
             if not AnimBackgroundEnabled then task.wait(0.5) continue end
             
-            -- FASE 1: "Who is" zoom in + fade out
+            -- FASE 1: "Who is" zoom in → fade out
             WhoIsText.TextTransparency = 1
             WhoIsText.Size = UDim2.new(0.4, 0, 0, 30)   -- reset kecil
             WhoIsText.Visible = true
@@ -216,17 +215,17 @@ local function startCinematicTextSequence()
             tweenFadeIn:Play()
             tweenZoom.Completed:Wait()
             task.wait(0.8)
-            -- fade out
+            -- fade out halus
             local tweenFadeOut = TweenService:Create(WhoIsText, TweenInfo.new(0.3), {TextTransparency = 1})
             tweenFadeOut:Play()
             tweenFadeOut.Completed:Wait()
             WhoIsText.Visible = false
-            
-            -- FASE 2: "Anonymous9x?" muncul besar, scramble karakter, langsung white flash
+
+            -- FASE 2: "Anonymous9x?" muncul besar → scramble → JEDA 5.5 DETIK → white flash
             AnonText.Text = "Anonymous9x?"
             AnonText.TextTransparency = 0.2
             AnonText.Visible = true
-            
+
             -- Scramble karakter (10 putaran cepat)
             for _ = 1, 10 do
                 local scrambled = ""
@@ -237,8 +236,11 @@ local function startCinematicTextSequence()
                 task.wait(0.03)
             end
             AnonText.Text = "Anonymous9x?"   -- kembali normal
-            
-            -- White flash cinematic langsung (tanpa garis)
+
+            -- JEDA 5.5 DETIK AGAR USER BISA BACA "Anonymous9x?"
+            task.wait(5.5)
+
+            -- White flash cinematic langsung
             WhiteFlash.BackgroundTransparency = 1
             local tweenFlash = TweenService:Create(WhiteFlash, TweenInfo.new(0.15), {BackgroundTransparency = 0})
             tweenFlash:Play()
@@ -248,7 +250,7 @@ local function startCinematicTextSequence()
             local tweenOut = TweenService:Create(WhiteFlash, TweenInfo.new(0.3), {BackgroundTransparency = 1})
             tweenOut:Play()
             tweenOut.Completed:Wait()
-            
+
             task.wait(0.8)   -- jeda sebelum loop
         end
     end)
