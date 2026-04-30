@@ -2,7 +2,7 @@
     ANONYMOUS9x VIP - MAIN GUI (UPGRADED v2.1)
     FIX: LOADING ANIMATION POSITION & TEXT SEQUENCE
     MOD: REMOVED KEY SYSTEM, ADDED ANIMATED BACKGROUND + TOGGLE
-    V2: REVISED MATRIX RAIN, GLITCH TEXT, CARD BORDER ANIMATION
+    V3: HEAVY MATRIX RAIN, GLITCH TEXT SCRAMBLE, BLINKING BORDERS
 --]]
 
 -- Main Configuration
@@ -117,13 +117,13 @@ RainContainer.ClipsDescendants = true
 
 -- Glitch text
 local GlitchText = Instance.new("TextLabel", AnimBG)
-GlitchText.Size = UDim2.new(0.8, 0, 0, 36)   -- lebih kecil
+GlitchText.Size = UDim2.new(0.8, 0, 0, 36)
 GlitchText.Position = UDim2.new(0.1, 0, 0.44, 0)
 GlitchText.BackgroundTransparency = 1
 GlitchText.Text = "Who is Anonymous9x?"
 GlitchText.TextColor3 = Color3.fromRGB(200, 200, 200)
 GlitchText.Font = Enum.Font.GothamBlack
-GlitchText.TextSize = 22   -- diperkecil
+GlitchText.TextSize = 22
 GlitchText.TextTransparency = 1
 GlitchText.TextXAlignment = Enum.TextXAlignment.Center
 GlitchText.ZIndex = 5
@@ -135,27 +135,30 @@ WhiteFlash.BackgroundColor3 = Color3.new(1, 1, 1)
 WhiteFlash.BackgroundTransparency = 1
 WhiteFlash.ZIndex = 10
 
--- Matrix rain character pool: karakter dari "Anonymous9x" + simbol
-local charPool = {"A","n","o","n","y","m","o","u","s","9","x","&","$","#","!"}
+-- Matrix rain: heavy downpour, random characters (alphanumeric + symbols)
+local charPool = {}
+for c = 33, 126 do   -- printable ASCII (33-126)
+    table.insert(charPool, string.char(c))
+end
 local rainChars = {}
-for i = 1, 50 do   -- lebih banyak titik hujan
+for i = 1, 120 do   -- super banyak
     local lbl = Instance.new("TextLabel", RainContainer)
-    lbl.Size = UDim2.new(0, 16, 0, 16)
+    lbl.Size = UDim2.new(0, 14, 0, 14)
     lbl.BackgroundTransparency = 1
-    lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+    lbl.TextColor3 = Color3.fromRGB(180, 180, 180)   -- abu-abu
     lbl.Font = Enum.Font.Code
-    lbl.TextSize = 12 + math.random(4)  -- variasi ukuran
+    lbl.TextSize = 10 + math.random(6)  -- variasi
     lbl.Text = charPool[math.random(#charPool)]
     lbl.Position = UDim2.new(math.random(), 0, math.random(), 0)
     lbl.ZIndex = 0
     rainChars[#rainChars + 1] = {
         label = lbl,
-        speed = 1.5 + math.random()*3,
-        changeInterval = math.random(5, 15)   -- berubah karakter setelah beberapa update
+        speed = 2 + math.random()*4,    -- lebih cepat
+        changeInterval = math.random(3, 10)
     }
 end
 
--- Update rain loop (lebih dinamis)
+-- Update rain loop
 local function startRainLoop()
     task.spawn(function()
         local counter = 0
@@ -165,50 +168,55 @@ local function startRainLoop()
             for _, data in ipairs(rainChars) do
                 local lbl = data.label
                 local pos = lbl.Position
-                local newY = pos.Y.Scale + data.speed * 0.0015
+                local newY = pos.Y.Scale + data.speed * 0.002
                 if newY > 1.1 then
                     newY = -0.1
                     lbl.Position = UDim2.new(math.random(), 0, newY, 0)
                     lbl.Text = charPool[math.random(#charPool)]
                 else
                     lbl.Position = UDim2.new(pos.X.Scale, 0, newY, 0)
-                    -- ganti karakter secara acak saat turun
                     if counter % data.changeInterval == 0 then
                         lbl.Text = charPool[math.random(#charPool)]
                     end
                 end
             end
-            task.wait(0.04)
+            task.wait(0.03)
         end
     end)
 end
 
--- Glitch text animation cycle (dengan exit glitch)
+-- Glitch text animation cycle
 local function startGlitchCycle()
     task.spawn(function()
+        local baseText = "Who is Anonymous9x?"
+        local prefixLength = 7   -- "Who is " (7 karakter)
         while true do
             if not AnimBackgroundEnabled then task.wait(0.5) continue end
             
-            -- Munculkan teks dengan glitch effect (entrance)
+            -- Munculkan teks dengan entrance glitch kecil
             GlitchText.TextTransparency = 0.8
+            GlitchText.Text = baseText
             for i = 1, 3 do
                 GlitchText.Position = UDim2.new(0.08 + math.random(-3,3)*0.01, 0, 0.43 + math.random(-2,2)*0.01, 0)
                 task.wait(0.05)
             end
-            GlitchText.Position = UDim2.new(0.1, 0, 0.44, 0)  -- posisi normal
+            GlitchText.Position = UDim2.new(0.1, 0, 0.44, 0)
             local tweenIn = TweenService:Create(GlitchText, TweenInfo.new(0.3), {TextTransparency = 0.3})
             tweenIn:Play()
             tweenIn.Completed:Wait()
             
-            -- Teks stabil 2 detik
             task.wait(2)
             
-            -- Exit glitch random selama 0.5 detik
-            for i = 1, 8 do
-                GlitchText.Position = UDim2.new(0.08 + math.random(-4,4)*0.015, 0, 0.43 + math.random(-3,3)*0.015, 0)
-                task.wait(0.06)
+            -- Exit glitch: scramble "Anonymous9x?" saja (karakter ke-8 sampai akhir)
+            for _ = 1, 8 do   -- 8 kali scramble cepat
+                local scrambled = baseText:sub(1, prefixLength)
+                for j = prefixLength+1, #baseText do
+                    scrambled = scrambled .. charPool[math.random(#charPool)]
+                end
+                GlitchText.Text = scrambled
+                task.wait(0.04)
             end
-            GlitchText.Position = UDim2.new(0.1, 0, 0.44, 0)
+            GlitchText.Text = baseText
             
             -- White flash cinematic
             WhiteFlash.BackgroundTransparency = 1
@@ -220,25 +228,31 @@ local function startGlitchCycle()
             tweenOut:Play()
             tweenOut.Completed:Wait()
             
-            task.wait(0.8)  -- jeda sebelum loop
+            task.wait(0.8)
         end
     end)
 end
 
--- Border card animation (denyut warna putih)
-local function startBorderAnimation()
+-- Border blink animation (random double blinks, etc.)
+local function startBorderBlink()
     task.spawn(function()
+        local dimColor = Color3.fromRGB(60,60,60)   -- gelap saat blink
         while true do
             if not AnimBackgroundEnabled then task.wait(0.5) continue end
-            -- animasi denyut: perlahan ubah warna ke abu terang lalu putih
-            local t = tick() % 2  -- periode 2 detik
-            local brightness = 0.7 + 0.3 * math.sin(t * math.pi)  -- antara 0.4 dan 1.0? Kita ingin antara putih agak redup dan putih terang.
-            -- Nilai: kalau sin 0 -> 0.7; sin pi/2 -> 1.0; sin pi -> 0.7; sin 3pi/2 -> 0.4; sin 2pi -> 0.7
-            local col = Color3.fromRGB(255 * brightness, 255 * brightness, 255 * brightness)
-            for _, stroke in ipairs(cardStrokes) do
-                stroke.Color = col
+            local waitTime = math.random(1, 3)   -- diam 1-3 detik
+            task.wait(waitTime)
+            -- Randomly do single or double blink
+            local blinks = math.random(1,2)
+            for _ = 1, blinks do
+                for _, stroke in ipairs(cardStrokes) do
+                    stroke.Color = dimColor
+                end
+                task.wait(0.06)
+                for _, stroke in ipairs(cardStrokes) do
+                    stroke.Color = Config.Theme.Border
+                end
+                if blinks == 2 then task.wait(0.06) end
             end
-            task.wait(0.05)
         end
     end)
 end
@@ -247,21 +261,19 @@ end
 local function updateVisualMode()
     for _, card in ipairs(animatedCards) do
         if AnimBackgroundEnabled then
-            card.BackgroundTransparency = 0.7      -- transparan
+            card.BackgroundTransparency = 0.7
         else
-            card.BackgroundTransparency = 0        -- solid hitam (Card asli)
+            card.BackgroundTransparency = 0
         end
     end
     if Footer then
         if AnimBackgroundEnabled then
-            Footer.BackgroundTransparency = 0.5    -- transparan
+            Footer.BackgroundTransparency = 0.5
         else
-            Footer.BackgroundTransparency = 0      -- solid hijau tua
+            Footer.BackgroundTransparency = 0
         end
     end
     AnimBG.Visible = AnimBackgroundEnabled
-    
-    -- Reset border warna statis jika non-aktif
     if not AnimBackgroundEnabled then
         for _, stroke in ipairs(cardStrokes) do
             stroke.Color = Config.Theme.Border
@@ -303,7 +315,6 @@ local function RunLoadingScreen()
     local dotsConnection
     
     dotsConnection = RunService.Heartbeat:Connect(function()
-        -- Animasi titik-titik tetap jalan
     end)
     
     return LoadingFrame, LoadingText, dotsConnection
@@ -427,7 +438,6 @@ Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     Scroll.CanvasSize = UDim2.new(0, Layout.AbsoluteContentSize.X, 0, 0)
 end)
 
--- Simpan referensi card untuk transparansi + stroke
 animatedCards = {}
 cardStrokes = {}
 
@@ -438,10 +448,8 @@ for _, s in ipairs(Config.Scripts) do
     Card.BackgroundColor3 = Config.Theme.Card
     Card.LayoutOrder = _
     Instance.new("UICorner", Card)
-    local stroke = AddStroke(Card, 1)  -- simpan stroke untuk animasi
+    local stroke = AddStroke(Card, 1)
     table.insert(cardStrokes, stroke)
-    
-    -- Simpan card
     table.insert(animatedCards, Card)
     
     local I = Instance.new("TextLabel", Card)
@@ -486,7 +494,7 @@ for _, s in ipairs(Config.Scripts) do
     L.MouseButton1Click:Connect(function() if s.URL ~= "" then loadstring(game:HttpGet(s.URL))() end end)
 end
 
--- ==================== MARQUEE TEXT ====================
+-- Marquee
 local MarqueeContainer = Instance.new("Frame", AppWindow)
 MarqueeContainer.Size = UDim2.new(1, -20, 0, 15)
 MarqueeContainer.Position = UDim2.new(0, 10, 1, -63)
@@ -530,11 +538,11 @@ TerminalTxt.TextSize = 10
 TerminalTxt.TextXAlignment = "Left"
 TerminalTxt.Text = "> INITIALIZING MONITOR..."
 
--- Tombol toggle "C" di kanan footer
+-- Tombol toggle "C"
 local ToggleBackgroundBtn = Instance.new("TextButton", Footer)
 ToggleBackgroundBtn.Size = UDim2.new(0, 24, 0, 24)
 ToggleBackgroundBtn.Position = UDim2.new(0.88, 0, 0.5, -12)
-ToggleBackgroundBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)  -- abu-abu
+ToggleBackgroundBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
 ToggleBackgroundBtn.Text = "C"
 ToggleBackgroundBtn.Font = Enum.Font.GothamBlack
 ToggleBackgroundBtn.TextSize = 14
@@ -546,7 +554,7 @@ ToggleBackgroundBtn.MouseButton1Click:Connect(function()
     updateVisualMode()
 end)
 
--- Monitor Function
+-- Monitor
 local function StartMonitor()
     task.spawn(function()
         while task.wait(0.5) do
@@ -559,7 +567,7 @@ local function StartMonitor()
     end)
 end
 
--- Event Handlers
+-- Events
 MinimizedApp.MouseButton1Click:Connect(function() AppWindow.Visible = true MinimizedApp.Visible = false end)
 Search:GetPropertyChangedSignal("Text"):Connect(function()
     local q = Search.Text:lower()
@@ -568,14 +576,13 @@ Search:GetPropertyChangedSignal("Text"):Connect(function()
     end
 end)
 
--- Mulai semua animasi
+-- Mulai animasi
 startRainLoop()
 startGlitchCycle()
-startBorderAnimation()
--- Set visual awal (animasi aktif)
+startBorderBlink()
 updateVisualMode()
 
--- ==================== INITIALIZATION (TANPA KEY SYSTEM) ====================
+-- Initialize
 local function InitializeGUI()
     AppWindow.Visible = true
     local LoadingFrame, LoadingText, dotsConnection = RunLoadingScreen()
