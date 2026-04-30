@@ -2,7 +2,8 @@
     ANONYMOUS9x VIP - MAIN GUI (UPGRADED v2.1)
     FIX: LOADING ANIMATION POSITION & TEXT SEQUENCE
     MOD: REMOVED KEY SYSTEM, ADDED ANIMATED BACKGROUND + TOGGLE
-    V4: CINEMATIC TEXT SEQUENCE – ZOOM "Who is" → SCRAMBLE "Anonymous9x?" + WHITE LINE SCAN → WHITE FLASH
+    V4 FINAL: CINEMATIC TEXT SEQUENCE – ZOOM "Who is" → SCRAMBLE "Anonymous9x?" → WHITE FLASH
+              (REMOVED SCAN LINE)
 --]]
 
 -- Main Configuration
@@ -142,15 +143,6 @@ AnonText.TextSize = 34
 AnonText.TextTransparency = 1
 AnonText.ZIndex = 5
 
--- Garis putih berjalan (list putih)
-local ScanLine = Instance.new("Frame", AnonText)
-ScanLine.Name = "ScanLine"
-ScanLine.Size = UDim2.new(0, 2, 1, 0)      -- garis vertikal 2px
-ScanLine.Position = UDim2.new(-0.1, 0, 0, 0)
-ScanLine.BackgroundColor3 = Color3.new(1, 1, 1)
-ScanLine.BorderSizePixel = 0
-ScanLine.Visible = false
-
 -- White flash effect
 local WhiteFlash = Instance.new("Frame", AnimBG)
 WhiteFlash.Size = UDim2.new(1, 0, 1, 0)
@@ -208,7 +200,7 @@ local function startRainLoop()
     end)
 end
 
--- Cinematic text sequence (NEW)
+-- Cinematic text sequence (NEW - tanpa scan line)
 local function startCinematicTextSequence()
     task.spawn(function()
         while true do
@@ -230,12 +222,12 @@ local function startCinematicTextSequence()
             tweenFadeOut.Completed:Wait()
             WhoIsText.Visible = false
             
-            -- FASE 2: "Anonymous9x?" muncul besar, scramble, lalu garis putih berjalan, lalu white flash
+            -- FASE 2: "Anonymous9x?" muncul besar, scramble karakter, langsung white flash
             AnonText.Text = "Anonymous9x?"
             AnonText.TextTransparency = 0.2
             AnonText.Visible = true
             
-            -- Scramble karakter (8 putaran cepat)
+            -- Scramble karakter (10 putaran cepat)
             for _ = 1, 10 do
                 local scrambled = ""
                 for i = 1, #AnonText.Text do
@@ -246,15 +238,7 @@ local function startCinematicTextSequence()
             end
             AnonText.Text = "Anonymous9x?"   -- kembali normal
             
-            -- Garis putih berjalan dari kiri ke kanan
-            ScanLine.Visible = true
-            ScanLine.Position = UDim2.new(-0.1, 0, 0, 0)
-            local tweenLine = TweenService:Create(ScanLine, TweenInfo.new(0.6, Enum.EasingStyle.Linear), {Position = UDim2.new(1.1, 0, 0, 0)})
-            tweenLine:Play()
-            tweenLine.Completed:Wait()
-            ScanLine.Visible = false
-            
-            -- White flash cinematic
+            -- White flash cinematic langsung (tanpa garis)
             WhiteFlash.BackgroundTransparency = 1
             local tweenFlash = TweenService:Create(WhiteFlash, TweenInfo.new(0.15), {BackgroundTransparency = 0})
             tweenFlash:Play()
@@ -313,10 +297,8 @@ local function updateVisualMode()
         for _, stroke in ipairs(cardStrokes) do
             stroke.Color = Config.Theme.Border
         end
-        -- Pastikan juga teks disembunyikan
         WhoIsText.Visible = false
         AnonText.Visible = false
-        ScanLine.Visible = false
     end
 end
 
@@ -616,7 +598,7 @@ end)
 -- Mulai animasi
 startRainLoop()
 startBorderBlink()
-startCinematicTextSequence()   -- animasi teks sinematik baru
+startCinematicTextSequence()
 updateVisualMode()
 
 -- Initialize
