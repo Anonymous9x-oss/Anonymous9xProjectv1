@@ -1,68 +1,32 @@
--- Script By Anonymous9x 
+--[[
+    Anonymous9x Ghost Mode  —  Upgraded Visual Edition
+    By Anonymous9x
+    Logic ORI 100% untouched. UI + visuals only upgraded.
+]]
 
-local key = Enum.KeyCode.X -- key to toggle invisibility --// dont edit script below
-local invis_on = false
-local defaultSpeed = 16 -- Default walk speed
-local boostedSpeed = 48 -- 3x the default speed (16 * 3)
+-- ═══════════════════════════════════════════════════
+-- ORI CONFIG (UNCHANGED)
+-- ═══════════════════════════════════════════════════
+local key           = Enum.KeyCode.X
+local invis_on      = false
+local defaultSpeed  = 16
+local boostedSpeed  = 48
 local isSpeedBoosted = false
 
--- Создание GUI с черно-белой темой
-local player = game.Players.LocalPlayer
-local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-local frame = Instance.new("Frame", screenGui)
-local toggleButton = Instance.new("TextButton", frame)
-local closeButton = Instance.new("TextButton", frame)
-local signatureLabel = Instance.new("TextLabel", frame)
-local speedButton = Instance.new("TextButton", frame)
+local player     = game.Players.LocalPlayer
+local TweenSvc   = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
-screenGui.ResetOnSpawn = false
-
--- UI ЧЕРНЫЙ ПОЛНЫЙ
-frame.Size = UDim2.new(0, 100, 0, 110)
-frame.Position = UDim2.new(0.5, -110, 0.5, -60)
-frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- ЧЕРНЫЙ
-frame.Active = true
-frame.Draggable = true
-
-toggleButton.Size = UDim2.new(0, 80, 0, 30)
-toggleButton.Position = UDim2.new(0, 10, 0, 30)
-toggleButton.Text = "INVISIBLE"
-toggleButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20) -- ТЕМНО-ЧЕРНЫЙ
-toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255) -- БЕЛЫЙ
-toggleButton.Font = Enum.Font.SourceSans
-toggleButton.TextScaled = true
-
-closeButton.Size = UDim2.new(0, 20, 0, 20)
-closeButton.Position = UDim2.new(1, -30, 0, 5)
-closeButton.Text = "X"
-closeButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40) -- ЧЕРНЫЙ
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255) -- БЕЛЫЙ
-closeButton.Font = Enum.Font.SourceSans
-closeButton.TextSize = 18
-
-signatureLabel.Size = UDim2.new(0, 100, 0, 10)
-signatureLabel.Position = UDim2.new(0, 0, 0.9, 0)
-signatureLabel.Text = "Anonymous9x Ghost"
-signatureLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- ЧЕРНЫЙ
-signatureLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- БЕЛЫЙ
-signatureLabel.Font = Enum.Font.SourceSans
-signatureLabel.TextScaled = true
-signatureLabel.Transparency = 0.3
-
-speedButton.Size = UDim2.new(0, 80, 0, 30)
-speedButton.Position = UDim2.new(0, 10, 0, 65)
-speedButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20) -- ТЕМНО-ЧЕРНЫЙ
-speedButton.Text = "SPEED BOOST"
-speedButton.TextScaled = true
-speedButton.TextColor3 = Color3.fromRGB(255, 255, 255) -- БЕЛЫЙ
-speedButton.Font = Enum.Font.SourceSans
-
--- Создание звукового объекта (ORI)
+-- ═══════════════════════════════════════════════════
+-- SOUND (ORI)
+-- ═══════════════════════════════════════════════════
 local sound = Instance.new("Sound", player:WaitForChild("PlayerGui"))
 sound.SoundId = "rbxassetid://942127495"
-sound.Volume = 1
+sound.Volume  = 1
 
--- ФУНКЦИЯ ОРИ (НЕ ИЗМЕНЕНА)
+-- ═══════════════════════════════════════════════════
+-- ORI FUNCTION: setTransparency (UNCHANGED)
+-- ═══════════════════════════════════════════════════
 local function setTransparency(character, transparency)
     for _, part in pairs(character:GetDescendants()) do
         if part:IsA("BasePart") or part:IsA("Decal") then
@@ -71,54 +35,205 @@ local function setTransparency(character, transparency)
     end
 end
 
+-- ═══════════════════════════════════════════════════
+-- GHOST TRAIL (afterimage visual — runs only when invis ON)
+-- Source logic kept as-is, adapted to run as a managed loop
+-- ═══════════════════════════════════════════════════
+local AfterimageDuration = 0.7
+local SpawnInterval      = 0.10
+local trailActive        = false
+local trailThread        = nil
+
+local function createAfterimage(character)
+    local ok, _ = pcall(function()
+        -- Need Archivable true for Clone
+        character.Archivable = true
+        local clone = character:Clone()
+        -- Remove humanoid so it doesn't animate
+        local hum = clone:FindFirstChildOfClass("Humanoid")
+        if hum then hum:Destroy() end
+        -- Remove HRP so it doesn't simulate physics
+        local hrpC = clone:FindFirstChild("HumanoidRootPart")
+        if hrpC then hrpC:Destroy() end
+
+        for _, part in ipairs(clone:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 0.25
+                part.CanCollide   = false
+                part.Anchored     = true
+                part.CastShadow   = false
+                TweenSvc:Create(part,
+                    TweenInfo.new(AfterimageDuration),
+                    {Transparency = 1}):Play()
+            elseif part:IsA("Decal") then
+                part.Transparency = 0.25
+                TweenSvc:Create(part,
+                    TweenInfo.new(AfterimageDuration),
+                    {Transparency = 1}):Play()
+            end
+        end
+        clone.Parent = workspace
+        task.delay(AfterimageDuration + 0.1, function()
+            pcall(function() clone:Destroy() end)
+        end)
+    end)
+end
+
+local function startTrail()
+    trailActive = true
+    trailThread = task.spawn(function()
+        local lastPos = Vector3.new(0, -9999, 0)
+        while trailActive do
+            local char = player.Character
+            if char then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local cur = hrp.Position
+                    if (cur - lastPos).Magnitude > 0.15 then
+                        task.spawn(createAfterimage, char)
+                    end
+                    lastPos = cur
+                end
+            end
+            task.wait(SpawnInterval)
+        end
+    end)
+end
+
+local function stopTrail()
+    trailActive = false
+    trailThread = nil
+end
+
+-- ═══════════════════════════════════════════════════
+-- GHOST BILLBOARD (floating "Ghost" text above head)
+-- ═══════════════════════════════════════════════════
+local ghostBillboard = nil
+local glitchConn     = nil
+
+local GCHARS = {"#","X","/","_","!","0","G","h","o","s","t","@","*"}
+local function scramble(s)
+    local chars = {}
+    for c in s:gmatch(".") do table.insert(chars, c) end
+    local n = math.random(1, 2)
+    for _ = 1, n do
+        local i = math.random(1, #chars)
+        chars[i] = GCHARS[math.random(1, #GCHARS)]
+    end
+    return table.concat(chars)
+end
+
+local function showGhostLabel()
+    -- Clean old if any
+    if ghostBillboard then ghostBillboard:Destroy() end
+    if glitchConn     then glitchConn:Disconnect() end
+
+    local char = player.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+
+    ghostBillboard = Instance.new("BillboardGui")
+    ghostBillboard.Name             = "_GhostBB"
+    ghostBillboard.Size             = UDim2.fromOffset(100, 28)
+    ghostBillboard.StudsOffset      = Vector3.new(0, 2.8, 0)
+    ghostBillboard.AlwaysOnTop      = true
+    ghostBillboard.ResetOnSpawn     = false
+    ghostBillboard.ZIndexBehavior   = Enum.ZIndexBehavior.Sibling
+    ghostBillboard.Parent           = head
+
+    local lbl = Instance.new("TextLabel", ghostBillboard)
+    lbl.Size               = UDim2.fromScale(1, 1)
+    lbl.BackgroundTransparency = 1
+    lbl.Text               = "Ghost"
+    lbl.Font               = Enum.Font.GothamBlack
+    lbl.TextSize           = 16
+    lbl.TextColor3         = Color3.new(1, 1, 1)
+    lbl.TextStrokeColor3   = Color3.fromRGB(180, 130, 255)
+    lbl.TextStrokeTransparency = 0.4
+    lbl.TextXAlignment     = Enum.TextXAlignment.Center
+
+    -- Glitch animation loop — scramble 20% of the time
+    local t = 0
+    local glitching = false
+    local origText  = "Ghost"
+    glitchConn = RunService.Heartbeat:Connect(function(dt)
+        t = t + dt
+        -- Every ~0.7s do a quick glitch burst
+        if t > 0.70 then
+            t = 0
+            glitching = true
+            lbl.TextColor3 = Color3.fromRGB(200, 160, 255) -- purple flash
+            task.delay(0.055, function()
+                glitching    = false
+                lbl.Text     = origText
+                lbl.TextColor3 = Color3.new(1, 1, 1)
+            end)
+        end
+        if glitching then
+            lbl.Text = scramble(origText)
+        end
+    end)
+end
+
+local function hideGhostLabel()
+    if glitchConn     then glitchConn:Disconnect(); glitchConn = nil end
+    if ghostBillboard then ghostBillboard:Destroy(); ghostBillboard = nil end
+end
+
+-- ═══════════════════════════════════════════════════
+-- ORI TOGGLE INVISIBILITY (logic UNCHANGED)
+-- ═══════════════════════════════════════════════════
 local function toggleInvisibility()
     invis_on = not invis_on
     sound:Play()
-    
+
     if invis_on then
-        local savedpos = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame
+        local savedpos = player.Character.HumanoidRootPart.CFrame
         wait()
-        game.Players.LocalPlayer.Character:MoveTo(Vector3.new(-25.95, 84, 3537.55))
+        player.Character:MoveTo(Vector3.new(-25.95, 84, 3537.55))
         wait(.15)
-        local Seat = Instance.new('Seat', game.Workspace)
-        Seat.Anchored = false
+        local Seat = Instance.new('Seat', workspace)
+        Seat.Anchored  = false
         Seat.CanCollide = false
-        Seat.Name = 'invischair'
+        Seat.Name      = 'invischair'
         Seat.Transparency = 1
-        Seat.Position = Vector3.new(-25.95, 84, 3537.55)
-        local Weld = Instance.new("Weld", Seat)
-        Weld.Part0 = Seat
-        Weld.Part1 = game.Players.LocalPlayer.Character:FindFirstChild("Torso") or game.Players.LocalPlayer.Character.UpperTorso
+        Seat.Position  = Vector3.new(-25.95, 84, 3537.55)
+        local Weld     = Instance.new("Weld", Seat)
+        Weld.Part0     = Seat
+        Weld.Part1     = player.Character:FindFirstChild("Torso")
+                      or player.Character.UpperTorso
         wait()
         Seat.CFrame = savedpos
-        setTransparency(game.Players.LocalPlayer.Character, 0.5)
-        
-        -- Обновление цвета кнопки для обратной связи
-        toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60) -- СВЕТЛО-ЧЕРНЫЙ ПРИ АКТИВНОМ
-        
+        setTransparency(player.Character, 0.5)
+
+        -- Visual upgrades ON
+        showGhostLabel()
+        startTrail()
+
+        toggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
         game.StarterGui:SetCore("SendNotification", {
-            Title = "Invis (on)",
-            Duration = 3,
-            Text = "STATUS: INVISIBLE"
+            Title = "Anonymous9x Ghost", Duration = 3, Text = "INVISIBLE  ON"
         })
     else
         local invisChair = workspace:FindFirstChild('invischair')
-        if invisChair then
-            invisChair:Destroy()
-        end
-        setTransparency(game.Players.LocalPlayer.Character, 0)
-        
-        -- Сброс цвета кнопки
-        toggleButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20) -- ВОЗВРАТ К ТЕМНО-ЧЕРНОМУ
-        
+        if invisChair then invisChair:Destroy() end
+        setTransparency(player.Character, 0)
+
+        -- Visual upgrades OFF
+        hideGhostLabel()
+        stopTrail()
+
+        toggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
         game.StarterGui:SetCore("SendNotification", {
-            Title = "Invis (off)",
-            Duration = 3,
-            Text = "STATUS: VISIBLE"
+            Title = "Anonymous9x Ghost", Duration = 3, Text = "INVISIBLE  OFF"
         })
     end
 end
 
+-- ═══════════════════════════════════════════════════
+-- ORI TOGGLE SPEED (logic UNCHANGED)
+-- ═══════════════════════════════════════════════════
 local function toggleSpeedBoost()
     isSpeedBoosted = not isSpeedBoosted
     sound:Play()
@@ -126,94 +241,191 @@ local function toggleSpeedBoost()
     if humanoid then
         if isSpeedBoosted then
             humanoid.WalkSpeed = boostedSpeed
-            speedButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60) -- СВЕТЛО-ЧЕРНЫЙ ПРИ АКТИВНОМ
+            speedButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
             game.StarterGui:SetCore("SendNotification", {
-                Title = "Speed Boost (on)",
-                Duration = 3,
-                Text = "Speed: " .. boostedSpeed
+                Title = "Anonymous9x Ghost", Duration = 3,
+                Text  = "SPEED BOOST  ON  — " .. boostedSpeed
             })
         else
             humanoid.WalkSpeed = defaultSpeed
-            speedButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20) -- ВОЗВРАТ К ТЕМНО-ЧЕРНОМУ
+            speedButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
             game.StarterGui:SetCore("SendNotification", {
-                Title = "Speed Boost (off)",
-                Duration = 3,
-                Text = "Speed: " .. defaultSpeed
+                Title = "Anonymous9x Ghost", Duration = 3,
+                Text  = "SPEED BOOST  OFF  — " .. defaultSpeed
             })
         end
     end
 end
 
--- ═══════════════════════════════════════════════════════
--- MODIFIKASI BARU: FUNGSI UNTUK MATIKAN SEMUA FITUR
--- ═══════════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════
+-- ORI TURN OFF ALL (logic UNCHANGED)
+-- ═══════════════════════════════════════════════════
 local function turnOffAllFeatures()
-    -- 1. Matikan invisibility jika aktif
     if invis_on then
         local invisChair = workspace:FindFirstChild('invischair')
-        if invisChair then
-            invisChair:Destroy()
-        end
-        
-        if player.Character then
-            setTransparency(player.Character, 0)
-        end
-        
+        if invisChair then invisChair:Destroy() end
+        if player.Character then setTransparency(player.Character, 0) end
         invis_on = false
-        toggleButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        toggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+        hideGhostLabel()
+        stopTrail()
     end
-    
-    -- 2. Matikan speed boost jika aktif
     if isSpeedBoosted then
         local humanoid = player.Character and player.Character:FindFirstChild("Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = defaultSpeed
-        end
-        
+        if humanoid then humanoid.WalkSpeed = defaultSpeed end
         isSpeedBoosted = false
-        speedButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        speedButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     end
-    
-    -- 3. Play sound dan notifikasi
     sound:Play()
     game.StarterGui:SetCore("SendNotification", {
-        Title = "UI Closed",
-        Duration = 3,
-        Text = "All features turned OFF"
+        Title = "Anonymous9x Ghost", Duration = 3,
+        Text  = "All features OFF"
     })
-    
-    print("Anonymous9x Ghost - All features OFF")
 end
 
--- Подписка на события
-toggleButton.MouseButton1Click:Connect(toggleInvisibility)
-speedButton.MouseButton1Click:Connect(toggleSpeedBoost)
-
--- ═══════════════════════════════════════════════════════
--- MODIFIKASI: Close button sekarang matikan semua fitur!
--- ═══════════════════════════════════════════════════════
-closeButton.MouseButton1Click:Connect(function()
-    -- 1. Matikan semua fitur yang aktif
-    turnOffAllFeatures()
-    
-    -- 2. Sembunyikan UI
-    frame.Visible = false
-    
-    -- 3. Optional: Destroy UI completely
-    -- screenGui:Destroy()  -- Uncomment jika mau hapus UI sepenuhnya
-end)
-
--- Reset speed when character respawns (ORI)
+-- ═══════════════════════════════════════════════════
+-- ORI CHARACTER RESPAWN RESET (UNCHANGED)
+-- ═══════════════════════════════════════════════════
 player.CharacterAdded:Connect(function(character)
     isSpeedBoosted = false
+    invis_on       = false
+    hideGhostLabel()
+    stopTrail()
     local humanoid = character:WaitForChild("Humanoid")
     humanoid.WalkSpeed = defaultSpeed
-    speedButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    
-    -- Juga reset invisibility state
-    invis_on = false
-    toggleButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    toggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    speedButton.BackgroundColor3  = Color3.fromRGB(18, 18, 22)
 end)
 
--- Print di console
-print("Anonymous9x Ghost - UI Dark Mode Mode with Auto-Off Feature")
+-- ═══════════════════════════════════════════════════
+-- UPGRADED UI
+-- Black bg  |  White border  |  Glitch border animation
+-- Same button layout, just visually upgraded
+-- ═══════════════════════════════════════════════════
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name         = "GhostModeUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function() screenGui.Parent = game.CoreGui end)
+if screenGui.Parent ~= game.CoreGui then
+    screenGui.Parent = player.PlayerGui
+end
+
+-- Main card frame
+local frame = Instance.new("Frame", screenGui)
+frame.Size             = UDim2.fromOffset(118, 120)
+frame.Position         = UDim2.new(0.5, -59, 0.5, -60)
+frame.BackgroundColor3 = Color3.fromRGB(7, 7, 9)
+frame.BackgroundTransparency = 0
+frame.BorderSizePixel  = 0
+frame.Active           = true
+frame.Draggable        = true
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+-- White border with glitch animation
+local borderStroke = Instance.new("UIStroke", frame)
+borderStroke.Color     = Color3.new(1, 1, 1)
+borderStroke.Thickness = 1.5
+borderStroke.Transparency = 0
+
+-- Glitch border loop (alternates white ↔ faint purple, slight thickness pulse)
+task.spawn(function()
+    local bt = 0
+    while screenGui.Parent do
+        bt = bt + task.wait(0.04)
+        local pulse = math.sin(bt * 3) -- -1 to 1
+        -- Flicker the border color between white and purple-white
+        local r = 1
+        local g = 0.92 + pulse * 0.08
+        local b = 0.92 + math.abs(pulse) * 0.50
+        borderStroke.Color = Color3.new(r, g, b)
+        borderStroke.Thickness = 1.4 + math.abs(pulse) * 0.5
+
+        -- Rare glitch flash: random chance every ~2s to spike to purple
+        if math.random(1, 90) == 1 then
+            borderStroke.Color = Color3.fromRGB(200, 140, 255)
+            task.wait(0.045)
+        end
+    end
+end)
+
+-- Title label
+local titleLbl = Instance.new("TextLabel", frame)
+titleLbl.Size               = UDim2.new(1, -28, 0, 20)
+titleLbl.Position           = UDim2.fromOffset(8, 5)
+titleLbl.BackgroundTransparency = 1
+titleLbl.Text               = "Anonymous9x Ghost"
+titleLbl.Font               = Enum.Font.GothamBlack
+titleLbl.TextSize           = 9
+titleLbl.TextColor3         = Color3.new(1, 1, 1)
+titleLbl.TextXAlignment     = Enum.TextXAlignment.Left
+titleLbl.TextTruncate       = Enum.TextTruncate.AtEnd
+
+-- Close button
+local closeButton = Instance.new("TextButton", frame)
+closeButton.Size             = UDim2.fromOffset(19, 17)
+closeButton.Position         = UDim2.new(1, -23, 0, 4)
+closeButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+closeButton.BorderSizePixel  = 0
+closeButton.Text             = "X"
+closeButton.Font             = Enum.Font.GothamBold
+closeButton.TextSize         = 10
+closeButton.TextColor3       = Color3.new(1, 1, 1)
+closeButton.AutoButtonColor  = false
+Instance.new("UICorner", closeButton).CornerRadius = UDim.new(0, 4)
+
+-- Helper: make a button
+local function makeBtn(yOff, labelTxt)
+    local b = Instance.new("TextButton", frame)
+    b.Size             = UDim2.new(1, -16, 0, 30)
+    b.Position         = UDim2.fromOffset(8, yOff)
+    b.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    b.BorderSizePixel  = 0
+    b.Text             = labelTxt
+    b.Font             = Enum.Font.GothamBold
+    b.TextSize         = 10
+    b.TextColor3       = Color3.new(1, 1, 1)
+    b.AutoButtonColor  = false
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
+    local bS = Instance.new("UIStroke", b)
+    bS.Color     = Color3.fromRGB(42, 42, 58)
+    bS.Thickness = 0.9
+    -- Hover effect
+    b.MouseEnter:Connect(function()
+        TweenSvc:Create(b, TweenInfo.new(0.10),
+            {BackgroundColor3 = Color3.fromRGB(26, 26, 34)}):Play()
+    end)
+    b.MouseLeave:Connect(function()
+        if b.BackgroundColor3 ~= Color3.fromRGB(35, 35, 45) then
+            TweenSvc:Create(b, TweenInfo.new(0.10),
+                {BackgroundColor3 = Color3.fromRGB(18, 18, 22)}):Play()
+        end
+    end)
+    return b
+end
+
+local toggleButton = makeBtn(28, "INVISIBLE")
+local speedButton  = makeBtn(64, "SPEED BOOST")
+
+-- Signature
+local signatureLabel = Instance.new("TextLabel", frame)
+signatureLabel.Size               = UDim2.new(1, 0, 0, 10)
+signatureLabel.Position           = UDim2.new(0, 0, 1, -13)
+signatureLabel.BackgroundTransparency = 1
+signatureLabel.Text               = "By Anonymous9x"
+signatureLabel.Font               = Enum.Font.Gotham
+signatureLabel.TextSize           = 7
+signatureLabel.TextColor3         = Color3.fromRGB(70, 70, 88)
+signatureLabel.TextXAlignment     = Enum.TextXAlignment.Center
+
+-- ═══════════════════════════════════════════════════
+-- WIRE BUTTONS
+-- ═══════════════════════════════════════════════════
+toggleButton.MouseButton1Click:Connect(toggleInvisibility)
+speedButton.MouseButton1Click:Connect(toggleSpeedBoost)
+closeButton.MouseButton1Click:Connect(function()
+    turnOffAllFeatures()
+    frame.Visible = false
+end)
+
+print("Anonymous9x Ghost — Upgraded Visual Edition loaded.")
