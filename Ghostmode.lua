@@ -106,7 +106,7 @@ local function stopTrail()
 end
 
 -- ═══════════════════════════════════════════════════
--- GHOST BILLBOARD (floating "Ghost" text above head)
+-- GHOST BILLBOARD (floating "GhostAno9x" text above head) -- UBAHAN HANYA TEKS
 -- ═══════════════════════════════════════════════════
 local ghostBillboard = nil
 local glitchConn     = nil
@@ -145,7 +145,7 @@ local function showGhostLabel()
     local lbl = Instance.new("TextLabel", ghostBillboard)
     lbl.Size               = UDim2.fromScale(1, 1)
     lbl.BackgroundTransparency = 1
-    lbl.Text               = "Ghost"
+    lbl.Text               = "GhostAno9x"               -- HANYA INI YANG DIUBAH
     lbl.Font               = Enum.Font.GothamBlack
     lbl.TextSize           = 16
     lbl.TextColor3         = Color3.new(1, 1, 1)
@@ -156,7 +156,7 @@ local function showGhostLabel()
     -- Glitch animation loop — scramble 20% of the time
     local t = 0
     local glitching = false
-    local origText  = "Ghost"
+    local origText  = "GhostAno9x"                      -- HANYA INI YANG DIUBAH
     glitchConn = RunService.Heartbeat:Connect(function(dt)
         t = t + dt
         -- Every ~0.7s do a quick glitch burst
