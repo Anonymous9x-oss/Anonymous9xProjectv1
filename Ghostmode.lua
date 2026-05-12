@@ -106,7 +106,7 @@ local function stopTrail()
 end
 
 -- ═══════════════════════════════════════════════════
--- GHOST BILLBOARD (floating "GhostAno9x" text above head) -- UBAHAN HANYA TEKS
+-- GHOST BILLBOARD (floating "Ghost" text above head)
 -- ═══════════════════════════════════════════════════
 local ghostBillboard = nil
 local glitchConn     = nil
@@ -135,7 +135,7 @@ local function showGhostLabel()
 
     ghostBillboard = Instance.new("BillboardGui")
     ghostBillboard.Name             = "_GhostBB"
-    ghostBillboard.Size             = UDim2.fromOffset(100, 28)
+    ghostBillboard.Size             = UDim2.fromOffset(130, 28)
     ghostBillboard.StudsOffset      = Vector3.new(0, 2.8, 0)
     ghostBillboard.AlwaysOnTop      = true
     ghostBillboard.ResetOnSpawn     = false
@@ -145,9 +145,9 @@ local function showGhostLabel()
     local lbl = Instance.new("TextLabel", ghostBillboard)
     lbl.Size               = UDim2.fromScale(1, 1)
     lbl.BackgroundTransparency = 1
-    lbl.Text               = "GhostAno9x"               -- HANYA INI YANG DIUBAH
+    lbl.Text               = "GhostAno9x"
     lbl.Font               = Enum.Font.GothamBlack
-    lbl.TextSize           = 16
+    lbl.TextSize           = 13
     lbl.TextColor3         = Color3.new(1, 1, 1)
     lbl.TextStrokeColor3   = Color3.fromRGB(180, 130, 255)
     lbl.TextStrokeTransparency = 0.4
@@ -156,7 +156,7 @@ local function showGhostLabel()
     -- Glitch animation loop — scramble 20% of the time
     local t = 0
     local glitching = false
-    local origText  = "GhostAno9x"                      -- HANYA INI YANG DIUBAH
+    local origText  = "GhostAno9x"
     glitchConn = RunService.Heartbeat:Connect(function(dt)
         t = t + dt
         -- Every ~0.7s do a quick glitch burst
@@ -182,32 +182,86 @@ local function hideGhostLabel()
 end
 
 -- ═══════════════════════════════════════════════════
--- ORI TOGGLE INVISIBILITY (logic UNCHANGED)
+-- TOGGLE INVISIBILITY
+-- FE core method: UNCHANGED (MoveTo → Seat weld → snap back)
+-- TIMING FIXED to eliminate stuck-character bug:
+--
+-- ROOT CAUSE:
+--   wait() = 0.033s minimum — too short for MoveTo to replicate.
+--   Seat was welded before character arrived at far pos.
+--   Weld had wrong offset → snap-back placed char at wrong location.
+--
+-- FIXES (core FE logic NOT changed):
+--   [1] Double-click lock guard (_invisBusy)
+--   [2] task.wait(0.05) before MoveTo — clean frame boundary
+--   [3] repeat-until position verify — wait until char truly at farPos
+--   [4] Weld.C0 / Weld.C1 explicit zero offset
+--   [5] task.wait(0.12) after Weld — server propagation
+--   [6] task.wait(0.08) after CFrame snap — physics settle
 -- ═══════════════════════════════════════════════════
+local _invisBusy = false
+
 local function toggleInvisibility()
+    if _invisBusy then return end
+    _invisBusy = true
+
     invis_on = not invis_on
     sound:Play()
 
     if invis_on then
-        local savedpos = player.Character.HumanoidRootPart.CFrame
-        wait()
-        player.Character:MoveTo(Vector3.new(-25.95, 84, 3537.55))
-        wait(.15)
-        local Seat = Instance.new('Seat', workspace)
-        Seat.Anchored  = false
-        Seat.CanCollide = false
-        Seat.Name      = 'invischair'
-        Seat.Transparency = 1
-        Seat.Position  = Vector3.new(-25.95, 84, 3537.55)
-        local Weld     = Instance.new("Weld", Seat)
-        Weld.Part0     = Seat
-        Weld.Part1     = player.Character:FindFirstChild("Torso")
-                      or player.Character.UpperTorso
-        wait()
-        Seat.CFrame = savedpos
-        setTransparency(player.Character, 0.5)
+        local char = player.Character
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            _invisBusy = false
+            invis_on   = false
+            return
+        end
 
-        -- Visual upgrades ON
+        local savedpos = hrp.CFrame
+        local farPos   = Vector3.new(-25.95, 84, 3537.55)
+
+        -- Step 1: Move to far spot
+        task.wait(0.05)
+        char:MoveTo(farPos)
+
+        -- Step 2: Wait until character actually arrives (max 30 checks × 0.06s = 1.8s timeout)
+        for _ = 1, 30 do
+            task.wait(0.06)
+            local curHRP = char:FindFirstChild("HumanoidRootPart")
+            if curHRP and (curHRP.Position - farPos).Magnitude < 8 then
+                break
+            end
+        end
+        task.wait(0.05) -- extra settle
+
+        -- Step 3: Create Seat at far position
+        local Seat = Instance.new("Seat", workspace)
+        Seat.Anchored     = false
+        Seat.CanCollide   = false
+        Seat.Name         = "invischair"
+        Seat.Transparency = 1
+        Seat.Position     = farPos
+
+        -- Step 4: Weld Seat to character torso with explicit zero offset
+        local Weld  = Instance.new("Weld", Seat)
+        Weld.Part0  = Seat
+        Weld.Part1  = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+        Weld.C0     = CFrame.new()
+        Weld.C1     = CFrame.new()
+
+        -- Step 5: Let weld propagate to server
+        task.wait(0.12)
+
+        -- Step 6: Snap Seat (and character) back to saved position
+        Seat.CFrame = savedpos
+
+        -- Step 7: Physics settle
+        task.wait(0.08)
+
+        -- Step 8: Apply transparency
+        setTransparency(char, 0.5)
+
+        -- Visual ON
         showGhostLabel()
         startTrail()
 
@@ -215,12 +269,12 @@ local function toggleInvisibility()
         game.StarterGui:SetCore("SendNotification", {
             Title = "Anonymous9x Ghost", Duration = 3, Text = "INVISIBLE  ON"
         })
-    else
-        local invisChair = workspace:FindFirstChild('invischair')
-        if invisChair then invisChair:Destroy() end
-        setTransparency(player.Character, 0)
 
-        -- Visual upgrades OFF
+    else
+        local invisChair = workspace:FindFirstChild("invischair")
+        if invisChair then invisChair:Destroy() end
+        if player.Character then setTransparency(player.Character, 0) end
+
         hideGhostLabel()
         stopTrail()
 
@@ -229,6 +283,8 @@ local function toggleInvisibility()
             Title = "Anonymous9x Ghost", Duration = 3, Text = "INVISIBLE  OFF"
         })
     end
+
+    _invisBusy = false
 end
 
 -- ═══════════════════════════════════════════════════
