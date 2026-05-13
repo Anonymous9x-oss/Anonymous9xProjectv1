@@ -4,6 +4,7 @@
     Logic ORI 100% untouched. UI + visuals only upgraded.
     Fix: invis ON/OFF loop + mini status notif (bottom-right)
     Status now updates instantly on click (Ghost only)
+    Status hides when panel closed.
 ]]
 
 -- ═══════════════════════════════════════════════════
@@ -181,7 +182,6 @@ end
 -- ═══════════════════════════════════════════════════
 local _invisBusy = false
 
--- placeholder untuk status label, diisi setelah screenGui dibuat
 local statusLabel = nil
 
 local function setStatus(text, color)
@@ -201,7 +201,6 @@ local function turnOffInvis()
     stopTrail()
     toggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 
-    -- Notif lama
     pcall(function()
         game.StarterGui:SetCore("SendNotification", {
             Title    = "Anonymous9x Ghost",
@@ -273,18 +272,16 @@ end
 local function toggleInvisibility()
     sound:Play()
     if invis_on then
-        -- Set status langsung SEBELUM off
         setStatus("INVISIBLE OFF", Color3.fromRGB(255, 100, 100))
         turnOffInvis()
     else
-        -- Set status langsung SEBELUM on
         setStatus("INVISIBLE ON", Color3.fromRGB(100, 255, 100))
         task.spawn(turnOnInvis)
     end
 end
 
 -- ═══════════════════════════════════════════════════
--- ORI TOGGLE SPEED (UNCHANGED, NO MINI STATUS)
+-- ORI TOGGLE SPEED (UNCHANGED)
 -- ═══════════════════════════════════════════════════
 local function toggleSpeedBoost()
     isSpeedBoosted = not isSpeedBoosted
@@ -307,7 +304,6 @@ local function toggleSpeedBoost()
             })
         end
     end
-    -- No setStatus for speed boost
 end
 
 -- ═══════════════════════════════════════════════════
@@ -328,7 +324,7 @@ local function turnOffAllFeatures()
         Title = "Anonymous9x Ghost", Duration = 3,
         Text  = "All features OFF"
     })
-    setStatus("Ghost Ready", Color3.new(0.7,0.7,0.7)) -- kembali ke ready
+    setStatus("Ghost Ready", Color3.new(0.7,0.7,0.7))
 end
 
 -- ═══════════════════════════════════════════════════
@@ -348,7 +344,6 @@ end)
 
 -- ═══════════════════════════════════════════════════
 -- UPGRADED UI
--- Black bg  |  White border  |  Glitch border animation
 -- ═══════════════════════════════════════════════════
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name         = "GhostModeUI"
@@ -467,7 +462,7 @@ signatureLabel.TextXAlignment     = Enum.TextXAlignment.Center
 -- ═══════════════════════════════════════════════════
 local statusFrame = Instance.new("Frame", screenGui)
 statusFrame.Size = UDim2.fromOffset(160, 22)
-statusFrame.Position = UDim2.new(1, -170, 1, -30) -- kanan bawah
+statusFrame.Position = UDim2.new(1, -170, 1, -30)
 statusFrame.BackgroundColor3 = Color3.fromRGB(10,10,10)
 statusFrame.BackgroundTransparency = 0.4
 statusFrame.BorderSizePixel = 0
@@ -490,8 +485,9 @@ speedButton.MouseButton1Click:Connect(toggleSpeedBoost)
 closeButton.MouseButton1Click:Connect(function()
     turnOffAllFeatures()
     frame.Visible = false
+    statusFrame.Visible = false  -- ✅ hide status when panel closed
 end)
 
 -- Init status
 setStatus("Ghost Ready", Color3.new(0.7,0.7,0.7))
-print("Anonymous9x Ghost — Upgraded Visual Edition loaded. (Instant Status Fix)")
+print("Anonymous9x Ghost — Upgraded V2")
