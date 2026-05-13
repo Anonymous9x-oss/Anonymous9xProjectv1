@@ -2,6 +2,7 @@
     Anonymous9x Ghost Mode  —  Upgraded Visual Edition
     By Anonymous9x
     Logic ORI 100% untouched. UI + visuals only upgraded.
+    Fix: invis ON/OFF loop + mini status notif (bottom-right)
 ]]
 
 -- ═══════════════════════════════════════════════════
@@ -46,13 +47,10 @@ local trailThread        = nil
 
 local function createAfterimage(character)
     local ok, _ = pcall(function()
-        -- Need Archivable true for Clone
         character.Archivable = true
         local clone = character:Clone()
-        -- Remove humanoid so it doesn't animate
         local hum = clone:FindFirstChildOfClass("Humanoid")
         if hum then hum:Destroy() end
-        -- Remove HRP so it doesn't simulate physics
         local hrpC = clone:FindFirstChild("HumanoidRootPart")
         if hrpC then hrpC:Destroy() end
 
@@ -106,7 +104,7 @@ local function stopTrail()
 end
 
 -- ═══════════════════════════════════════════════════
--- GHOST BILLBOARD (floating "Ghost" text above head)
+-- GHOST BILLBOARD (floating "GhostAno9x" text above head)
 -- ═══════════════════════════════════════════════════
 local ghostBillboard = nil
 local glitchConn     = nil
@@ -124,7 +122,6 @@ local function scramble(s)
 end
 
 local function showGhostLabel()
-    -- Clean old if any
     if ghostBillboard then ghostBillboard:Destroy() end
     if glitchConn     then glitchConn:Disconnect() end
 
@@ -153,17 +150,15 @@ local function showGhostLabel()
     lbl.TextStrokeTransparency = 0.4
     lbl.TextXAlignment     = Enum.TextXAlignment.Center
 
-    -- Glitch animation loop — scramble 20% of the time
     local t = 0
     local glitching = false
     local origText  = "GhostAno9x"
     glitchConn = RunService.Heartbeat:Connect(function(dt)
         t = t + dt
-        -- Every ~0.7s do a quick glitch burst
         if t > 0.70 then
             t = 0
             glitching = true
-            lbl.TextColor3 = Color3.fromRGB(200, 160, 255) -- purple flash
+            lbl.TextColor3 = Color3.fromRGB(200, 160, 255)
             task.delay(0.055, function()
                 glitching    = false
                 lbl.Text     = origText
@@ -182,24 +177,22 @@ local function hideGhostLabel()
 end
 
 -- ═══════════════════════════════════════════════════
--- TOGGLE INVISIBILITY
--- FE core method: UNCHANGED (MoveTo → Seat weld → snap back)
---
--- BUG FIX — why OFF click had no reaction:
---   _invisBusy was true during the entire ON animation (~0.6-1.8s).
---   If user clicked OFF during that window → silently rejected.
---   Fix: lock ONLY blocks double-ON clicks.
---   OFF path is always synchronous (no waits) so no lock needed.
---
--- Other timing fixes kept:
---   · repeat-until position verify before creating Seat
---   · Weld.C0 / Weld.C1 = CFrame.new() explicit zero offset
---   · generous task.wait between steps
+-- TOGGLE INVISIBILITY (BUG FIX + MINI NOTIF)
 -- ═══════════════════════════════════════════════════
-local _invisBusy = false   -- only blocks concurrent ON operations
+local _invisBusy = false
+
+-- Mini status UI (kanan bawah) - akan dibuat setelah screenGui ada
+local statusLabel = nil  -- placeholder, akan diisi nanti
+
+local function setStatus(text, color)
+    if statusLabel then
+        statusLabel.Text = text
+        statusLabel.TextColor3 = color or Color3.new(1,1,1)
+    end
+end
 
 local function turnOffInvis()
-    -- OFF is always fast and synchronous — no lock needed
+    _invisBusy = false  -- ✅ BUG FIX: lepaskan lock agar bisa on lagi
     invis_on = false
     local invisChair = workspace:FindFirstChild("invischair")
     if invisChair then invisChair:Destroy() end
@@ -208,7 +201,7 @@ local function turnOffInvis()
     stopTrail()
     toggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 
-    -- Notif — OFF pantun
+    -- Notif lama
     pcall(function()
         game.StarterGui:SetCore("SendNotification", {
             Title    = "Anonymous9x Ghost",
@@ -216,10 +209,11 @@ local function turnOffInvis()
             Duration = 5,
         })
     end)
+    setStatus("INVISIBLE OFF", Color3.fromRGB(255, 100, 100))
 end
 
 local function turnOnInvis()
-    if _invisBusy then return end  -- block only double-ON
+    if _invisBusy then return end
     _invisBusy = true
 
     local char = player.Character
@@ -230,24 +224,19 @@ local function turnOnInvis()
     local savedpos = hrp.CFrame
     local farPos   = Vector3.new(-25.95, 84, 3537.55)
 
-    -- Step 1: move to far spot
     task.wait(0.05)
     char:MoveTo(farPos)
 
-    -- Step 2: verify arrival (max 30 × 0.06s = 1.8s timeout)
     for _ = 1, 30 do
         task.wait(0.06)
-        -- If user turned off mid-animation, abort cleanly
         if not invis_on then _invisBusy = false; return end
         local curHRP = char:FindFirstChild("HumanoidRootPart")
         if curHRP and (curHRP.Position - farPos).Magnitude < 8 then break end
     end
     task.wait(0.05)
 
-    -- Safety: if user turned off while we were waiting, abort
     if not invis_on then _invisBusy = false; return end
 
-    -- Step 3: create Seat
     local Seat = Instance.new("Seat", workspace)
     Seat.Anchored     = false
     Seat.CanCollide   = false
@@ -255,31 +244,22 @@ local function turnOnInvis()
     Seat.Transparency = 1
     Seat.Position     = farPos
 
-    -- Step 4: Weld with zero offset
     local Weld = Instance.new("Weld", Seat)
     Weld.Part0 = Seat
     Weld.Part1 = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
     Weld.C0    = CFrame.new()
     Weld.C1    = CFrame.new()
 
-    -- Step 5: server propagation
     task.wait(0.12)
-
-    -- Step 6: snap back
     Seat.CFrame = savedpos
-
-    -- Step 7: physics settle
     task.wait(0.08)
 
-    -- Step 8: transparency
     setTransparency(char, 0.5)
 
-    -- Visual
     showGhostLabel()
     startTrail()
     toggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 
-    -- Notif — ON pantun
     pcall(function()
         game.StarterGui:SetCore("SendNotification", {
             Title    = "Anonymous9x Ghost — ON",
@@ -287,6 +267,7 @@ local function turnOnInvis()
             Duration = 6,
         })
     end)
+    setStatus("INVISIBLE ON", Color3.fromRGB(100, 255, 100))
 
     _invisBusy = false
 end
@@ -294,14 +275,14 @@ end
 local function toggleInvisibility()
     sound:Play()
     if invis_on then
-        turnOffInvis()   -- always responsive, no lock
+        turnOffInvis()
     else
-        task.spawn(turnOnInvis)  -- async ON with lock
+        task.spawn(turnOnInvis)
     end
 end
 
 -- ═══════════════════════════════════════════════════
--- ORI TOGGLE SPEED (logic UNCHANGED)
+-- ORI TOGGLE SPEED (logic UNCHANGED + mini notif)
 -- ═══════════════════════════════════════════════════
 local function toggleSpeedBoost()
     isSpeedBoosted = not isSpeedBoosted
@@ -315,6 +296,7 @@ local function toggleSpeedBoost()
                 Title = "Anonymous9x Ghost", Duration = 3,
                 Text  = "SPEED BOOST  ON  — " .. boostedSpeed
             })
+            setStatus("SPEED BOOST ON", Color3.fromRGB(100, 255, 100))
         else
             humanoid.WalkSpeed = defaultSpeed
             speedButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
@@ -322,6 +304,7 @@ local function toggleSpeedBoost()
                 Title = "Anonymous9x Ghost", Duration = 3,
                 Text  = "SPEED BOOST  OFF  — " .. defaultSpeed
             })
+            setStatus("SPEED BOOST OFF", Color3.fromRGB(255, 100, 100))
         end
     end
 end
@@ -331,18 +314,12 @@ end
 -- ═══════════════════════════════════════════════════
 local function turnOffAllFeatures()
     if invis_on then
-        local invisChair = workspace:FindFirstChild('invischair')
-        if invisChair then invisChair:Destroy() end
-        if player.Character then setTransparency(player.Character, 0) end
-        invis_on = false
-        toggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
-        hideGhostLabel()
-        stopTrail()
+        turnOffInvis()  -- sudah termasuk reset lock
     end
     if isSpeedBoosted then
+        isSpeedBoosted = false
         local humanoid = player.Character and player.Character:FindFirstChild("Humanoid")
         if humanoid then humanoid.WalkSpeed = defaultSpeed end
-        isSpeedBoosted = false
         speedButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     end
     sound:Play()
@@ -350,6 +327,7 @@ local function turnOffAllFeatures()
         Title = "Anonymous9x Ghost", Duration = 3,
         Text  = "All features OFF"
     })
+    setStatus("All OFF", Color3.fromRGB(255,255,255))
 end
 
 -- ═══════════════════════════════════════════════════
@@ -364,6 +342,7 @@ player.CharacterAdded:Connect(function(character)
     humanoid.WalkSpeed = defaultSpeed
     toggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     speedButton.BackgroundColor3  = Color3.fromRGB(18, 18, 22)
+    setStatus("Respawning...", Color3.fromRGB(255,255,255))
 end)
 
 -- ═══════════════════════════════════════════════════
@@ -397,20 +376,17 @@ borderStroke.Color     = Color3.new(1, 1, 1)
 borderStroke.Thickness = 1.5
 borderStroke.Transparency = 0
 
--- Glitch border loop (alternates white ↔ faint purple, slight thickness pulse)
 task.spawn(function()
     local bt = 0
     while screenGui.Parent do
         bt = bt + task.wait(0.04)
-        local pulse = math.sin(bt * 3) -- -1 to 1
-        -- Flicker the border color between white and purple-white
+        local pulse = math.sin(bt * 3)
         local r = 1
         local g = 0.92 + pulse * 0.08
         local b = 0.92 + math.abs(pulse) * 0.50
         borderStroke.Color = Color3.new(r, g, b)
         borderStroke.Thickness = 1.4 + math.abs(pulse) * 0.5
 
-        -- Rare glitch flash: random chance every ~2s to spike to purple
         if math.random(1, 90) == 1 then
             borderStroke.Color = Color3.fromRGB(200, 140, 255)
             task.wait(0.045)
@@ -488,6 +464,26 @@ signatureLabel.TextColor3         = Color3.fromRGB(70, 70, 88)
 signatureLabel.TextXAlignment     = Enum.TextXAlignment.Center
 
 -- ═══════════════════════════════════════════════════
+-- MINI STATUS UI (KANAN BAWAH) — UPGRADE DIMINTA
+-- ═══════════════════════════════════════════════════
+local statusFrame = Instance.new("Frame", screenGui)
+statusFrame.Size = UDim2.fromOffset(160, 22)
+statusFrame.Position = UDim2.new(1, -170, 1, -30) -- kanan bawah
+statusFrame.BackgroundColor3 = Color3.fromRGB(10,10,10)
+statusFrame.BackgroundTransparency = 0.4
+statusFrame.BorderSizePixel = 0
+Instance.new("UICorner", statusFrame).CornerRadius = UDim.new(0,6)
+
+statusLabel = Instance.new("TextLabel", statusFrame)   -- isi variabel global statusLabel
+statusLabel.Size = UDim2.fromScale(1,1)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Ghost Ready"
+statusLabel.Font = Enum.Font.GothamBold
+statusLabel.TextSize = 11
+statusLabel.TextColor3 = Color3.new(0,1,0)
+statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+-- ═══════════════════════════════════════════════════
 -- WIRE BUTTONS
 -- ═══════════════════════════════════════════════════
 toggleButton.MouseButton1Click:Connect(toggleInvisibility)
@@ -497,4 +493,6 @@ closeButton.MouseButton1Click:Connect(function()
     frame.Visible = false
 end)
 
-print("Anonymous9x Ghost — Upgraded Visual Edition loaded.")
+-- Eksekusi awal: set status siap
+setStatus("Ghost Ready", Color3.new(0,1,0))
+print("Anonymous9x Ghost — Upgraded Visual Edition loaded. (Loop Fix + Mini Status)")
