@@ -3,6 +3,7 @@
     By Anonymous9x
     Logic ORI 100% untouched. UI + visuals only upgraded.
     Fix: invis ON/OFF loop + mini status notif (bottom-right)
+    Status now updates instantly on click (Ghost only)
 ]]
 
 -- ═══════════════════════════════════════════════════
@@ -38,7 +39,6 @@ end
 
 -- ═══════════════════════════════════════════════════
 -- GHOST TRAIL (afterimage visual — runs only when invis ON)
--- Source logic kept as-is, adapted to run as a managed loop
 -- ═══════════════════════════════════════════════════
 local AfterimageDuration = 0.7
 local SpawnInterval      = 0.10
@@ -177,12 +177,12 @@ local function hideGhostLabel()
 end
 
 -- ═══════════════════════════════════════════════════
--- TOGGLE INVISIBILITY (BUG FIX + MINI NOTIF)
+-- TOGGLE INVISIBILITY (BUG FIX + INSTANT MINI STATUS)
 -- ═══════════════════════════════════════════════════
 local _invisBusy = false
 
--- Mini status UI (kanan bawah) - akan dibuat setelah screenGui ada
-local statusLabel = nil  -- placeholder, akan diisi nanti
+-- placeholder untuk status label, diisi setelah screenGui dibuat
+local statusLabel = nil
 
 local function setStatus(text, color)
     if statusLabel then
@@ -192,7 +192,7 @@ local function setStatus(text, color)
 end
 
 local function turnOffInvis()
-    _invisBusy = false  -- ✅ BUG FIX: lepaskan lock agar bisa on lagi
+    _invisBusy = false
     invis_on = false
     local invisChair = workspace:FindFirstChild("invischair")
     if invisChair then invisChair:Destroy() end
@@ -209,7 +209,6 @@ local function turnOffInvis()
             Duration = 5,
         })
     end)
-    setStatus("INVISIBLE OFF", Color3.fromRGB(255, 100, 100))
 end
 
 local function turnOnInvis()
@@ -267,7 +266,6 @@ local function turnOnInvis()
             Duration = 6,
         })
     end)
-    setStatus("INVISIBLE ON", Color3.fromRGB(100, 255, 100))
 
     _invisBusy = false
 end
@@ -275,14 +273,18 @@ end
 local function toggleInvisibility()
     sound:Play()
     if invis_on then
+        -- Set status langsung SEBELUM off
+        setStatus("INVISIBLE OFF", Color3.fromRGB(255, 100, 100))
         turnOffInvis()
     else
+        -- Set status langsung SEBELUM on
+        setStatus("INVISIBLE ON", Color3.fromRGB(100, 255, 100))
         task.spawn(turnOnInvis)
     end
 end
 
 -- ═══════════════════════════════════════════════════
--- ORI TOGGLE SPEED (logic UNCHANGED + mini notif)
+-- ORI TOGGLE SPEED (UNCHANGED, NO MINI STATUS)
 -- ═══════════════════════════════════════════════════
 local function toggleSpeedBoost()
     isSpeedBoosted = not isSpeedBoosted
@@ -296,7 +298,6 @@ local function toggleSpeedBoost()
                 Title = "Anonymous9x Ghost", Duration = 3,
                 Text  = "SPEED BOOST  ON  — " .. boostedSpeed
             })
-            setStatus("SPEED BOOST ON", Color3.fromRGB(100, 255, 100))
         else
             humanoid.WalkSpeed = defaultSpeed
             speedButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
@@ -304,17 +305,17 @@ local function toggleSpeedBoost()
                 Title = "Anonymous9x Ghost", Duration = 3,
                 Text  = "SPEED BOOST  OFF  — " .. defaultSpeed
             })
-            setStatus("SPEED BOOST OFF", Color3.fromRGB(255, 100, 100))
         end
     end
+    -- No setStatus for speed boost
 end
 
 -- ═══════════════════════════════════════════════════
--- ORI TURN OFF ALL (logic UNCHANGED)
+-- ORI TURN OFF ALL (UNCHANGED)
 -- ═══════════════════════════════════════════════════
 local function turnOffAllFeatures()
     if invis_on then
-        turnOffInvis()  -- sudah termasuk reset lock
+        turnOffInvis()
     end
     if isSpeedBoosted then
         isSpeedBoosted = false
@@ -327,7 +328,7 @@ local function turnOffAllFeatures()
         Title = "Anonymous9x Ghost", Duration = 3,
         Text  = "All features OFF"
     })
-    setStatus("All OFF", Color3.fromRGB(255,255,255))
+    setStatus("Ghost Ready", Color3.new(0.7,0.7,0.7)) -- kembali ke ready
 end
 
 -- ═══════════════════════════════════════════════════
@@ -342,13 +343,12 @@ player.CharacterAdded:Connect(function(character)
     humanoid.WalkSpeed = defaultSpeed
     toggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     speedButton.BackgroundColor3  = Color3.fromRGB(18, 18, 22)
-    setStatus("Respawning...", Color3.fromRGB(255,255,255))
+    setStatus("Ghost Ready", Color3.new(0.5,0.5,0.5))
 end)
 
 -- ═══════════════════════════════════════════════════
 -- UPGRADED UI
 -- Black bg  |  White border  |  Glitch border animation
--- Same button layout, just visually upgraded
 -- ═══════════════════════════════════════════════════
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name         = "GhostModeUI"
@@ -435,7 +435,6 @@ local function makeBtn(yOff, labelTxt)
     local bS = Instance.new("UIStroke", b)
     bS.Color     = Color3.fromRGB(42, 42, 58)
     bS.Thickness = 0.9
-    -- Hover effect
     b.MouseEnter:Connect(function()
         TweenSvc:Create(b, TweenInfo.new(0.10),
             {BackgroundColor3 = Color3.fromRGB(26, 26, 34)}):Play()
@@ -464,7 +463,7 @@ signatureLabel.TextColor3         = Color3.fromRGB(70, 70, 88)
 signatureLabel.TextXAlignment     = Enum.TextXAlignment.Center
 
 -- ═══════════════════════════════════════════════════
--- MINI STATUS UI (KANAN BAWAH) — UPGRADE DIMINTA
+-- MINI STATUS UI (KANAN BAWAH) — HANYA UNTUK INVISIBLE
 -- ═══════════════════════════════════════════════════
 local statusFrame = Instance.new("Frame", screenGui)
 statusFrame.Size = UDim2.fromOffset(160, 22)
@@ -474,13 +473,13 @@ statusFrame.BackgroundTransparency = 0.4
 statusFrame.BorderSizePixel = 0
 Instance.new("UICorner", statusFrame).CornerRadius = UDim.new(0,6)
 
-statusLabel = Instance.new("TextLabel", statusFrame)   -- isi variabel global statusLabel
+statusLabel = Instance.new("TextLabel", statusFrame)
 statusLabel.Size = UDim2.fromScale(1,1)
 statusLabel.BackgroundTransparency = 1
 statusLabel.Text = "Ghost Ready"
 statusLabel.Font = Enum.Font.GothamBold
 statusLabel.TextSize = 11
-statusLabel.TextColor3 = Color3.new(0,1,0)
+statusLabel.TextColor3 = Color3.new(0.7,0.7,0.7)
 statusLabel.TextXAlignment = Enum.TextXAlignment.Center
 
 -- ═══════════════════════════════════════════════════
@@ -493,6 +492,6 @@ closeButton.MouseButton1Click:Connect(function()
     frame.Visible = false
 end)
 
--- Eksekusi awal: set status siap
-setStatus("Ghost Ready", Color3.new(0,1,0))
-print("Anonymous9x Ghost — Upgraded Visual Edition loaded. (Loop Fix + Mini Status)")
+-- Init status
+setStatus("Ghost Ready", Color3.new(0.7,0.7,0.7))
+print("Anonymous9x Ghost — Upgraded Visual Edition loaded. (Instant Status Fix)")
