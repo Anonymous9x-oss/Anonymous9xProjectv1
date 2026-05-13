@@ -184,107 +184,120 @@ end
 -- ═══════════════════════════════════════════════════
 -- TOGGLE INVISIBILITY
 -- FE core method: UNCHANGED (MoveTo → Seat weld → snap back)
--- TIMING FIXED to eliminate stuck-character bug:
 --
--- ROOT CAUSE:
---   wait() = 0.033s minimum — too short for MoveTo to replicate.
---   Seat was welded before character arrived at far pos.
---   Weld had wrong offset → snap-back placed char at wrong location.
+-- BUG FIX — why OFF click had no reaction:
+--   _invisBusy was true during the entire ON animation (~0.6-1.8s).
+--   If user clicked OFF during that window → silently rejected.
+--   Fix: lock ONLY blocks double-ON clicks.
+--   OFF path is always synchronous (no waits) so no lock needed.
 --
--- FIXES (core FE logic NOT changed):
---   [1] Double-click lock guard (_invisBusy)
---   [2] task.wait(0.05) before MoveTo — clean frame boundary
---   [3] repeat-until position verify — wait until char truly at farPos
---   [4] Weld.C0 / Weld.C1 explicit zero offset
---   [5] task.wait(0.12) after Weld — server propagation
---   [6] task.wait(0.08) after CFrame snap — physics settle
+-- Other timing fixes kept:
+--   · repeat-until position verify before creating Seat
+--   · Weld.C0 / Weld.C1 = CFrame.new() explicit zero offset
+--   · generous task.wait between steps
 -- ═══════════════════════════════════════════════════
-local _invisBusy = false
+local _invisBusy = false   -- only blocks concurrent ON operations
 
-local function toggleInvisibility()
-    if _invisBusy then return end
+local function turnOffInvis()
+    -- OFF is always fast and synchronous — no lock needed
+    invis_on = false
+    local invisChair = workspace:FindFirstChild("invischair")
+    if invisChair then invisChair:Destroy() end
+    if player.Character then setTransparency(player.Character, 0) end
+    hideGhostLabel()
+    stopTrail()
+    toggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+
+    -- Notif — OFF pantun
+    pcall(function()
+        game.StarterGui:SetCore("SendNotification", {
+            Title    = "Anonymous9x Ghost",
+            Text     = "Back to reality, shadows clear — visible once more, nothing to fear.",
+            Duration = 5,
+        })
+    end)
+end
+
+local function turnOnInvis()
+    if _invisBusy then return end  -- block only double-ON
     _invisBusy = true
 
-    invis_on = not invis_on
-    sound:Play()
+    local char = player.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then _invisBusy = false; return end
 
-    if invis_on then
-        local char = player.Character
-        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then
-            _invisBusy = false
-            invis_on   = false
-            return
-        end
+    invis_on = true
+    local savedpos = hrp.CFrame
+    local farPos   = Vector3.new(-25.95, 84, 3537.55)
 
-        local savedpos = hrp.CFrame
-        local farPos   = Vector3.new(-25.95, 84, 3537.55)
+    -- Step 1: move to far spot
+    task.wait(0.05)
+    char:MoveTo(farPos)
 
-        -- Step 1: Move to far spot
-        task.wait(0.05)
-        char:MoveTo(farPos)
-
-        -- Step 2: Wait until character actually arrives (max 30 checks × 0.06s = 1.8s timeout)
-        for _ = 1, 30 do
-            task.wait(0.06)
-            local curHRP = char:FindFirstChild("HumanoidRootPart")
-            if curHRP and (curHRP.Position - farPos).Magnitude < 8 then
-                break
-            end
-        end
-        task.wait(0.05) -- extra settle
-
-        -- Step 3: Create Seat at far position
-        local Seat = Instance.new("Seat", workspace)
-        Seat.Anchored     = false
-        Seat.CanCollide   = false
-        Seat.Name         = "invischair"
-        Seat.Transparency = 1
-        Seat.Position     = farPos
-
-        -- Step 4: Weld Seat to character torso with explicit zero offset
-        local Weld  = Instance.new("Weld", Seat)
-        Weld.Part0  = Seat
-        Weld.Part1  = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
-        Weld.C0     = CFrame.new()
-        Weld.C1     = CFrame.new()
-
-        -- Step 5: Let weld propagate to server
-        task.wait(0.12)
-
-        -- Step 6: Snap Seat (and character) back to saved position
-        Seat.CFrame = savedpos
-
-        -- Step 7: Physics settle
-        task.wait(0.08)
-
-        -- Step 8: Apply transparency
-        setTransparency(char, 0.5)
-
-        -- Visual ON
-        showGhostLabel()
-        startTrail()
-
-        toggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "Anonymous9x Ghost", Duration = 3, Text = "INVISIBLE  ON"
-        })
-
-    else
-        local invisChair = workspace:FindFirstChild("invischair")
-        if invisChair then invisChair:Destroy() end
-        if player.Character then setTransparency(player.Character, 0) end
-
-        hideGhostLabel()
-        stopTrail()
-
-        toggleButton.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
-        game.StarterGui:SetCore("SendNotification", {
-            Title = "Anonymous9x Ghost", Duration = 3, Text = "INVISIBLE  OFF"
-        })
+    -- Step 2: verify arrival (max 30 × 0.06s = 1.8s timeout)
+    for _ = 1, 30 do
+        task.wait(0.06)
+        -- If user turned off mid-animation, abort cleanly
+        if not invis_on then _invisBusy = false; return end
+        local curHRP = char:FindFirstChild("HumanoidRootPart")
+        if curHRP and (curHRP.Position - farPos).Magnitude < 8 then break end
     end
+    task.wait(0.05)
+
+    -- Safety: if user turned off while we were waiting, abort
+    if not invis_on then _invisBusy = false; return end
+
+    -- Step 3: create Seat
+    local Seat = Instance.new("Seat", workspace)
+    Seat.Anchored     = false
+    Seat.CanCollide   = false
+    Seat.Name         = "invischair"
+    Seat.Transparency = 1
+    Seat.Position     = farPos
+
+    -- Step 4: Weld with zero offset
+    local Weld = Instance.new("Weld", Seat)
+    Weld.Part0 = Seat
+    Weld.Part1 = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+    Weld.C0    = CFrame.new()
+    Weld.C1    = CFrame.new()
+
+    -- Step 5: server propagation
+    task.wait(0.12)
+
+    -- Step 6: snap back
+    Seat.CFrame = savedpos
+
+    -- Step 7: physics settle
+    task.wait(0.08)
+
+    -- Step 8: transparency
+    setTransparency(char, 0.5)
+
+    -- Visual
+    showGhostLabel()
+    startTrail()
+    toggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+
+    -- Notif — ON pantun
+    pcall(function()
+        game.StarterGui:SetCore("SendNotification", {
+            Title    = "Anonymous9x Ghost — ON",
+            Text     = "A ghost unseen, a shadow free — none can catch what eyes can't see. Stay sharp!",
+            Duration = 6,
+        })
+    end)
 
     _invisBusy = false
+end
+
+local function toggleInvisibility()
+    sound:Play()
+    if invis_on then
+        turnOffInvis()   -- always responsive, no lock
+    else
+        task.spawn(turnOnInvis)  -- async ON with lock
+    end
 end
 
 -- ═══════════════════════════════════════════════════
