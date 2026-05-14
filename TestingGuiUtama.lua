@@ -1,9 +1,14 @@
 --[[
     ANONYMOUS9x VIP - MAIN GUI (UPGRADED v2.1)
     FIX: LOADING ANIMATION POSITION & TEXT SEQUENCE
-    MOD: REMOVED KEY SYSTEM, ADDED ANIMATED BACKGROUND + TOGGLE
-    V3: HEAVY MATRIX RAIN, GLITCH TEXT SCRAMBLE, BLINKING BORDERS
+    MOD: HEAVY MATRIX RAIN, GLITCH TEXT SCRAMBLE, BLINKING BORDERS
 --]]
+
+-- Check if credentials exist (ORIGINAL KEY SYSTEM)
+if not _G.VIP_CREDENTIALS then
+    warn(">> [ANONYMOUS9x]: No credentials found! Loading login panel...")
+    return
+end
 
 -- Main Configuration
 local Config = {
@@ -23,7 +28,7 @@ local Config = {
         {Name = "Fly Noclip", Icon = "Main", URL = "https://pastebin.com/raw/ZrRwsPAe", Desc = "universal mobile fly with analog, keyboard with wasd"},
         {Name = "ESP Master", Icon = "Main", URL = "https://pastebin.com/raw/zdqzRRDe", Desc = "can see other players without range"},
         {Name = "Speed Walk", Icon = "Main", URL = "https://pastebin.com/raw/BAqbsBx0", Desc = "easily adjust your running speed"},
-        {Name = "Ghost Mode", Icon = "Main", URL = "https://pastebin.com/raw/A26bz69Q", Desc = "set yourself to be invisible so you can become a ghost equipped with speedboost"},
+        {Name = "Ghost Mode", Icon = "FE", URL = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/Ghostmode.lua", Desc = "set yourself to be invisible so you can become a ghost equipped with speedboost"},
         {Name = "No Clip", Icon = "Main", URL = "https://pastebin.com/raw/4Y3ium6c", Desc = "set you up so you can go through walls or other parts"},
         {Name = "Infinite Jump", Icon = "Main", URL = "https://pastebin.com/raw/qrMSz160", Desc = "you can do jump spam"},
         {Name = "Spectator Full", Icon = "Player", URL = "https://pastebin.com/raw/yYrK3kNi", Desc = "Spectator All Player with tp, follow, kick features"},
@@ -40,7 +45,7 @@ local Config = {
         {Name = "FakeDonate", Icon = "Chaos", URL = "https://pastebin.com/raw/yaGNQ4i3", Desc = "donate FE with a system that manipulates product developers"},
         {Name = "Hitbox Universal", Icon = "Main", URL = "https://pastebin.com/raw/BWD0p374", Desc = "can help you hit players with hitboxes with a sophisticated engine that auto scans maps to see if they can hitbox or not"}, 
         {Name = "Report Text", Icon = "Misc", URL = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/PanelGUIVip.lua", Desc = "copy text that can make it easier for you to ban players who are in violation by reporting"},
-        {Name = "Aimbot Universal", Icon = "Main", URL = "https://pastebin.com/raw/ey0WnWUv", Desc = "can help you hit players with lock aim or aim assist"}, 
+        {Name = "Aimbot Universal", Icon = "Main", URL = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/Aimbot.lua", Desc = "can help you hit players with lock aim or aim assist V3"}, 
         {Name = "AutoWalk Universal", Icon = "Main", URL = "https://pastebin.com/raw/fbUrKRbG", Desc = "autowalk with full features, record manually"},
         {Name = "Jump Power", Icon = "Main", URL = "https://pastebin.com/raw/eiDMNdLC", Desc = "can adjust your jump height with particle effects"}, 
         {Name = "AutoTp Universal", Icon = "Main", URL = "https://pastebin.com/raw/1Q3ZLFT6", Desc = "teleport by getting location manually"},
