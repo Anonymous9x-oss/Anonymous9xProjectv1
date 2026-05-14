@@ -2,13 +2,8 @@
     ANONYMOUS9x VIP - MAIN GUI (UPGRADED v2.1)
     FIX: LOADING ANIMATION POSITION & TEXT SEQUENCE
     MOD: HEAVY MATRIX RAIN, GLITCH TEXT SCRAMBLE, BLINKING BORDERS
+    KEY SYSTEM REMOVED – NO KEY REQUIRED
 --]]
-
--- Check if credentials exist (ORIGINAL KEY SYSTEM)
-if not _G.VIP_CREDENTIALS then
-    warn(">> [ANONYMOUS9x]: No credentials found! Loading login panel...")
-    return
-end
 
 -- Main Configuration
 local Config = {
