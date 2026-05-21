@@ -3,6 +3,7 @@
     FIX: LOADING ANIMATION POSITION & TEXT SEQUENCE
     MOD: HEAVY MATRIX RAIN, GLITCH TEXT SCRAMBLE, BLINKING BORDERS
     KEY SYSTEM REMOVED – NO KEY REQUIRED
+    ADDED: WELCOME NOTIFICATION (SMALL, BOTTOM-RIGHT, 4s, SMOOTH FADE OUT)
 --]]
 
 -- Main Configuration
@@ -320,6 +321,89 @@ local function RunLoadingScreen()
     return LoadingFrame, LoadingText, dotsConnection
 end
 
+-- ==================== WELCOME NOTIFICATION (SMALL & SMOOTH FADE OUT) ====================
+local function ShowWelcomeNotification()
+    local notif = Instance.new("Frame", ScreenGui)
+    notif.Name = "WelcomeNotif"
+    notif.Size = UDim2.new(0, 200, 0, 75)   -- lebih kecil
+    notif.Position = UDim2.new(1, -210, 1, -90) -- kanan bawah
+    notif.BackgroundColor3 = Config.Theme.Background
+    notif.ZIndex = 100
+    Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 6)
+    AddStroke(notif, 1.5, Config.Theme.Border)
+
+    -- "Good to see you {username}"
+    local label1 = Instance.new("TextLabel", notif)
+    label1.Text = "Good to see you " .. LocalPlayer.Name
+    label1.Size = UDim2.new(1, -12, 0, 16)
+    label1.Position = UDim2.new(0, 6, 0, 5)
+    label1.BackgroundTransparency = 1
+    label1.TextColor3 = Config.Theme.Text
+    label1.Font = Enum.Font.GothamBold
+    label1.TextSize = 11
+    label1.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- User ID
+    local label2 = Instance.new("TextLabel", notif)
+    label2.Text = "ID: " .. LocalPlayer.UserId
+    label2.Size = UDim2.new(1, -12, 0, 14)
+    label2.Position = UDim2.new(0, 6, 0, 24)
+    label2.BackgroundTransparency = 1
+    label2.TextColor3 = Color3.fromRGB(180, 180, 180)
+    label2.Font = Enum.Font.Gotham
+    label2.TextSize = 9
+    label2.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- "Welcome VIP User" bold & agak besar
+    local label3 = Instance.new("TextLabel", notif)
+    label3.Text = "Welcome VIP User"
+    label3.Size = UDim2.new(1, -12, 0, 20)
+    label3.Position = UDim2.new(0, 6, 0, 40)
+    label3.BackgroundTransparency = 1
+    label3.TextColor3 = Config.Theme.Text
+    label3.Font = Enum.Font.GothamBlack
+    label3.TextSize = 14
+    label3.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Loading bar (progress putih) di bawah
+    local barContainer = Instance.new("Frame", notif)
+    barContainer.Size = UDim2.new(1, -12, 0, 3)
+    barContainer.Position = UDim2.new(0, 6, 1, -10)
+    barContainer.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Instance.new("UICorner", barContainer).CornerRadius = UDim.new(0, 1)
+
+    local bar = Instance.new("Frame", barContainer)
+    bar.Size = UDim2.new(0, 0, 1, 0)
+    bar.BackgroundColor3 = Config.Theme.Border
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 1)
+
+    -- Animasi loading 4 detik lalu fade out
+    local startTime = tick()
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        local elapsed = tick() - startTime
+        local progress = math.min(elapsed / 4, 1)
+        bar.Size = UDim2.new(progress, 0, 1, 0)
+        if progress >= 1 then
+            connection:Disconnect()
+            -- Smooth fade out untuk semua elemen
+            local objectsToFade = {notif}
+            for _, child in ipairs(notif:GetChildren()) do
+                if child:IsA("TextLabel") or child:IsA("Frame") then
+                    table.insert(objectsToFade, child)
+                end
+            end
+            for _, obj in ipairs(objectsToFade) do
+                local prop = obj:IsA("TextLabel") and "TextTransparency" or "BackgroundTransparency"
+                local tween = TweenService:Create(obj, TweenInfo.new(0.5), {[prop] = 1})
+                tween:Play()
+            end
+            task.wait(0.5)
+            notif:Destroy()
+        end
+    end)
+end
+
 -- Header
 local Header = Instance.new("Frame", AppWindow)
 Header.Size = UDim2.new(1, 0, 0, 50)
@@ -601,6 +685,8 @@ local function InitializeGUI()
             LoadingFrame:Destroy()
             StartMonitor()
             print(">> [ANONYMOUS9x VIP Main GUI]: Loaded Successfully!")
+            -- Tampilkan notifikasi selamat datang di kanan bawah
+            ShowWelcomeNotification()
         end)
     end)
 end
