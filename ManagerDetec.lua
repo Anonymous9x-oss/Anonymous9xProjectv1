@@ -1,14 +1,13 @@
 --[[
-    Anonymous9x Detector Manager v1.1
+    Anonymous9x Detector Manager v1.2
     Compact | Black/White | Touch + Mouse Drag
     Delta Mobile / iOS / PC — All Executors
 
     UPDATES:
-    - Copy Script button now full-width inside each row, clean & centered.
-    - Row layout redesigned: badge + name/path + single Copy button (no overflow).
-    - Copy action copies full executable Lua script for the selected remote.
-    - Panel width slightly increased to 320px for better mobile fit.
-    - All other features remain identical.
+    - Copy Script now retrieves the original source code
+      of the script that contains the remote (ancestor LuaSourceContainer).
+      No more generated Fire/Invoke templates.
+    - UI unchanged (still 320px, perfect layout).
 ]]
 
 -- ══════════════════════════════════════════
@@ -64,10 +63,10 @@ local C = {
     touchClr = Color3.fromRGB(160, 120, 120),
     otherClr = Color3.fromRGB(100, 100, 100),
 }
-local W = 320  -- panel width (slightly wider for button comfort)
+local W = 320  -- panel width
 local HDR = 30
-local BTH = 28 -- button height in rows
-local RH = 66 -- row height (now taller to accommodate badge + texts + full-width button)
+local BTH = 28
+local RH = 66
 
 -- ══════════════════════════════════════════
 -- WINDOW
@@ -88,7 +87,7 @@ local winStroke = Instance.new("UIStroke", win)
 winStroke.Thickness = 1.2
 winStroke.Color = C.border
 
--- Glitch border animation (white↔purple pulse)
+-- Glitch border animation
 task.spawn(function()
     local t = 0
     while win.Parent do
@@ -144,7 +143,7 @@ hTitle.TextTruncate = Enum.TextTruncate.AtEnd
 hTitle.ZIndex = 12
 hTitle.Parent = hdr
 
--- Control buttons (ImageButton = no cursor bug)
+-- Control buttons
 local function makeCtrl(xOff, sym)
     local b = Instance.new("ImageButton")
     b.Size = UDim2.fromOffset(20, 17)
@@ -181,7 +180,7 @@ local minBtn = makeCtrl(-44, "-")
 local closeBtn = makeCtrl(-22, "x")
 
 -- ══════════════════════════════════════════
--- DRAG (global UIS — reliable on Delta)
+-- DRAG
 -- ══════════════════════════════════════════
 do
     local drag = false
@@ -227,7 +226,6 @@ do
         end
     end)
 
-    -- Minimize
     local fullH = 300
     minBtn.MouseButton1Click:Connect(function()
         minH = not minH
@@ -237,7 +235,6 @@ do
     end)
 end
 
--- Close
 closeBtn.MouseButton1Click:Connect(function()
     TS:Create(win, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
     task.delay(0.16, function() pcall(function() gui:Destroy() end) end)
@@ -293,7 +290,7 @@ scL.Parent = searchClear
 searchClear.MouseButton1Click:Connect(function() searchBox.Text = "" end)
 
 -- ══════════════════════════════════════════
--- TOOLBAR (Refresh | AutoScan | AntiKill | Rescan)
+-- TOOLBAR
 -- ══════════════════════════════════════════
 local toolBar = Instance.new("Frame")
 toolBar.Size = UDim2.new(1, -10, 0, 22)
@@ -428,211 +425,30 @@ local function isDangerous(inst)
     return false
 end
 
--- ──────────────────────────────────────────
--- GENERATE EXECUTABLE SCRIPT for a remote
--- (Unchanged – already copies full functional code)
--- ──────────────────────────────────────────
-local function generateScript(inst)
-    local path = inst:GetFullName()
-    local cn = inst.ClassName
-
-    local function buildPath(obj)
-        local parts = {}
-        local current = obj
-        while current and current ~= game do
-            table.insert(parts, 1, current.Name)
-            current = current.Parent
-        end
-        local acc = "game"
-        local services = {
-            ReplicatedStorage = true, Workspace = true, ServerStorage = true,
-            ServerScriptService = true, StarterGui = true, StarterPack = true,
-            Players = true, Lighting = true, RunService = true, TweenService = true,
-            UserInputService = true, SoundService = true, HttpService = true,
-            Chat = true, Teams = true, SocialService = true,
-        }
-        for i, name in ipairs(parts) do
-            if i == 1 and services[name] then
-                acc = 'game:GetService("' .. name .. '")'
+-- ══════════════════════════════════════════
+-- COPY ORIGINAL SCRIPT SOURCE (NEW)
+-- ══════════════════════════════════════════
+-- Walk up the parent chain to find the first LuaSourceContainer
+-- (Script, LocalScript, ModuleScript) and return its Source.
+-- If none is found, return a placeholder message.
+local function getSourceCode(inst)
+    local current = inst
+    while current do
+        if current:IsA("LuaSourceContainer") then
+            local src = current.Source
+            if src and src ~= "" then
+                return src
             else
-                local safe = name:gsub('"', '\\"')
-                acc = acc .. ':FindFirstChild("' .. safe .. '")'
+                return "-- Empty source in " .. current:GetFullName()
             end
         end
-        return acc
+        current = current.Parent
     end
-
-    local accessor = buildPath(inst)
-    local lines = {
-        "-- Anonymous9x Detector Manager – Generated Script",
-        "-- Remote: " .. path,
-        "-- Class: " .. cn,
-        "",
-        "local remote = " .. accessor,
-        'if not remote then warn("Remote not found: ' .. path:gsub('"','\\"') .. '") return end',
-        "",
-    }
-
-    if cn == "RemoteEvent" then
-        table.insert(lines, "-- ╔══════════════════════════════════╗")
-        table.insert(lines, "-- ║ RemoteEvent :: FireServer      ║")
-        table.insert(lines, "-- ╚══════════════════════════════════╝")
-        table.insert(lines, "")
-        table.insert(lines, "-- Single fire (no args):")
-        table.insert(lines, "remote:FireServer()")
-        table.insert(lines, "")
-        table.insert(lines, "-- Single fire with common arg types:")
-        table.insert(lines, "-- remote:FireServer(true)")
-        table.insert(lines, "-- remote:FireServer('action', 1, Vector3.new(0,0,0))")
-        table.insert(lines, "-- remote:FireServer({key='value', num=99})")
-        table.insert(lines, "")
-        table.insert(lines, "-- Loop fire (runs until script is stopped):")
-        table.insert(lines, "-- while task.wait(0.1) do")
-        table.insert(lines, "-- remote:FireServer()")
-        table.insert(lines, "-- end")
-        table.insert(lines, "")
-        table.insert(lines, "-- Rapid burst (fire N times):")
-        table.insert(lines, "-- for i = 1, 10 do")
-        table.insert(lines, "-- remote:FireServer()")
-        table.insert(lines, "-- task.wait(0.05)")
-        table.insert(lines, "-- end")
-        table.insert(lines, "")
-        table.insert(lines, "-- Listen to OnClientEvent (spy on server responses):")
-        table.insert(lines, "-- remote.OnClientEvent:Connect(function(...)")
-        table.insert(lines, "-- print('[Spy]', ...)")
-        table.insert(lines, "-- end)")
-    elseif cn == "RemoteFunction" then
-        table.insert(lines, "-- ╔══════════════════════════════════╗")
-        table.insert(lines, "-- ║ RemoteFunction :: InvokeServer  ║")
-        table.insert(lines, "-- ╚══════════════════════════════════╝")
-        table.insert(lines, "")
-        table.insert(lines, "-- Invoke (no args) with full error capture:")
-        table.insert(lines, "local ok, result = pcall(function()")
-        table.insert(lines, " return remote:InvokeServer()")
-        table.insert(lines, "end)")
-        table.insert(lines, 'print("[A9x] InvokeServer ok:", ok, "| result:", result)')
-        table.insert(lines, "")
-        table.insert(lines, "-- Invoke with arguments:")
-        table.insert(lines, "-- local ok2, res2 = pcall(function()")
-        table.insert(lines, "-- return remote:InvokeServer('buy', 1, 'item_id')")
-        table.insert(lines, "-- end)")
-        table.insert(lines, "-- print('[A9x] result:', ok2, res2)")
-        table.insert(lines, "")
-        table.insert(lines, "-- Hook server response (if hookfunction available):")
-        table.insert(lines, "-- local original = hookfunction(remote.InvokeServer, function(self, ...)")
-        table.insert(lines, "-- print('[Hook] args:', ...)")
-        table.insert(lines, "-- return original(self, ...)")
-        table.insert(lines, "-- end)")
-        table.insert(lines, "")
-        table.insert(lines, "-- Intercept OnClientInvoke:")
-        table.insert(lines, "-- remote.OnClientInvoke = function(...)")
-        table.insert(lines, "-- print('[Intercept]', ...)")
-        table.insert(lines, "-- return true")
-        table.insert(lines, "-- end")
-    elseif cn == "BindableEvent" then
-        table.insert(lines, "-- ╔══════════════════════════════════╗")
-        table.insert(lines, "-- ║ BindableEvent :: Fire          ║")
-        table.insert(lines, "-- ╚══════════════════════════════════╝")
-        table.insert(lines, "")
-        table.insert(lines, "-- Fire with no args:")
-        table.insert(lines, "remote:Fire()")
-        table.insert(lines, "")
-        table.insert(lines, "-- Fire with args:")
-        table.insert(lines, "-- remote:Fire('param1', 42)")
-        table.insert(lines, "")
-        table.insert(lines, "-- Listen to Event:")
-        table.insert(lines, "-- remote.Event:Connect(function(...)")
-        table.insert(lines, "-- print('[BindableEvent]', ...)")
-        table.insert(lines, "-- end)")
-        table.insert(lines, "")
-        table.insert(lines, "-- Loop fire:")
-        table.insert(lines, "-- while task.wait(0.1) do remote:Fire() end")
-    elseif cn == "BindableFunction" then
-        table.insert(lines, "-- ╔══════════════════════════════════╗")
-        table.insert(lines, "-- ║ BindableFunction :: Invoke     ║")
-        table.insert(lines, "-- ╚══════════════════════════════════╝")
-        table.insert(lines, "")
-        table.insert(lines, "-- Invoke with error handling:")
-        table.insert(lines, "local ok, result = pcall(function()")
-        table.insert(lines, " return remote:Invoke()")
-        table.insert(lines, "end)")
-        table.insert(lines, 'print("[A9x] Invoke result:", ok, result)')
-        table.insert(lines, "")
-        table.insert(lines, "-- Hook OnInvoke to spy/override:")
-        table.insert(lines, "-- local realFn = remote.OnInvoke")
-        table.insert(lines, "-- remote.OnInvoke = function(...)")
-        table.insert(lines, "-- print('[Hook OnInvoke]', ...)")
-        table.insert(lines, "-- if realFn then return realFn(...) end")
-        table.insert(lines, "-- end")
-    elseif cn == "ClickDetector" then
-        table.insert(lines, "-- ╔══════════════════════════════════╗")
-        table.insert(lines, "-- ║ ClickDetector :: fireclickdetector║")
-        table.insert(lines, "-- ╚══════════════════════════════════╝")
-        table.insert(lines, "")
-        table.insert(lines, "-- Fire click detector:")
-        table.insert(lines, "fireclickdetector(remote)")
-        table.insert(lines, "")
-        table.insert(lines, "-- Rapid loop fire:")
-        table.insert(lines, "-- while task.wait(0.05) do fireclickdetector(remote) end")
-        table.insert(lines, "")
-        table.insert(lines, "-- Listen to MouseClick event:")
-        table.insert(lines, "-- remote.MouseClick:Connect(function(plr)")
-        table.insert(lines, "-- print('[ClickDetector clicked by]', plr.Name)")
-        table.insert(lines, "-- end)")
-    elseif cn == "ProximityPrompt" then
-        table.insert(lines, "-- ╔══════════════════════════════════╗")
-        table.insert(lines, "-- ║ ProximityPrompt :: fireproximityprompt║")
-        table.insert(lines, "-- ╚══════════════════════════════════╝")
-        table.insert(lines, "")
-        table.insert(lines, "-- Trigger proximity prompt:")
-        table.insert(lines, "fireproximityprompt(remote)")
-        table.insert(lines, "")
-        table.insert(lines, "-- Loop trigger:")
-        table.insert(lines, "-- while task.wait(0.1) do fireproximityprompt(remote) end")
-        table.insert(lines, "")
-        table.insert(lines, "-- Listen to Triggered event:")
-        table.insert(lines, "-- remote.Triggered:Connect(function(plr)")
-        table.insert(lines, "-- print('[Prompt triggered by]', plr.Name)")
-        table.insert(lines, "-- end)")
-        table.insert(lines, "")
-        table.insert(lines, "-- Max distance override:")
-        table.insert(lines, "-- remote.MaxActivationDistance = 9999")
-    elseif cn == "TouchTransmitter" then
-        table.insert(lines, "-- ╔══════════════════════════════════╗")
-        table.insert(lines, "-- ║ TouchTransmitter :: firetouchinterest║")
-        table.insert(lines, "-- ╚══════════════════════════════════╝")
-        table.insert(lines, "")
-        table.insert(lines, "local lp = game:GetService('Players').LocalPlayer")
-        table.insert(lines, "local char = lp.Character or lp.CharacterAdded:Wait()")
-        table.insert(lines, "local hrp = char:WaitForChild('HumanoidRootPart', 5)")
-        table.insert(lines, "local touchPart = remote.Parent")
-        table.insert(lines, "")
-        table.insert(lines, "if hrp and touchPart then")
-        table.insert(lines, " firetouchinterest(touchPart, hrp, 0) -- touch begin")
-        table.insert(lines, " task.wait(0.10)")
-        table.insert(lines, " firetouchinterest(touchPart, hrp, 1) -- touch end")
-        table.insert(lines, " print('[A9x] TouchTransmitter fired on:', touchPart:GetFullName())")
-        table.insert(lines, "else")
-        table.insert(lines, " warn('[A9x] Could not find HumanoidRootPart or TouchPart')")
-        table.insert(lines, "end")
-        table.insert(lines, "")
-        table.insert(lines, "-- Rapid loop:")
-        table.insert(lines, "-- while task.wait(0.05) do")
-        table.insert(lines, "-- pcall(firetouchinterest, touchPart, hrp, 0)")
-        table.insert(lines, "-- task.wait(0.05)")
-        table.insert(lines, "-- pcall(firetouchinterest, touchPart, hrp, 1)")
-        table.insert(lines, "-- end")
-    end
-
-    table.insert(lines, "")
-    table.insert(lines, '-- ════════════════════════════════════')
-    table.insert(lines, '-- By Anonymous9x | Detector Manager')
-    table.insert(lines, '-- ════════════════════════════════════')
-    return table.concat(lines, "\n")
+    return "-- No source script found for " .. inst:GetFullName()
 end
 
 -- ══════════════════════════════════════════
--- BUILD ROW (redesigned for clean button)
+-- BUILD ROW (unchanged layout, only copy logic updated)
 -- ══════════════════════════════════════════
 local rowOrder = 0
 local rowFrames = {}
@@ -659,7 +475,7 @@ local function makeRow(inst)
     rStroke.Thickness = 0.7
     rStroke.Transparency = 0.45
 
-    -- Color badge on the left
+    -- Color badge
     local badge = Instance.new("Frame")
     badge.Size = UDim2.new(0, 6, 1, 0)
     badge.Position = UDim2.fromOffset(0, 0)
@@ -670,7 +486,7 @@ local function makeRow(inst)
     badge.Parent = row
     Instance.new("UICorner", badge).CornerRadius = UDim.new(1, 0)
 
-    -- Right content area
+    -- Content area
     local content = Instance.new("Frame")
     content.Size = UDim2.new(1, -12, 1, 0)
     content.Position = UDim2.fromOffset(10, 0)
@@ -707,7 +523,7 @@ local function makeRow(inst)
     classLbl.ZIndex = 14
     classLbl.Parent = content
 
-    -- Copy Script button (full-width under text)
+    -- Copy Script button (now copies original source)
     local copyBtn = Instance.new("ImageButton")
     copyBtn.Size = UDim2.new(1, -4, 0, BTH)
     copyBtn.Position = UDim2.fromOffset(2, 36)
@@ -738,13 +554,13 @@ local function makeRow(inst)
     end)
 
     copyBtn.MouseButton1Click:Connect(function()
-        local script = generateScript(inst)
-        local ok = pcall(function() setclipboard(script) end)
+        local src = getSourceCode(inst)      -- use the new function
+        local ok = pcall(function() setclipboard(src) end)
         if ok then
             copyLbl.Text = "Copied!"
         else
-            print("=== Anonymous9x Generated Script ===")
-            print(script)
+            print("=== Anonymous9x Original Script ===")
+            print(src)
             print("=== END ===")
             copyLbl.Text = "See Console"
         end
@@ -898,7 +714,7 @@ akBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ══════════════════════════════════════════
--- STOP ALL LOOPS (Rescan)
+-- RESCAN (Stop All Loops)
 -- ══════════════════════════════════════════
 stopBtn.MouseButton1Click:Connect(function()
     for fp, loopD in pairs(loops) do
