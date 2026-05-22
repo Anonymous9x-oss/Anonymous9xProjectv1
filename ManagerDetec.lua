@@ -1,12 +1,12 @@
 --[[
-    Anonymous9x Detector Manager v1.2
+    Anonymous9x Detector Manager v1.3
     Compact | Black/White | Touch + Mouse Drag
     Delta Mobile / iOS / PC — All Executors
 
     UPDATES:
-    - Copy Script now retrieves the original source code
-      of the script that contains the remote (ancestor LuaSourceContainer).
-      No more generated Fire/Invoke templates.
+    - getSourceCode now uses multiple methods:
+        1. Walk parent chain (fast).
+        2. Scan getgc() for LuaSourceContainer ancestors (deeper search).
     - UI unchanged (still 320px, perfect layout).
 ]]
 
@@ -426,12 +426,10 @@ local function isDangerous(inst)
 end
 
 -- ══════════════════════════════════════════
--- COPY ORIGINAL SCRIPT SOURCE (NEW)
+-- UPGRADED getSourceCode (v1.3)
 -- ══════════════════════════════════════════
--- Walk up the parent chain to find the first LuaSourceContainer
--- (Script, LocalScript, ModuleScript) and return its Source.
--- If none is found, return a placeholder message.
 local function getSourceCode(inst)
+    -- Method 1: Walk up parent chain (fast, works most of the time)
     local current = inst
     while current do
         if current:IsA("LuaSourceContainer") then
@@ -444,11 +442,30 @@ local function getSourceCode(inst)
         end
         current = current.Parent
     end
+
+    -- Method 2: Use getgc (if available) to search all loaded scripts
+    -- This catches dynamically created remotes whose parent scripts are not in direct ancestry.
+    if getgc then
+        for _, obj in next, getgc() do
+            if typeof(obj) == "Instance" and obj:IsA("LuaSourceContainer") and obj:IsDescendantOf(game) then
+                if inst:IsDescendantOf(obj) then
+                    local src = obj.Source
+                    if src and src ~= "" then
+                        return src
+                    else
+                        return "-- Empty source in " .. obj:GetFullName()
+                    end
+                end
+            end
+        end
+    end
+
+    -- Fallback
     return "-- No source script found for " .. inst:GetFullName()
 end
 
 -- ══════════════════════════════════════════
--- BUILD ROW (unchanged layout, only copy logic updated)
+-- BUILD ROW (unchanged layout)
 -- ══════════════════════════════════════════
 local rowOrder = 0
 local rowFrames = {}
@@ -523,7 +540,7 @@ local function makeRow(inst)
     classLbl.ZIndex = 14
     classLbl.Parent = content
 
-    -- Copy Script button (now copies original source)
+    -- Copy Script button (uses upgraded getSourceCode)
     local copyBtn = Instance.new("ImageButton")
     copyBtn.Size = UDim2.new(1, -4, 0, BTH)
     copyBtn.Position = UDim2.fromOffset(2, 36)
@@ -554,7 +571,7 @@ local function makeRow(inst)
     end)
 
     copyBtn.MouseButton1Click:Connect(function()
-        local src = getSourceCode(inst)      -- use the new function
+        local src = getSourceCode(inst)
         local ok = pcall(function() setclipboard(src) end)
         if ok then
             copyLbl.Text = "Copied!"
