@@ -1,729 +1,676 @@
 --[[
-    Set Car etc Anonymous9x
-    Universal Vehicle Controller + Anti-Bounce Physics
-    UI Style: Indo Hangout inspired
-    Features:
-        - Vehicle Spawner (preset + custom model)
-        - Full Physics Control (anti‑bounce, speed, flight, traction, freeze, noclip)
-        - Suspension Tuning (per‑spring, presets)
-        - Fun Mods (paint client‑side, gravity modes)
-        - Visuals (fullbright, headlights)
-    Works on any map (FE compatible)
-    Length: 2000+ lines
+╔══════════════════════════════════════════════════════════════════╗
+║   Anonymous9x Vehicle FE  —  v1.0                                ║
+║   Universal Vehicle Control  |  All Executors                    ║
+║   Delta Mobile / iOS / iPad / PC                                 ║
+╠══════════════════════════════════════════════════════════════════╣
+║   HOW IT WORKS (FE / client-side physics):                       ║
+║   When you sit in a vehicle, we claim network ownership of all   ║
+║   BaseParts in that vehicle. Once we own them client-side, we    ║
+║   can set their physical properties (velocity, CanCollide,        ║
+║   Anchored, SpringConstraint params) and they replicate to       ║
+║   other clients. This is the same method the leaked source used. ║
+║                                                                  ║
+║   TABS:                                                          ║
+║   Physics   — Anti-Bounce, Speed, Flight, Traction, Freeze       ║
+║   Suspension — Global sliders, Presets, Per-spring fine-tune     ║
+║   Visual    — Vehicle color presets + custom RGB                 ║
+║   Fun       — Gravity modes, Fullbright                          ║
+╚══════════════════════════════════════════════════════════════════╝
 ]]
 
--- ===================== Services =====================
-local setmetatable, rawset, type, pairs, ipairs, table, math, string, tick, wait, task, pcall, error =
-      setmetatable, rawset, type, pairs, ipairs, table, math, string, tick, wait, task, pcall, error
+-- ═══════════════════════════════════════════════
+-- SERVICES
+-- ═══════════════════════════════════════════════
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UIS        = game:GetService("UserInputService")
+local Lighting   = game:GetService("Lighting")
+local LP         = Players.LocalPlayer
+local Cam        = workspace.CurrentCamera
 
-local Services = setmetatable({}, {
-    __index = function(self, name)
-        local service = game:GetService(name)
-        rawset(self, name, service)
-        return service
-    end
-})
+-- ═══════════════════════════════════════════════
+-- DESTROY OLD
+-- ═══════════════════════════════════════════════
+pcall(function() game.CoreGui:FindFirstChild("_A9xVeh"):Destroy() end)
+pcall(function() LP.PlayerGui:FindFirstChild("_A9xVeh"):Destroy() end)
 
-local TweenService = Services.TweenService
-local RunService = Services.RunService
-local UserInputService = Services.UserInputService
-local Workspace = Services.Workspace
-local Lighting = Services.Lighting
-local StarterGui = Services.StarterGui
-local CoreGui = Services.CoreGui
-local Debris = Services.Debris
-local Players = Services.Players
-local InsertService = Services.InsertService
-local ReplicatedStorage = Services.ReplicatedStorage
-local VirtualInputManager = Services.VirtualInputManager
+-- ═══════════════════════════════════════════════
+-- ROOT
+-- ═══════════════════════════════════════════════
+local gui = Instance.new("ScreenGui")
+gui.Name             = "_A9xVeh"
+gui.ResetOnSpawn     = false
+gui.ZIndexBehavior   = Enum.ZIndexBehavior.Sibling
+gui.IgnoreGuiInset   = true
+pcall(function() gui.Parent = game.CoreGui end)
+if not gui.Parent then gui.Parent = LP.PlayerGui end
 
-local LocalPlayer = Players.LocalPlayer
-local Cam = Workspace.CurrentCamera
-
--- ===================== Vehicle Physics Data =====================
-local PhysicsData = {
-    System = {
-        Active = true,
-        Connections = {}
-    },
-    Physics = {
-        Speed = { Enabled = false, Rate = 1.5, BrakeRate = 0.9 },
-        Flight = { Enabled = false, Speed = 1, Smoothness = 0.1 },
-        Traction = { Enabled = false, Grip = 1, Vector = 0 },
-        BrakeOverride = { Enabled = false, Force = 50 },
-        Freeze = false,
-        Noclip = false,
-        Velocity = { Mult = 0.025, BrakeMult = 0.15 },
-        MaxGroundSpeed = 250,
-        MaxAirSpeed = 100,
-        GroundCheckDistance = 5,
-        LastGroundTime = 0,
-        AntiBounce = {
-            Enabled = true,
-            VelocityDampening = 0.92,
-            AngularDampening = 0.85,
-            SurfaceSmoothing = true,
-            TransitionDampening = 0.75,
-            EdgeDetectionRadius = 3,
-            MaxHeightDiff = 0.5,
-            MaxVelocityChange = 20,
-            SmoothingFrames = 5,
-            ImpactThreshold = 15,
-            StabilizationTime = 0.4,
-            LastImpactTime = 0,
-            PreviousVelocity = Vector3.new(0,0,0),
-            PreviousPosition = Vector3.new(0,0,0),
-            VelocityHistory = {},
-            GroundHeightHistory = {},
-            CurrentSurface = nil,
-            PreviousSurface = nil,
-            InTransition = false,
-            TransitionStartTime = 0
-        }
-    },
-    Suspension = {
-        Cache = {},
-        OriginalValues = {},
-        SpringCount = 0,
-        CurrentSpringUI = {},
-        Data = {
-            Stiffness = 4000,
-            Damping = 200,
-            Height = 0,
-            FrontStiff = 4000,
-            RearStiff = 4000,
-            Preload = 0,
-            ARB = false,
-            ARB_Str = 2000,
-            MinLength = 0.5,
-            MaxLength = 8
-        }
-    },
-    Fun = {
-        Heli = { Enabled = false, Speed = 0.5 },
-        Trans = { Enabled = false, Mode = "None", Cache = {} },
-        Gravity = { Enabled = false, Mode = "Normal", ForceObj = nil },
-        Trail = { Enabled = false, Mode = "None", Cache = {} },
-        Paint = { Color = Color3.new(1,0,0) }
-    },
-    Visuals = {
-        Fullbright = {
-            Enabled = false,
-            Settings = { Brightness = 2, Ambient = Color3.new(1,1,1), FogEnd = 100000 }
-        },
-        Headlights = { Enabled = true }
-    },
-    Internal = {
-        Vehicle = nil,
-        Seat = nil,
-        Size = { Mult = 1 },
-        PartsCache = {},
-        LastVehicleCheck = 0,
-        VehicleModelName = "None",
-        LastNotificationTime = 0,
-        VehicleMass = 0
-    }
+-- ═══════════════════════════════════════════════
+-- VEHICLE STATE
+-- ═══════════════════════════════════════════════
+local V = {
+    vehicle      = nil,   -- Model
+    seat         = nil,   -- VehicleSeat or Seat BasePart
+    partsCache   = {},    -- all BaseParts in vehicle
+    springsCache = {},    -- all SpringConstraints
+    origSpring   = {},    -- {[spring] = {Stiffness,Damping,FreeLength,Min,Max}}
+    mass         = 0,
+    lastCheck    = 0,
+    modelName    = "None",
 }
 
--- ===================== Helper Functions (from original) =====================
-local function lerp(a, b, t)
-    return a + (b - a) * t
-end
+-- Physics flags
+local Phys = {
+    antiBounce       = true,
+    velDamp          = 0.92,
+    angDamp          = 0.85,
+    surfSmooth       = true,
+    transDamp        = 0.75,
+    impactThresh     = 15,
+    stabTime         = 0.4,
+    lastImpact       = 0,
+    prevVel          = Vector3.zero,
+    prevPos          = Vector3.zero,
+    velHistory       = {},
+    historyMax       = 5,
+    inTransition     = false,
+    transStart       = 0,
 
-local function clampVector(v, maxMag)
-    if v.Magnitude > maxMag then
-        return v.Unit * maxMag
-    end
-    return v
-end
+    speedEnabled     = false,
+    accelRate        = 1.5,
+    brakeRate        = 0.9,
+    maxGroundSpeed   = 250,
 
--- Surface detection
-local SurfaceDetector = {}
-SurfaceDetector.DetectSurface = function(vehicle)
-    if not vehicle or not vehicle.PrimaryPart then return nil end
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    rayParams.FilterDescendantsInstances = { vehicle }
-    local rayResult = Workspace:Raycast(vehicle.PrimaryPart.Position, Vector3.new(0,-1,0)*10, rayParams)
-    if rayResult then
-        return {
-            Instance = rayResult.Instance,
-            Position = rayResult.Position,
-            Normal = rayResult.Normal,
-            Material = rayResult.Material,
-            Height = rayResult.Position.Y
-        }
-    end
-    return nil
-end
+    flightEnabled    = false,
+    flightSpeed      = 1.0,
 
-SurfaceDetector.DetectTransition = function(currentSurf, previousSurf)
-    if not currentSurf or not previousSurf then return false end
-    if currentSurf.Instance ~= previousSurf.Instance then return true end
-    if math.abs(currentSurf.Height - previousSurf.Height) > PhysicsData.Physics.AntiBounce.MaxHeightDiff then
-        return true
-    end
-    return false
-end
+    tractionEnabled  = false,
+    tractionGrip     = 1.0,
 
--- Velocity smoothing
-local VelocityHandler = {}
-VelocityHandler.UpdateVelocityHistory = function(velocity)
-    table.insert(PhysicsData.Physics.AntiBounce.VelocityHistory, velocity)
-    if #PhysicsData.Physics.AntiBounce.VelocityHistory > PhysicsData.Physics.AntiBounce.SmoothingFrames then
-        table.remove(PhysicsData.Physics.AntiBounce.VelocityHistory, 1)
-    end
-end
+    freeze           = false,
+    noclip           = false,
+}
 
-VelocityHandler.GetSmoothedVelocity = function()
-    local history = PhysicsData.Physics.AntiBounce.VelocityHistory
-    if #history == 0 then return Vector3.zero end
-    local sum = Vector3.zero
-    for _, v in ipairs(history) do
-        sum = sum + v
-    end
-    return sum / #history
-end
+-- Suspension data
+local Sus = {
+    stiffness   = 4000,
+    damping     = 200,
+    height      = 0,
+    frontStiff  = 4000,
+    rearStiff   = 4000,
+    minLength   = 0.5,
+    maxLength   = 8.0,
+}
 
-VelocityHandler.DetectImpact = function(currentVel, previousVel)
-    if (currentVel - previousVel).Magnitude > PhysicsData.Physics.AntiBounce.ImpactThreshold then
-        PhysicsData.Physics.AntiBounce.LastImpactTime = tick()
-        return true
-    end
-    return false
-end
+-- Fun / Visual
+local Fun = {
+    gravEnabled   = false,
+    gravMode      = "Normal",
+    gravForceObj  = nil,
+    gravAttach    = nil,
+    fullbright    = false,
+    origAmbient   = Lighting.Ambient,
+    origBrightness= Lighting.Brightness,
+    origFogEnd    = Lighting.FogEnd,
+    customColor   = Color3.fromRGB(200, 0, 0),
+}
 
-VelocityHandler.ApplyTransitionSmoothing = function(seat, vehicle)
-    if not PhysicsData.Physics.AntiBounce.SurfaceSmoothing then return end
-    if not seat or not vehicle then return end
-    local surf = SurfaceDetector.DetectSurface(vehicle)
-    if surf and SurfaceDetector.DetectTransition(surf, PhysicsData.Physics.AntiBounce.PreviousSurface) then
-        PhysicsData.Physics.AntiBounce.InTransition = true
-        PhysicsData.Physics.AntiBounce.TransitionStartTime = tick()
-        local vel = seat.AssemblyLinearVelocity
-        local damp = PhysicsData.Physics.AntiBounce.TransitionDampening
-        seat.AssemblyLinearVelocity = Vector3.new(vel.X, vel.Y * damp, vel.Z)
-        seat.AssemblyAngularVelocity = seat.AssemblyAngularVelocity * damp * 0.5
-    end
-    PhysicsData.Physics.AntiBounce.PreviousSurface = surf
-    if PhysicsData.Physics.AntiBounce.InTransition then
-        if tick() - PhysicsData.Physics.AntiBounce.TransitionStartTime < 0.2 then
-            seat.AssemblyLinearVelocity = seat.AssemblyLinearVelocity * 0.95
-        else
-            PhysicsData.Physics.AntiBounce.InTransition = false
+-- ═══════════════════════════════════════════════
+-- NOTIFICATION  (bottom-right custom)
+-- ═══════════════════════════════════════════════
+local notifQ = {}; local notifBusy = false
+local function showNotif(title, body, dur)
+    table.insert(notifQ, {t=title, b=body, d=dur or 3})
+    if notifBusy then return end
+    notifBusy = true
+    task.spawn(function()
+        while #notifQ > 0 do
+            local n = table.remove(notifQ,1)
+            local f = Instance.new("Frame")
+            f.Size             = UDim2.fromOffset(220,50)
+            f.Position         = UDim2.new(1,10,1,-65)
+            f.BackgroundColor3 = Color3.fromRGB(7,7,9)
+            f.BackgroundTransparency=0
+            f.BorderSizePixel  = 0
+            f.ZIndex           = 800
+            f.Parent           = gui
+            Instance.new("UICorner",f).CornerRadius = UDim.new(0,6)
+            local fs = Instance.new("UIStroke",f)
+            fs.Color = Color3.fromRGB(160,100,255); fs.Thickness=1.1
+            local t1 = Instance.new("TextLabel")
+            t1.Size=UDim2.new(1,-10,0,17); t1.Position=UDim2.fromOffset(7,4)
+            t1.BackgroundTransparency=1; t1.Text=n.t
+            t1.Font=Enum.Font.GothamBold; t1.TextSize=9
+            t1.TextColor3=Color3.new(1,1,1); t1.TextXAlignment=Enum.TextXAlignment.Left
+            t1.ZIndex=801; t1.Parent=f
+            local t2 = Instance.new("TextLabel")
+            t2.Size=UDim2.new(1,-10,0,20); t2.Position=UDim2.fromOffset(7,21)
+            t2.BackgroundTransparency=1; t2.Text=n.b
+            t2.Font=Enum.Font.Gotham; t2.TextSize=8
+            t2.TextColor3=Color3.fromRGB(110,110,130); t2.TextXAlignment=Enum.TextXAlignment.Left
+            t2.TextWrapped=true; t2.ZIndex=801; t2.Parent=f
+            TweenService:Create(f,TweenInfo.new(0.18),{Position=UDim2.new(1,-228,1,-65)}):Play()
+            task.wait(n.d)
+            TweenService:Create(f,TweenInfo.new(0.15),{Position=UDim2.new(1,10,1,-65)}):Play()
+            task.wait(0.18); pcall(function() f:Destroy() end); task.wait(0.06)
         end
-    end
+        notifBusy = false
+    end)
 end
 
-VelocityHandler.ApplyVelocitySmoothing = function(seat)
-    if not seat then return end
-    local currentVel = seat.AssemblyLinearVelocity
-    local previousVel = PhysicsData.Physics.AntiBounce.PreviousVelocity
-    if previousVel then
-        VelocityHandler.DetectImpact(currentVel, previousVel)
-        VelocityHandler.UpdateVelocityHistory(currentVel)
-        local diff = currentVel - previousVel
-        if diff.Magnitude > PhysicsData.Physics.AntiBounce.MaxVelocityChange then
-            local targetVel = previousVel + clampVector(diff, PhysicsData.Physics.AntiBounce.MaxVelocityChange)
-            seat.AssemblyLinearVelocity = lerp(currentVel, targetVel, 0.5)
-        end
-        PhysicsData.Physics.AntiBounce.PreviousVelocity = seat.AssemblyLinearVelocity
-    else
-        PhysicsData.Physics.AntiBounce.PreviousVelocity = currentVel
-    end
-end
+-- ═══════════════════════════════════════════════
+-- VEHICLE DETECTION + NETWORK OWNERSHIP
+-- ═══════════════════════════════════════════════
+local function cacheVehicle(model)
+    V.partsCache   = {}
+    V.springsCache = {}
+    V.origSpring   = {}
+    V.mass         = 0
 
-VelocityHandler.ApplyStabilization = function(seat, vehicle)
-    if not seat or not vehicle or not vehicle.PrimaryPart then return end
-    local dt = tick() - PhysicsData.Physics.AntiBounce.LastImpactTime
-    if dt < PhysicsData.Physics.AntiBounce.StabilizationTime then
-        local t = dt / PhysicsData.Physics.AntiBounce.StabilizationTime
-        local velDamp = PhysicsData.Physics.AntiBounce.VelocityDampening
-        local angDamp = PhysicsData.Physics.AntiBounce.AngularDampening
-        seat.AssemblyLinearVelocity = seat.AssemblyLinearVelocity * (velDamp + (1-velDamp)*t)
-        seat.AssemblyAngularVelocity = seat.AssemblyAngularVelocity * (angDamp + (1-angDamp)*t)
-        local up = vehicle.PrimaryPart.CFrame.UpVector
-        local worldUp = Vector3.new(0,1,0)
-        local angle = math.acos(math.clamp(up:Dot(worldUp), -1, 1))
-        if angle > math.rad(10) then
-            local axis = up:Cross(worldUp)
-            if axis.Magnitude > 0 then
-                local torque = axis.Unit * angle * 30 * (1 - t)
-                pcall(function() seat:ApplyAngularImpulse(torque) end)
+    for _, p in ipairs(model:GetDescendants()) do
+        if p:IsA("BasePart") then
+            table.insert(V.partsCache, p)
+            pcall(function() V.mass = V.mass + p:GetMass() end)
+            -- Claim network ownership
+            pcall(function() p:SetNetworkOwner(LP) end)
+            -- Set good physical props
+            if not p.Anchored then
+                pcall(function()
+                    p.CustomPhysicalProperties = PhysicalProperties.new(
+                        0.7, 0.6, 0.15, 100, 100)
+                end)
             end
-        end
-    end
-end
-
-VelocityHandler.Process = function(seat, vehicle)
-    if not PhysicsData.Physics.AntiBounce.Enabled then return end
-    if not seat or not vehicle then return end
-    VelocityHandler.ApplyTransitionSmoothing(seat, vehicle)
-    VelocityHandler.ApplyVelocitySmoothing(seat)
-    VelocityHandler.ApplyStabilization(seat, vehicle)
-end
-
--- Vehicle cache
-local VehicleManager = {}
-VehicleManager.CacheSuspension = function(vehicle)
-    PhysicsData.Suspension.Cache = {}
-    PhysicsData.Suspension.OriginalValues = {}
-    PhysicsData.Suspension.SpringCount = 0
-    for _, child in ipairs(vehicle:GetDescendants()) do
-        if child:IsA("SpringConstraint") then
-            PhysicsData.Suspension.OriginalValues[child] = {
-                Stiffness = child.Stiffness,
-                Damping = child.Damping,
-                FreeLength = child.FreeLength,
-                MinLength = child.MinLength,
-                MaxLength = child.MaxLength
+        elseif p:IsA("SpringConstraint") then
+            table.insert(V.springsCache, p)
+            V.origSpring[p] = {
+                Stiffness  = p.Stiffness,
+                Damping    = p.Damping,
+                FreeLength = p.FreeLength,
+                MinLength  = p.MinLength,
+                MaxLength  = p.MaxLength,
             }
-            table.insert(PhysicsData.Suspension.Cache, child)
-            PhysicsData.Suspension.SpringCount = PhysicsData.Suspension.SpringCount + 1
         end
     end
 end
 
-VehicleManager.CacheParts = function(vehicle)
-    PhysicsData.Internal.PartsCache = {}
-    PhysicsData.Internal.VehicleMass = 0
-    for _, part in ipairs(vehicle:GetDescendants()) do
-        if part:IsA("BasePart") then
-            table.insert(PhysicsData.Internal.PartsCache, part)
-            PhysicsData.Internal.VehicleMass = PhysicsData.Internal.VehicleMass + part:GetMass()
-            if not part.Anchored then
-                part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.6, 0.15, 100, 100)
-            end
+local function getVehicle()
+    local c = LP.Character
+    if not c then return end
+    local h = c:FindFirstChildOfClass("Humanoid")
+    if not h then return end
+    local seat = h.SeatPart
+    if not seat then
+        -- exited vehicle
+        if V.vehicle then
+            V.vehicle = nil; V.seat = nil
+            V.partsCache = {}; V.springsCache = {}
+            V.mass = 0; V.modelName = "None"
+            Phys.prevVel = Vector3.zero
+            Phys.velHistory = {}
         end
+        return
+    end
+    local model = seat:FindFirstAncestorOfClass("Model")
+    if model and model ~= V.vehicle then
+        V.vehicle   = model
+        V.seat      = seat
+        V.modelName = model.Name or "Unknown"
+        cacheVehicle(model)
+        showNotif("Vehicle Detected",
+            V.modelName .. "  |  Springs: " .. #V.springsCache ..
+            "  |  Mass: " .. math.floor(V.mass), 4)
     end
 end
 
-VehicleManager.GetVehicle = function()
-    local now = tick()
-    if now - PhysicsData.Internal.LastVehicleCheck < 0.5 then return end
-    PhysicsData.Internal.LastVehicleCheck = now
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChildWhichIsA("Humanoid")
-    if not hum then return end
-    local seatPart = hum.SeatPart
-    if seatPart and seatPart:IsA("VehicleSeat") then
-        local vehicle = seatPart:FindFirstAncestorWhichIsA("Model")
-        if vehicle and vehicle ~= PhysicsData.Internal.Vehicle then
-            PhysicsData.Internal.Vehicle = vehicle
-            PhysicsData.Internal.Seat = seatPart
-            PhysicsData.Physics.AntiBounce.VelocityHistory = {}
-            PhysicsData.Physics.AntiBounce.PreviousVelocity = Vector3.zero
-            PhysicsData.Physics.AntiBounce.PreviousSurface = nil
-            PhysicsData.Physics.AntiBounce.InTransition = false
-            PhysicsData.Physics.AntiBounce.LastImpactTime = 0
-            if not vehicle.PrimaryPart then vehicle.PrimaryPart = vehicle:FindFirstChild("BasePart") or vehicle:FindFirstChildWhichIsA("BasePart") end
-            pcall(function()
-                for _, part in ipairs(vehicle:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part:SetNetworkOwner(LocalPlayer)
-                    end
-                end
-            end)
-            VehicleManager.CacheSuspension(vehicle)
-            VehicleManager.CacheParts(vehicle)
-            PhysicsData.Internal.VehicleModelName = vehicle.Name
-            if tick() - PhysicsData.Internal.LastNotificationTime > 3 then
-                PhysicsData.Internal.LastNotificationTime = tick()
-            end
-        end
-    else
-        if PhysicsData.Internal.Vehicle then
-            PhysicsData.Internal.Vehicle = nil
-            PhysicsData.Internal.Seat = nil
-            PhysicsData.Internal.PartsCache = {}
-            PhysicsData.Suspension.Cache = {}
-            PhysicsData.Suspension.SpringCount = 0
-            PhysicsData.Internal.VehicleMass = 0
-            PhysicsData.Physics.AntiBounce.VelocityHistory = {}
-            PhysicsData.Physics.AntiBounce.PreviousVelocity = Vector3.zero
-            PhysicsData.Physics.AntiBounce.PreviousSurface = nil
-            PhysicsData.Physics.AntiBounce.InTransition = false
-            PhysicsData.Physics.AntiBounce.LastImpactTime = 0
-        end
-    end
-end
+-- ═══════════════════════════════════════════════
+-- PHYSICS ENGINE — called every Heartbeat
+-- ═══════════════════════════════════════════════
+local function lerp3(a,b,t) return a + (b-a)*t end
+local function clampMag(v,m) return v.Magnitude>m and v.Unit*m or v end
 
--- Process cycles
-local PhysicsProcessor = {}
-PhysicsProcessor.ProcessSpeed = function(seat, dt)
-    if not PhysicsData.Physics.Speed.Enabled then return end
-    if not seat then return end
+local function processAntiBounce(seat)
+    if not Phys.antiBounce or not seat then return end
     local vel = seat.AssemblyLinearVelocity
-    local mult = dt * 60
-    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-        local newVel = vel + seat.CFrame.LookVector * PhysicsData.Physics.Speed.Rate * mult
-        local horizontal = Vector3.new(newVel.X, 0, newVel.Z)
-        if horizontal.Magnitude > PhysicsData.Physics.MaxGroundSpeed then
-            horizontal = horizontal.Unit * PhysicsData.Physics.MaxGroundSpeed
+    local prev = Phys.prevVel
+
+    -- Velocity history smoothing
+    table.insert(Phys.velHistory, vel)
+    if #Phys.velHistory > Phys.historyMax then
+        table.remove(Phys.velHistory, 1)
+    end
+
+    -- Detect impact
+    if (vel - prev).Magnitude > Phys.impactThresh then
+        Phys.lastImpact = tick()
+    end
+
+    -- Velocity change clamping
+    local delta = vel - prev
+    if delta.Magnitude > 20 then
+        local clamped = clampMag(delta, 20)
+        seat.AssemblyLinearVelocity = lerp3(vel, prev + clamped, 0.5)
+    end
+
+    -- Stabilization after impact
+    local elapsed = tick() - Phys.lastImpact
+    if elapsed < Phys.stabTime then
+        local t    = elapsed / Phys.stabTime
+        local vd   = Phys.velDamp
+        local ad   = Phys.angDamp
+        local fade = vd + (1-vd)*t
+        seat.AssemblyLinearVelocity  = seat.AssemblyLinearVelocity  * fade
+        seat.AssemblyAngularVelocity = seat.AssemblyAngularVelocity * (ad+(1-ad)*t)
+    end
+
+    Phys.prevVel = seat.AssemblyLinearVelocity
+end
+
+local function processSpeed(seat, dt)
+    if not Phys.speedEnabled or not seat then return end
+    local vel = seat.AssemblyLinearVelocity
+    local step = dt * 60
+
+    if UIS:IsKeyDown(Enum.KeyCode.W) then
+        local fwd = seat.CFrame.LookVector
+        local newVel = vel + fwd * Phys.accelRate * step
+        local hVel = Vector3.new(newVel.X, 0, newVel.Z)
+        if hVel.Magnitude > Phys.maxGroundSpeed then
+            local clamped = hVel.Unit * Phys.maxGroundSpeed
+            newVel = Vector3.new(clamped.X, newVel.Y, clamped.Z)
         end
-        newVel = Vector3.new(horizontal.X, math.clamp(newVel.Y, -50, 50), horizontal.Z)
         seat.AssemblyLinearVelocity = newVel
     end
-    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-        local brake = math.clamp(1 - PhysicsData.Physics.Speed.BrakeRate * 0.1 * mult, 0, 1)
-        seat.AssemblyLinearVelocity = vel * Vector3.new(brake, 0.98, brake)
+    if UIS:IsKeyDown(Enum.KeyCode.S) then
+        local brakeF = math.clamp(1 - Phys.brakeRate * 0.1 * step, 0, 1)
+        seat.AssemblyLinearVelocity = vel * Vector3.new(brakeF, 0.98, brakeF)
     end
+    -- Hard cap
     if vel.Magnitude > 500 then
         seat.AssemblyLinearVelocity = vel.Unit * 300
     end
 end
 
-PhysicsProcessor.ProcessFlight = function(vehicle, seat, dt)
-    if not PhysicsData.Physics.Flight.Enabled then return end
-    local speed = PhysicsData.Physics.Flight.Speed
-    local moveDir = Vector3.zero
-    local keys = UserInputService
-    if keys:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Vector3.new(speed, 0, 0) end
-    if keys:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir + Vector3.new(-speed, 0, 0) end
-    if keys:IsKeyDown(Enum.KeyCode.E) then moveDir = moveDir + Vector3.new(0, speed/2, 0) end
-    if keys:IsKeyDown(Enum.KeyCode.Q) then moveDir = moveDir + Vector3.new(0, -speed/2, 0) end
-    if keys:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir + Vector3.new(0, 0, speed) end
-    if keys:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Vector3.new(0, 0, -speed) end
-    if moveDir.Magnitude > 0 then
-        local cf = vehicle:GetPrimaryPartCFrame()
-        vehicle:SetPrimaryPartCFrame(cf + cf.Rotation * moveDir)
-        seat.AssemblyLinearVelocity = seat.AssemblyLinearVelocity * 0.5
-        seat.AssemblyAngularVelocity = seat.AssemblyAngularVelocity * 0.5
-    end
-end
-
-PhysicsProcessor.ProcessTraction = function(vehicle, seat)
-    if not PhysicsData.Physics.Traction.Enabled then return end
-    if not vehicle.PrimaryPart then return end
-    local cf = vehicle:GetPrimaryPartCFrame()
-    local localVel = cf:VectorToObjectSpace(seat.AssemblyLinearVelocity)
-    if math.abs(localVel.X) > 0.5 then
-        seat:ApplyImpulse(cf.RightVector * -localVel.X * (1 - PhysicsData.Physics.Traction.Grip) * 50)
-    end
-end
-
-PhysicsProcessor.ProcessSuspension = function(vehicle)
-    if not vehicle or not vehicle.PrimaryPart then return end
-    if #PhysicsData.Suspension.Cache == 0 then return end
-    local data = PhysicsData.Suspension.Data
-    local cf = vehicle.PrimaryPart.CFrame
-    for _, spring in ipairs(PhysicsData.Suspension.Cache) do
-        if spring and spring.Parent then
-            local isFront = false
-            if spring.Attachment0 and spring.Attachment0.Parent then
-                isFront = cf:PointToObjectSpace(spring.Attachment0.WorldPosition).Z > 0
-            end
-            local stiff = isFront and data.FrontStiff or data.RearStiff
-            spring.Stiffness = math.clamp(stiff, 100, 50000)
-            spring.Damping = math.clamp(data.Damping, 10, 5000)
-            spring.FreeLength = math.clamp(2 + data.Height + data.Preload, data.MinLength, data.MaxLength)
-            spring.MinLength = math.clamp(0.2 + data.Height * 0.5, 0.1, 2)
-            spring.MaxLength = math.clamp(4 + data.Height, 1, 10)
+local function processFlight(model, seat)
+    if not Phys.flightEnabled or not model or not seat then return end
+    local sp = Phys.flightSpeed
+    local move = Vector3.zero
+    if UIS:IsKeyDown(Enum.KeyCode.W) then move = move + Vector3.new(0,0,-sp) end
+    if UIS:IsKeyDown(Enum.KeyCode.S) then move = move + Vector3.new(0,0, sp) end
+    if UIS:IsKeyDown(Enum.KeyCode.A) then move = move + Vector3.new(-sp,0,0) end
+    if UIS:IsKeyDown(Enum.KeyCode.D) then move = move + Vector3.new( sp,0,0) end
+    if UIS:IsKeyDown(Enum.KeyCode.E) then move = move + Vector3.new(0,sp/2,0) end
+    if UIS:IsKeyDown(Enum.KeyCode.Q) then move = move + Vector3.new(0,-sp/2,0) end
+    if move.Magnitude > 0 then
+        local pp = model.PrimaryPart
+        if pp then
+            pcall(function()
+                model:SetPrimaryPartCFrame(pp.CFrame + pp.CFrame.Rotation * move)
+                seat.AssemblyLinearVelocity  = seat.AssemblyLinearVelocity  * 0.5
+                seat.AssemblyAngularVelocity = seat.AssemblyAngularVelocity * 0.5
+            end)
         end
     end
 end
 
-PhysicsProcessor.ProcessCollision = function(vehicle)
-    if not vehicle then return end
-    for _, part in ipairs(PhysicsData.Internal.PartsCache) do
-        if part and part.Parent then
-            if PhysicsData.Physics.Noclip then
-                part.CanCollide = false
-            end
-            if PhysicsData.Physics.Freeze then
-                part.Anchored = true
-                part.AssemblyLinearVelocity = Vector3.zero
-                part.AssemblyAngularVelocity = Vector3.zero
-            end
+local function processTraction(model, seat)
+    if not Phys.tractionEnabled or not model or not seat then return end
+    local pp = model.PrimaryPart
+    if not pp then return end
+    pcall(function()
+        local cf = pp.CFrame
+        local sideSlip = cf:VectorToObjectSpace(seat.AssemblyLinearVelocity).X
+        if math.abs(sideSlip) > 0.5 then
+            seat:ApplyImpulse(cf.RightVector * -sideSlip * (1 - Phys.tractionGrip) * 50)
         end
-    end
-end
-
--- ===================== Fun Functions =====================
-local function applyColorToVehicle(color)
-    local vehicle = PhysicsData.Internal.Vehicle
-    if not vehicle then return end
-    local bodyKeywords = {"body","chassis","frame","door","hood","trunk","fender","bumper","quarter","roof","paint","panel","part","car"}
-    local excludeKeywords = {"window","glass","wheel","tire","rim","light","headlight","taillight","brake","signal","engine","exhaust","pipe","mirror","handle","seat","interior","dash","gauge","steer"}
-    local count = 0
-    for _, part in ipairs(vehicle:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local name = part.Name:lower()
-            local shouldPaint = false
-            for _, kw in ipairs(bodyKeywords) do
-                if name:find(kw, 1, true) then shouldPaint = true break end
-            end
-            if not shouldPaint and (name == "part" or name:match("^part%d") or name == "union") then
-                shouldPaint = true
-            end
-            local excluded = false
-            for _, kw in ipairs(excludeKeywords) do
-                if name:find(kw, 1, true) then excluded = true break end
-            end
-            if shouldPaint and not excluded then
-                part.Color = color
-                part.Material = Enum.Material.SmoothPlastic
-                count = count + 1
-            end
-        end
-    end
-end
-
-local function setGravityMode(enabled, mode)
-    local seat = PhysicsData.Internal.Seat
-    if not seat then return end
-    if PhysicsData.Fun.Gravity.ForceObj then
-        PhysicsData.Fun.Gravity.ForceObj:Destroy()
-        PhysicsData.Fun.Gravity.ForceObj = nil
-    end
-    for _, child in ipairs(seat:GetChildren()) do
-        if child:IsA("Attachment") and child.Name == "GravityAttachment" then
-            child:Destroy()
-        end
-    end
-    if enabled then
-        local force = Instance.new("VectorForce")
-        force.ApplyAtCenterOfMass = true
-        force.Parent = seat
-        local attach = Instance.new("Attachment")
-        attach.Name = "GravityAttachment"
-        attach.Parent = seat
-        force.Attachment0 = attach
-        local mass = seat:GetMass()
-        if mode == "Moon" then force.Force = Vector3.new(0, Workspace.Gravity * mass * 0.2, 0)
-        elseif mode == "Heavy" then force.Force = Vector3.new(0, -Workspace.Gravity * mass, 0)
-        elseif mode == "Zero" then force.Force = Vector3.new(0, Workspace.Gravity * mass, 0)
-        elseif mode == "Reverse" then force.Force = Vector3.new(0, Workspace.Gravity * mass * 1.5, 0)
-        else force.Force = Vector3.new(0,0,0) end
-        PhysicsData.Fun.Gravity.ForceObj = force
-    end
-end
-
--- ===================== UI Framework (Indo Hangout style) =====================
-local UI = {}
-UI.Minimized = false
-
--- Colors
-local C = {
-    bg = Color3.fromRGB(7,7,9),
-    hdr = Color3.fromRGB(5,5,7),
-    card = Color3.fromRGB(15,15,19),
-    cardH = Color3.fromRGB(21,21,27),
-    sep = Color3.fromRGB(26,26,34),
-    border = Color3.fromRGB(40,40,56),
-    white = Color3.new(1,1,1),
-    pri = Color3.fromRGB(218,218,226),
-    sec = Color3.fromRGB(110,110,130),
-    dim = Color3.fromRGB(60,60,80),
-    purple = Color3.fromRGB(170,110,255),
-    purpleD = Color3.fromRGB(120,70,210),
-    safe = Color3.fromRGB(80,185,90),
-    danger = Color3.fromRGB(210,55,55),
-}
-
-local gui = Instance.new("ScreenGui")
-gui.Name = "SetCarUI"
-gui.ResetOnSpawn = false
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.IgnoreGuiInset = true
-pcall(function() gui.Parent = CoreGui end)
-if not gui.Parent then gui.Parent = LocalPlayer.PlayerGui end
-
--- Notification system
-local notifQueue = {}
-local notifActive = false
-function UI:Notify(title, body, duration)
-    table.insert(notifQueue, {title=title, body=body, dur=duration or 3.5})
-    if notifActive then return end
-    notifActive = true
-    task.spawn(function()
-        while #notifQueue > 0 do
-            local n = table.remove(notifQueue, 1)
-            local nf = Instance.new("Frame")
-            nf.Size = UDim2.fromOffset(220, 54)
-            nf.Position = UDim2.new(1, 10, 1, -70)
-            nf.BackgroundColor3 = C.bg
-            nf.BackgroundTransparency = 0
-            nf.BorderSizePixel = 0
-            nf.ZIndex = 800
-            nf.Parent = gui
-            Instance.new("UICorner", nf).CornerRadius = UDim.new(0,7)
-            local nfS = Instance.new("UIStroke", nf)
-            nfS.Color = C.purple
-            nfS.Thickness = 1.2
-            local nt = Instance.new("TextLabel")
-            nt.Size = UDim2.new(1,-12,0,18)
-            nt.Position = UDim2.fromOffset(8,5)
-            nt.BackgroundTransparency = 1
-            nt.Text = n.title
-            nt.Font = Enum.Font.GothamBold
-            nt.TextSize = 10
-            nt.TextColor3 = C.white
-            nt.TextXAlignment = Enum.TextXAlignment.Left
-            nt.ZIndex = 801
-            nt.Parent = nf
-            local nb = Instance.new("TextLabel")
-            nb.Size = UDim2.new(1,-12,0,22)
-            nb.Position = UDim2.fromOffset(8,24)
-            nb.BackgroundTransparency = 1
-            nb.Text = n.body
-            nb.Font = Enum.Font.Gotham
-            nb.TextSize = 8
-            nb.TextColor3 = C.sec
-            nb.TextXAlignment = Enum.TextXAlignment.Left
-            nb.TextWrapped = true
-            nb.ZIndex = 801
-            nb.Parent = nf
-            TweenService:Create(nf, TweenInfo.new(0.20, Enum.EasingStyle.Quad), {Position = UDim2.new(1,-228,1,-70)}):Play()
-            task.wait(n.dur)
-            TweenService:Create(nf, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {Position = UDim2.new(1,10,1,-70)}):Play()
-            task.wait(0.20)
-            pcall(function() nf:Destroy() end)
-            task.wait(0.08)
-        end
-        notifActive = false
     end)
 end
 
--- Main window
-local WIDTH, HEIGHT = 260, 380
+local function processCollision()
+    for _, p in ipairs(V.partsCache) do
+        if p and p.Parent then
+            pcall(function()
+                if Phys.noclip  then p.CanCollide = false end
+                if Phys.freeze  then
+                    p.Anchored = true
+                    p.AssemblyLinearVelocity  = Vector3.zero
+                    p.AssemblyAngularVelocity = Vector3.zero
+                else
+                    if Phys.noclip == false then end -- keep existing CanCollide
+                end
+            end)
+        end
+    end
+end
+
+local function processSuspension()
+    if not V.vehicle then return end
+    for _, sp in ipairs(V.springsCache) do
+        if sp and sp.Parent then
+            pcall(function()
+                -- Front/rear detection via attachment position
+                local isF = false
+                if sp.Attachment0 and sp.Attachment0.Parent then
+                    local pp = V.vehicle.PrimaryPart
+                    if pp then
+                        isF = pp.CFrame:PointToObjectSpace(
+                            sp.Attachment0.WorldPosition).Z > 0
+                    end
+                end
+                local stiff = isF and Sus.frontStiff or Sus.rearStiff
+                sp.Stiffness  = math.clamp(math.abs(stiff), 100, 50000)
+                sp.Damping    = math.clamp(Sus.damping, 10, 5000)
+                sp.FreeLength = math.clamp(2 + Sus.height, Sus.minLength, Sus.maxLength)
+                sp.MinLength  = math.clamp(0.2 + Sus.height*0.5, 0.1, 2)
+                sp.MaxLength  = math.clamp(4 + Sus.height, 1, 10)
+            end)
+        end
+    end
+end
+
+-- Gravity VectorForce
+local function applyGravity(enabled, mode)
+    -- Clean old
+    if Fun.gravForceObj then
+        pcall(function() Fun.gravForceObj:Destroy() end)
+        Fun.gravForceObj = nil
+    end
+    if Fun.gravAttach then
+        pcall(function() Fun.gravAttach:Destroy() end)
+        Fun.gravAttach = nil
+    end
+    if not enabled or not V.seat then return end
+
+    local g = workspace.Gravity
+    local mass = V.seat:GetMass()
+    local attach = Instance.new("Attachment")
+    attach.Name   = "_A9xGravAtt"
+    attach.Parent = V.seat
+    Fun.gravAttach = attach
+
+    local vf = Instance.new("VectorForce")
+    vf.ApplyAtCenterOfMass = true
+    vf.Attachment0 = attach
+    vf.Parent = V.seat
+    Fun.gravForceObj = vf
+
+    if mode == "Moon" then
+        vf.Force = Vector3.new(0, g * mass * 0.2, 0)      -- lighter gravity
+    elseif mode == "Heavy" then
+        vf.Force = Vector3.new(0, -g * mass, 0)            -- double gravity
+    elseif mode == "Zero" then
+        vf.Force = Vector3.new(0, g * mass, 0)             -- cancel gravity
+    elseif mode == "Reverse" then
+        vf.Force = Vector3.new(0, g * mass * 1.5, 0)       -- float upward
+    else
+        -- Normal — no force needed, destroy
+        pcall(function() vf:Destroy() end)
+        pcall(function() attach:Destroy() end)
+        Fun.gravForceObj = nil; Fun.gravAttach = nil
+    end
+end
+
+-- Fullbright
+local function setFullbright(on)
+    if on then
+        Lighting.Ambient    = Color3.new(1,1,1)
+        Lighting.Brightness = 2
+        Lighting.FogEnd     = 100000
+    else
+        Lighting.Ambient    = Fun.origAmbient
+        Lighting.Brightness = Fun.origBrightness
+        Lighting.FogEnd     = Fun.origFogEnd
+    end
+end
+
+-- Color changer (client-side, body parts only)
+local SKIP_KEYWORDS = {
+    "window","glass","wheel","tire","rim","light","headlight",
+    "taillight","brake","signal","engine","exhaust","pipe",
+    "mirror","handle","interior","dash","gauge","steer",
+    "seat","pedal","windshield","number",
+}
+local PAINT_KEYWORDS = {
+    "body","chassis","frame","door","hood","trunk","fender",
+    "bumper","quarter","roof","paint","panel","part","car","union",
+}
+local function hasKeyword(name, list)
+    local nl = name:lower()
+    for _, k in ipairs(list) do
+        if nl:find(k, 1, true) then return true end
+    end
+    return false
+end
+local function paintVehicle(color)
+    if not V.vehicle then showNotif("No Vehicle","Sit in a vehicle first.",3); return end
+    local count = 0
+    for _, p in ipairs(V.partsCache) do
+        if p and p.Parent and p:IsA("BasePart") then
+            if not hasKeyword(p.Name, SKIP_KEYWORDS) then
+                if hasKeyword(p.Name, PAINT_KEYWORDS) or
+                   p.Name:lower() == "union" or
+                   p.Name:lower():match("^part%d") then
+                    pcall(function()
+                        p.Color    = color
+                        p.Material = Enum.Material.SmoothPlastic
+                        count      = count + 1
+                    end)
+                end
+            end
+        end
+    end
+    showNotif("Color Applied", count .. " parts painted (client-side)", 3)
+end
+
+-- Reset all springs to original
+local function resetAllSprings()
+    local n = 0
+    for sp, orig in pairs(V.origSpring) do
+        if sp and sp.Parent then
+            pcall(function()
+                sp.Stiffness  = orig.Stiffness
+                sp.Damping    = orig.Damping
+                sp.FreeLength = orig.FreeLength
+                sp.MinLength  = orig.MinLength
+                sp.MaxLength  = orig.MaxLength
+                n = n + 1
+            end)
+        end
+    end
+    showNotif("Springs Reset", n .. " springs restored to original.", 3)
+end
+
+-- ═══════════════════════════════════════════════
+-- MAIN HEARTBEAT LOOP
+-- ═══════════════════════════════════════════════
+RunService.Heartbeat:Connect(function(dt)
+    -- Vehicle detection every 0.5s
+    if tick() - V.lastCheck > 0.5 then
+        V.lastCheck = tick()
+        getVehicle()
+    end
+
+    if not V.seat or not V.vehicle then return end
+
+    processAntiBounce(V.seat)
+    processSpeed(V.seat, dt)
+    processFlight(V.vehicle, V.seat)
+    processTraction(V.vehicle, V.seat)
+    processCollision()
+end)
+
+RunService.Stepped:Connect(function()
+    if V.vehicle then processSuspension() end
+end)
+
+-- ═══════════════════════════════════════════════
+-- COLOURS + DIMS
+-- ═══════════════════════════════════════════════
+local C = {
+    bg     = Color3.fromRGB(7,   7,   9),
+    hdr    = Color3.fromRGB(5,   5,   7),
+    card   = Color3.fromRGB(15,  15,  19),
+    cardH  = Color3.fromRGB(21,  21,  27),
+    sep    = Color3.fromRGB(26,  26,  34),
+    border = Color3.fromRGB(40,  40,  56),
+    white  = Color3.new(1,1,1),
+    pri    = Color3.fromRGB(218,218,226),
+    sec    = Color3.fromRGB(110,110,130),
+    dim    = Color3.fromRGB(60,  60,  80),
+    purple = Color3.fromRGB(160, 100, 255),
+    safe   = Color3.fromRGB(80,  185,  90),
+    danger = Color3.fromRGB(210,  50,  50),
+}
+
+local W   = 248   -- panel width
+local H   = 300   -- panel height
+local HDR = 30    -- header
+local TAB = 24    -- tab bar
+
+-- ═══════════════════════════════════════════════
+-- WINDOW  (fixed center, no drag)
+-- ═══════════════════════════════════════════════
 local win = Instance.new("Frame")
-win.Name = "Win"
-win.Size = UDim2.fromOffset(WIDTH, HEIGHT)
-win.Position = UDim2.fromScale(0.5, 0.5)
-win.AnchorPoint = Vector2.new(0.5, 0.5)
-win.BackgroundColor3 = C.bg
+win.Name               = "Win"
+win.Size               = UDim2.fromOffset(W, H)
+win.Position           = UDim2.fromScale(0.5, 0.5)
+win.AnchorPoint        = Vector2.new(0.5, 0.5)
+win.BackgroundColor3   = C.bg
 win.BackgroundTransparency = 0
-win.BorderSizePixel = 0
-win.ClipsDescendants = true
-win.ZIndex = 10
-win.Parent = gui
-Instance.new("UICorner", win).CornerRadius = UDim.new(0,8)
-local winStroke = Instance.new("UIStroke", win)
-winStroke.Thickness = 1.3
-winStroke.Color = C.border
+win.BorderSizePixel    = 0
+win.ClipsDescendants   = true
+win.ZIndex             = 10
+win.Parent             = gui
+Instance.new("UICorner", win).CornerRadius = UDim.new(0, 7)
+
+local winS = Instance.new("UIStroke", win)
+winS.Thickness = 1.2; winS.Color = C.border
+
+-- Border glow
 task.spawn(function()
     local t = 0
     while win.Parent do
         t = t + task.wait(0.04)
-        local s = (math.sin(t * 2.4) + 1) / 2
-        winStroke.Color = Color3.new(0.86 + s * 0.14, 0.76 + s * 0.05, 0.88 + s * 0.52)
-        winStroke.Thickness = 1.2 + s * 0.6
+        local s = (math.sin(t*2.4)+1)/2
+        winS.Color = Color3.new(
+            0.85 + s*0.15,
+            0.75 + s*0.05,
+            0.87 + s*0.53)
+        winS.Thickness = 1.1 + s*0.55
+        if math.random(1,85) == 1 then
+            winS.Color = C.purple; task.wait(0.04)
+        end
     end
 end)
 
--- Header
+-- ═══════════════════════════════════════════════
+-- HEADER
+-- ═══════════════════════════════════════════════
 local hdr = Instance.new("Frame")
-hdr.Size = UDim2.new(1,0,0,32)
+hdr.Size             = UDim2.new(1,0,0,HDR)
 hdr.BackgroundColor3 = C.hdr
-hdr.BorderSizePixel = 0
-hdr.ZIndex = 12
-hdr.Parent = win
-Instance.new("UICorner", hdr).CornerRadius = UDim.new(0,8)
-local hPatch = Instance.new("Frame")
-hPatch.Size = UDim2.new(1,0,0,8)
-hPatch.Position = UDim2.new(0,0,1,-8)
-hPatch.BackgroundColor3 = C.hdr
-hPatch.BorderSizePixel = 0
-hPatch.ZIndex = 11
-hPatch.Parent = hdr
-local hTitle = Instance.new("TextLabel")
-hTitle.Size = UDim2.new(1,-52,1,0)
-hTitle.Position = UDim2.fromOffset(9,0)
-hTitle.BackgroundTransparency = 1
-hTitle.Text = "Set Car etc Anonymous9x"
-hTitle.Font = Enum.Font.GothamBold
-hTitle.TextSize = 10
-hTitle.TextColor3 = C.pri
-hTitle.TextXAlignment = Enum.TextXAlignment.Left
-hTitle.TextTruncate = Enum.TextTruncate.AtEnd
-hTitle.ZIndex = 13
-hTitle.Parent = hdr
+hdr.BackgroundTransparency = 0
+hdr.BorderSizePixel  = 0
+hdr.ZIndex           = 11
+hdr.Parent           = win
+Instance.new("UICorner", hdr).CornerRadius = UDim.new(0, 7)
 
+local hPatch = Instance.new("Frame")
+hPatch.Size = UDim2.new(1,0,0,7); hPatch.Position = UDim2.new(0,0,1,-7)
+hPatch.BackgroundColor3 = C.hdr; hPatch.BorderSizePixel=0; hPatch.ZIndex=10; hPatch.Parent=hdr
+
+local hSep = Instance.new("Frame")
+hSep.Size=UDim2.new(1,0,0,1); hSep.Position=UDim2.new(0,0,1,-1)
+hSep.BackgroundColor3=C.sep; hSep.BorderSizePixel=0; hSep.ZIndex=12; hSep.Parent=hdr
+
+-- Vehicle status in header
+local hTitleL = Instance.new("TextLabel")
+hTitleL.Size = UDim2.new(0,110,1,0); hTitleL.Position = UDim2.fromOffset(8,0)
+hTitleL.BackgroundTransparency=1; hTitleL.Text="Ano9x Vehicle FE"
+hTitleL.Font=Enum.Font.GothamBold; hTitleL.TextSize=9
+hTitleL.TextColor3=C.pri; hTitleL.TextXAlignment=Enum.TextXAlignment.Left
+hTitleL.TextTruncate=Enum.TextTruncate.AtEnd; hTitleL.ZIndex=12; hTitleL.Parent=hdr
+
+local hVehicleL = Instance.new("TextLabel")
+hVehicleL.Size = UDim2.new(0,96,1,0); hVehicleL.Position = UDim2.fromOffset(122,0)
+hVehicleL.BackgroundTransparency=1; hVehicleL.Text="No Vehicle"
+hVehicleL.Font=Enum.Font.Gotham; hVehicleL.TextSize=7
+hVehicleL.TextColor3=C.sec; hVehicleL.TextXAlignment=Enum.TextXAlignment.Right
+hVehicleL.TextTruncate=Enum.TextTruncate.AtEnd; hVehicleL.ZIndex=12; hVehicleL.Parent=hdr
+
+-- Update vehicle label
+RunService.Heartbeat:Connect(function()
+    pcall(function()
+        if V.vehicle then
+            hVehicleL.Text = V.modelName
+            hVehicleL.TextColor3 = C.safe
+        else
+            hVehicleL.Text = "No Vehicle"
+            hVehicleL.TextColor3 = C.sec
+        end
+    end)
+end)
+
+-- Control buttons
 local function makeCtrl(xOff, sym)
     local b = Instance.new("ImageButton")
-    b.Size = UDim2.fromOffset(20,18)
-    b.Position = UDim2.new(1,xOff,0.5,-9)
-    b.BackgroundColor3 = C.card
-    b.BackgroundTransparency = 0
-    b.BorderSizePixel = 0
-    b.Image = ""
-    b.AutoButtonColor = false
-    b.ZIndex = 14
-    b.Parent = hdr
-    Instance.new("UICorner",b).CornerRadius = UDim.new(0,4)
+    b.Size = UDim2.fromOffset(20,18); b.Position = UDim2.new(1,xOff,0.5,-9)
+    b.BackgroundColor3=C.card; b.BackgroundTransparency=0
+    b.BorderSizePixel=0; b.Image=""; b.AutoButtonColor=false
+    b.ZIndex=13; b.Parent=hdr
+    Instance.new("UICorner",b).CornerRadius=UDim.new(0,4)
     local l = Instance.new("TextLabel")
-    l.Size = UDim2.fromScale(1,1)
-    l.BackgroundTransparency = 1
-    l.Text = sym
-    l.Font = Enum.Font.GothamBold
-    l.TextSize = 12
-    l.TextColor3 = C.sec
-    l.ZIndex = 15
-    l.Parent = b
+    l.Size=UDim2.fromScale(1,1); l.BackgroundTransparency=1
+    l.Text=sym; l.Font=Enum.Font.GothamBold; l.TextSize=12
+    l.TextColor3=C.sec; l.ZIndex=14; l.Parent=b
     b.MouseEnter:Connect(function()
         TweenService:Create(b,TweenInfo.new(0.10),{BackgroundColor3=C.cardH}):Play()
-        l.TextColor3 = C.white
+        l.TextColor3=C.white
     end)
     b.MouseLeave:Connect(function()
         TweenService:Create(b,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play()
-        l.TextColor3 = C.sec
+        l.TextColor3=C.sec
     end)
     return b, l
 end
 
 local minBtn, minL = makeCtrl(-44, "-")
-local closeBtn, _ = makeCtrl(-22, "x")
+local closeBtn, _  = makeCtrl(-22, "x")
 
--- Minimize icon
+-- ═══════════════════════════════════════════════
+-- FLOAT ICON
+-- ═══════════════════════════════════════════════
 local floatF = Instance.new("Frame")
-floatF.Name = "FloatIcon"
-floatF.Size = UDim2.fromOffset(46,46)
-floatF.BackgroundColor3 = C.hdr
-floatF.BackgroundTransparency = 0
-floatF.BorderSizePixel = 0
-floatF.Visible = false
-floatF.ZIndex = 500
-floatF.Parent = gui
-Instance.new("UICorner",floatF).CornerRadius = UDim.new(0,10)
-local fiS = Instance.new("UIStroke",floatF)
-fiS.Color = C.purple
-fiS.Thickness = 1.4
+floatF.Name="FloatIcon"; floatF.Size=UDim2.fromOffset(42,42)
+floatF.BackgroundColor3=C.hdr; floatF.BackgroundTransparency=0
+floatF.BorderSizePixel=0; floatF.Visible=false; floatF.ZIndex=500; floatF.Parent=gui
+Instance.new("UICorner",floatF).CornerRadius=UDim.new(0,9)
+local fiS = Instance.new("UIStroke",floatF); fiS.Color=C.purple; fiS.Thickness=1.3
 task.spawn(function()
-    local t = 0
-    while gui.Parent do
-        t = t + task.wait(0.05)
-        local s = (math.sin(t*3)+1)/2
-        fiS.Color = Color3.new(0.8+s*0.2, 0.5+s*0.1, 1)
-        fiS.Thickness = 1.2+s*0.6
+    local t=0; while gui.Parent do t=t+task.wait(0.05)
+        local s=(math.sin(t*3)+1)/2
+        fiS.Color=Color3.new(0.8+s*0.2,0.5+s*0.1,1); fiS.Thickness=1.1+s*0.5
     end
 end)
 local fiImg = Instance.new("ImageLabel")
-fiImg.Size = UDim2.fromOffset(40,40)
-fiImg.Position = UDim2.fromOffset(3,3)
-fiImg.BackgroundTransparency = 1
-fiImg.Image = "rbxassetid://97269958324726"
-fiImg.ScaleType = Enum.ScaleType.Crop
-fiImg.ZIndex = 501
-fiImg.Parent = floatF
-Instance.new("UICorner",fiImg).CornerRadius = UDim.new(0,8)
+fiImg.Size=UDim2.fromOffset(36,36); fiImg.Position=UDim2.fromOffset(3,3)
+fiImg.BackgroundTransparency=1; fiImg.Image="rbxassetid://97269958324726"
+fiImg.ScaleType=Enum.ScaleType.Crop; fiImg.ZIndex=501; fiImg.Parent=floatF
+Instance.new("UICorner",fiImg).CornerRadius=UDim.new(0,7)
+
 local function anchorFloat()
-    local vp = Cam.ViewportSize
-    floatF.Position = UDim2.fromOffset(vp.X-56, math.floor(vp.Y/2)-23)
+    local vp2 = Cam.ViewportSize
+    if vp2.X<10 then vp2=Vector2.new(800,600) end
+    floatF.Position = UDim2.fromOffset(vp2.X-52, 60)
 end
 anchorFloat()
+
 local fiBtn = Instance.new("ImageButton")
-fiBtn.Size = UDim2.fromScale(1,1)
-fiBtn.BackgroundTransparency = 1
-fiBtn.Image = ""
-fiBtn.AutoButtonColor = false
-fiBtn.ZIndex = 502
-fiBtn.Parent = floatF
+fiBtn.Size=UDim2.fromScale(1,1); fiBtn.BackgroundTransparency=1
+fiBtn.Image=""; fiBtn.AutoButtonColor=false; fiBtn.ZIndex=502; fiBtn.Parent=floatF
 fiBtn.MouseButton1Click:Connect(function()
-    floatF.Visible = false
-    win.Visible = true
-    minL.Text = "-"
+    floatF.Visible=false; win.Visible=true; minL.Text="-"
 end)
 fiBtn.MouseEnter:Connect(function()
     TweenService:Create(floatF,TweenInfo.new(0.12),{BackgroundColor3=C.card}):Play()
@@ -731,732 +678,565 @@ end)
 fiBtn.MouseLeave:Connect(function()
     TweenService:Create(floatF,TweenInfo.new(0.12),{BackgroundColor3=C.hdr}):Play()
 end)
+
 minBtn.MouseButton1Click:Connect(function()
-    win.Visible = false
-    anchorFloat()
-    floatF.Visible = true
-    minL.Text = "+"
+    win.Visible=false; anchorFloat(); floatF.Visible=true; minL.Text="+"
 end)
+
 closeBtn.MouseButton1Click:Connect(function()
-    -- Cleanup
-    for _, conn in ipairs(PhysicsData.System.Connections) do
-        pcall(function() conn:Disconnect() end)
-    end
-    PhysicsData.System.Connections = {}
+    Phys.speedEnabled=false; Phys.flightEnabled=false
+    Phys.tractionEnabled=false; Phys.freeze=false; Phys.noclip=false
+    Fun.gravEnabled=false; applyGravity(false,"Normal")
+    setFullbright(false)
     pcall(function() gui:Destroy() end)
 end)
 
--- Tab bar and content
+-- ═══════════════════════════════════════════════
+-- TAB BAR
+-- ═══════════════════════════════════════════════
 local tabBar = Instance.new("Frame")
-tabBar.Size = UDim2.new(1,0,0,26)
-tabBar.Position = UDim2.new(0,0,0,32)
-tabBar.BackgroundColor3 = C.bg
-tabBar.BorderSizePixel = 0
-tabBar.ZIndex = 11
-tabBar.Parent = win
-local tabScroll = Instance.new("ScrollingFrame")
-tabScroll.Size = UDim2.new(1,0,1,0)
-tabScroll.BackgroundTransparency = 1
-tabScroll.ScrollBarThickness = 2
-tabScroll.ScrollBarImageColor3 = C.purple
-tabScroll.ScrollingDirection = Enum.ScrollingDirection.X
-tabScroll.CanvasSize = UDim2.new(2,0,0,0)
-tabScroll.BorderSizePixel = 0
-tabScroll.ZIndex = 12
-tabScroll.Parent = tabBar
-local tabLayout = Instance.new("UIListLayout")
-tabLayout.FillDirection = Enum.FillDirection.Horizontal
-tabLayout.Padding = UDim.new(0,2)
-tabLayout.Parent = tabScroll
+tabBar.Size=UDim2.new(1,0,0,TAB); tabBar.Position=UDim2.fromOffset(0,HDR)
+tabBar.BackgroundColor3=C.hdr; tabBar.BackgroundTransparency=0
+tabBar.BorderSizePixel=0; tabBar.ZIndex=11; tabBar.Parent=win
 
-local content = Instance.new("ScrollingFrame")
-content.Size = UDim2.new(1,0,1,-58)
-content.Position = UDim2.new(0,0,0,58)
-content.BackgroundColor3 = C.bg
-content.BorderSizePixel = 0
-content.ScrollBarThickness = 3
-content.ScrollBarImageColor3 = C.purple
-content.ScrollingDirection = Enum.ScrollingDirection.Y
-content.CanvasSize = UDim2.fromOffset(0,0)
-content.AutomaticCanvasSize = Enum.AutomaticSize.Y
-content.ZIndex = 11
-content.Parent = win
-local sLL = Instance.new("UIListLayout")
-sLL.SortOrder = Enum.SortOrder.LayoutOrder
-sLL.Padding = UDim.new(0,4)
-sLL.Parent = content
-local sPad = Instance.new("UIPadding")
-sPad.PaddingLeft = UDim.new(0,7)
-sPad.PaddingRight = UDim.new(0,7)
-sPad.PaddingTop = UDim.new(0,7)
-sPad.PaddingBottom = UDim.new(0,10)
-sPad.Parent = content
+local tbSep = Instance.new("Frame")
+tbSep.Size=UDim2.new(1,0,0,1); tbSep.Position=UDim2.new(0,0,1,-1)
+tbSep.BackgroundColor3=C.sep; tbSep.BorderSizePixel=0; tbSep.ZIndex=12; tbSep.Parent=tabBar
 
--- Tab management
-UI.Tabs = {}
-UI.CurrentTab = nil
-local _order = 0
-local function ord() _order = _order + 1; return _order end
+local tbLL = Instance.new("UIListLayout")
+tbLL.FillDirection=Enum.FillDirection.Horizontal
+tbLL.VerticalAlignment=Enum.VerticalAlignment.Center
+tbLL.SortOrder=Enum.SortOrder.LayoutOrder; tbLL.Parent=tabBar
 
-function UI:AddTab(name)
-    local tabBtn = Instance.new("TextButton")
-    tabBtn.Name = name
-    tabBtn.Size = UDim2.new(0, 80, 0, 22)
-    tabBtn.BackgroundColor3 = C.card
-    tabBtn.Text = name
-    tabBtn.Font = Enum.Font.GothamBold
-    tabBtn.TextSize = 9
-    tabBtn.TextColor3 = C.sec
-    tabBtn.BorderSizePixel = 0
-    tabBtn.ZIndex = 12
-    tabBtn.Parent = tabScroll
-    Instance.new("UICorner",tabBtn).CornerRadius = UDim.new(0,4)
+local TABS = {
+    {id="Physics",    label="Physics"},
+    {id="Suspension", label="Susp."},
+    {id="Visual",     label="Visual"},
+    {id="Fun",        label="Fun"},
+}
 
-    local tabFrame = Instance.new("Frame")
-    tabFrame.Name = "Tab_"..name
-    tabFrame.Size = UDim2.new(1,0,0,100)
-    tabFrame.BackgroundTransparency = 1
-    tabFrame.BorderSizePixel = 0
-    tabFrame.Visible = false
-    tabFrame.Parent = content
-    local tabLayout = Instance.new("UIListLayout")
-    tabLayout.FillDirection = Enum.FillDirection.Vertical
-    tabLayout.Padding = UDim.new(0,6)
-    tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    tabLayout.Parent = tabFrame
+local tabBtns   = {}
+local tabPanels = {}
+local activeTab = "Physics"
 
-    local tabData = {
-        Button = tabBtn,
-        Frame = tabFrame,
-        Sections = {}
-    }
-
-    tabBtn.MouseButton1Click:Connect(function()
-        UI:SwitchTab(name)
-    end)
-
-    table.insert(UI.Tabs, tabData)
-    if #UI.Tabs == 1 then
-        UI:SwitchTab(name)
-    end
-    return tabData
-end
-
-function UI:SwitchTab(name)
-    for _, tab in ipairs(UI.Tabs) do
-        if tab.Button.Name == name then
-            tab.Frame.Visible = true
-            tab.Button.BackgroundColor3 = C.purple
-            tab.Button.TextColor3 = C.white
-            UI.CurrentTab = tab
-        else
-            tab.Frame.Visible = false
-            tab.Button.BackgroundColor3 = C.card
-            tab.Button.TextColor3 = C.sec
+local function setTab(id)
+    activeTab = id
+    for _, def in ipairs(TABS) do
+        local btn = tabBtns[def.id]
+        local pan = tabPanels[def.id]
+        local on  = def.id == id
+        if btn then
+            TweenService:Create(btn,TweenInfo.new(0.12),{
+                BackgroundColor3        = on and C.card or C.hdr,
+                BackgroundTransparency  = on and 0 or 1,
+            }):Play()
+            local l = btn:FindFirstChild("L")
+            if l then l.TextColor3 = on and C.white or C.sec end
         end
+        if pan then pan.Visible = on end
     end
 end
 
-function UI:AddSection(tabData, sectionName)
-    local section = Instance.new("Frame")
-    section.Size = UDim2.new(1,0,0,18)
-    section.BackgroundTransparency = 1
-    section.BorderSizePixel = 0
-    section.LayoutOrder = ord()
-    section.Parent = tabData.Frame
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.fromScale(1,1)
-    label.BackgroundTransparency = 1
-    label.Text = sectionName:upper()
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 7
-    label.TextColor3 = C.purple
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.ZIndex = 13
-    label.Parent = section
-    local line = Instance.new("Frame")
-    line.Size = UDim2.new(1,0,0,1)
-    line.Position = UDim2.new(0,0,1,-1)
-    line.BackgroundColor3 = C.sep
-    line.BorderSizePixel = 0
-    line.ZIndex = 13
-    line.Parent = section
-
-    local elementsContainer = Instance.new("Frame")
-    elementsContainer.Size = UDim2.new(1,0,0,0)
-    elementsContainer.BackgroundTransparency = 1
-    elementsContainer.LayoutOrder = ord()
-    elementsContainer.Parent = tabData.Frame
-    local elLayout = Instance.new("UIListLayout")
-    elLayout.FillDirection = Enum.FillDirection.Vertical
-    elLayout.Padding = UDim.new(0,4)
-    elLayout.Parent = elementsContainer
-
-    local sectionData = {
-        Frame = section,
-        ElementsContainer = elementsContainer,
-        Elements = {}
-    }
-    table.insert(tabData.Sections, sectionData)
-    return sectionData
+for i, def in ipairs(TABS) do
+    local id  = def.id
+    local btn = Instance.new("ImageButton")
+    btn.Name               = "TB_"..id
+    btn.Size               = UDim2.new(1/#TABS,0,1,-1)
+    btn.BackgroundColor3   = C.hdr
+    btn.BackgroundTransparency = 1
+    btn.BorderSizePixel    = 0
+    btn.Image              = ""
+    btn.AutoButtonColor    = false
+    btn.LayoutOrder        = i
+    btn.ZIndex             = 12
+    btn.Parent             = tabBar
+    local l = Instance.new("TextLabel")
+    l.Name="L"; l.Size=UDim2.fromScale(1,1); l.BackgroundTransparency=1
+    l.Text=def.label; l.Font=Enum.Font.GothamSemibold; l.TextSize=8
+    l.TextColor3=C.sec; l.ZIndex=13; l.Parent=btn
+    btn.MouseButton1Click:Connect(function() setTab(id) end)
+    tabBtns[id] = btn
 end
 
--- Custom slider
-function UI:CreateSlider(sectionData, name, min, max, default, callback)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1,0,0,45)
-    frame.BackgroundColor3 = C.card
-    frame.BackgroundTransparency = 0
-    frame.BorderSizePixel = 0
-    frame.Parent = sectionData.ElementsContainer
-    Instance.new("UICorner",frame).CornerRadius = UDim.new(0,6)
-    local bS = Instance.new("UIStroke",frame)
-    bS.Color = C.border
-    bS.Thickness = 0.8
+-- Tab underline
+local tabUnder = Instance.new("Frame")
+tabUnder.Size=UDim2.fromOffset(W/#TABS-4,2)
+tabUnder.BackgroundColor3=C.purple; tabUnder.BackgroundTransparency=0
+tabUnder.BorderSizePixel=0; tabUnder.ZIndex=13; tabUnder.Parent=tabBar
+Instance.new("UICorner",tabUnder).CornerRadius=UDim.new(1,0)
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1,-10,0,16)
-    label.Position = UDim2.fromOffset(8,4)
-    label.BackgroundTransparency = 1
-    label.Text = name .. " (" .. default .. ")"
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 9
-    label.TextColor3 = C.pri
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = frame
+local function moveUnder(id)
+    local idx=0
+    for i,def in ipairs(TABS) do if def.id==id then idx=i-1 end end
+    local seg = W/#TABS
+    TweenService:Create(tabUnder,TweenInfo.new(0.14,Enum.EasingStyle.Quad),{
+        Position=UDim2.fromOffset(seg*idx+2, TAB-2)
+    }):Play()
+end
 
-    local track = Instance.new("Frame")
-    track.Size = UDim2.new(1,-16,0,10)
-    track.Position = UDim2.fromOffset(8,26)
-    track.BackgroundColor3 = C.dim
-    track.BorderSizePixel = 0
-    track.Parent = frame
-    Instance.new("UICorner",track).CornerRadius = UDim.new(1,0)
+local _origSetTab = setTab
+setTab = function(id)
+    _origSetTab(id); moveUnder(id)
+end
 
-    local fill = Instance.new("Frame")
-    fill.Size = UDim2.fromScale((default-min)/(max-min), 1)
-    fill.BackgroundColor3 = C.purple
-    fill.BorderSizePixel = 0
-    fill.Parent = track
-    Instance.new("UICorner",fill).CornerRadius = UDim.new(1,0)
+-- ═══════════════════════════════════════════════
+-- CONTENT AREA
+-- ═══════════════════════════════════════════════
+local BODY_Y = HDR + TAB
 
-    local knob = Instance.new("ImageButton")
-    knob.Size = UDim2.fromOffset(16,16)
-    knob.Position = UDim2.fromScale((default-min)/(max-min), -8)
-    knob.BackgroundColor3 = C.white
-    knob.BorderSizePixel = 0
-    knob.Image = ""
-    knob.ZIndex = 14
-    knob.Parent = track
-    Instance.new("UICorner",knob).CornerRadius = UDim.new(1,0)
+local function mkPanel(id)
+    local s = Instance.new("ScrollingFrame")
+    s.Name=("P_"..id); s.Size=UDim2.new(1,0,1,-BODY_Y)
+    s.Position=UDim2.fromOffset(0,BODY_Y)
+    s.BackgroundTransparency=1; s.BorderSizePixel=0
+    s.ScrollBarThickness=2; s.ScrollBarImageColor3=C.purple
+    s.ScrollingDirection=Enum.ScrollingDirection.Y
+    s.CanvasSize=UDim2.fromOffset(0,0); s.AutomaticCanvasSize=Enum.AutomaticSize.Y
+    s.Visible=false; s.ZIndex=11; s.Parent=win
+    local l=Instance.new("UIListLayout")
+    l.SortOrder=Enum.SortOrder.LayoutOrder; l.Padding=UDim.new(0,3); l.Parent=s
+    local p=Instance.new("UIPadding")
+    p.PaddingLeft=UDim.new(0,6); p.PaddingRight=UDim.new(0,6)
+    p.PaddingTop=UDim.new(0,6); p.PaddingBottom=UDim.new(0,8); p.Parent=s
+    tabPanels[id]=s; return s
+end
 
-    local dragging = false
-    knob.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-        end
+for _,def in ipairs(TABS) do mkPanel(def.id) end
+
+-- ═══════════════════════════════════════════════
+-- UI COMPONENT LIBRARY
+-- ═══════════════════════════════════════════════
+local _o=0; local function o() _o=_o+1; return _o end
+
+local function mkSec(par, title)
+    local f=Instance.new("Frame")
+    f.Size=UDim2.new(1,0,0,16); f.BackgroundTransparency=1
+    f.BorderSizePixel=0; f.LayoutOrder=o(); f.ZIndex=12; f.Parent=par
+    local l=Instance.new("TextLabel")
+    l.Size=UDim2.fromScale(1,1); l.BackgroundTransparency=1
+    l.Text=title:upper(); l.Font=Enum.Font.GothamBold; l.TextSize=7
+    l.TextColor3=C.purple; l.TextXAlignment=Enum.TextXAlignment.Left
+    l.ZIndex=13; l.Parent=f
+    local ln=Instance.new("Frame")
+    ln.Size=UDim2.new(1,0,0,1); ln.Position=UDim2.new(0,0,1,-1)
+    ln.BackgroundColor3=C.sep; ln.BorderSizePixel=0; ln.ZIndex=13; ln.Parent=f
+end
+
+-- Toggle with knob
+local function mkToggle(par, opts)
+    local h = opts.sub and 38 or 28
+    local card=Instance.new("Frame")
+    card.Size=UDim2.new(1,0,0,h); card.BackgroundColor3=C.card
+    card.BackgroundTransparency=0; card.BorderSizePixel=0
+    card.LayoutOrder=o(); card.ZIndex=12; card.Parent=par
+    Instance.new("UICorner",card).CornerRadius=UDim.new(0,5)
+    local tl=Instance.new("TextLabel")
+    tl.Size=UDim2.new(1,-42,0,12); tl.Position=UDim2.fromOffset(7,opts.sub and 4 or 8)
+    tl.BackgroundTransparency=1; tl.Text=opts.title
+    tl.Font=Enum.Font.GothamSemibold; tl.TextSize=9
+    tl.TextColor3=C.pri; tl.TextXAlignment=Enum.TextXAlignment.Left
+    tl.ZIndex=13; tl.Parent=card
+    if opts.sub then
+        local sl=Instance.new("TextLabel")
+        sl.Size=UDim2.new(1,-42,0,10); sl.Position=UDim2.fromOffset(7,17)
+        sl.BackgroundTransparency=1; sl.Text=opts.sub
+        sl.Font=Enum.Font.Gotham; sl.TextSize=7; sl.TextColor3=C.sec
+        sl.TextXAlignment=Enum.TextXAlignment.Left; sl.ZIndex=13; sl.Parent=card
+    end
+    local TW,TH2=26,13
+    local trk=Instance.new("Frame"); trk.Size=UDim2.fromOffset(TW,TH2)
+    trk.Position=UDim2.new(1,-(TW+6),0.5,-(TH2/2))
+    trk.BackgroundColor3=opts.val and C.purple or C.border
+    trk.BorderSizePixel=0; trk.ZIndex=13; trk.Parent=card
+    Instance.new("UICorner",trk).CornerRadius=UDim.new(1,0)
+    local KS=TH2-4
+    local knob=Instance.new("Frame"); knob.Size=UDim2.fromOffset(KS,KS)
+    knob.Position=opts.val and UDim2.fromOffset(TW-KS-2,2) or UDim2.fromOffset(2,2)
+    knob.BackgroundColor3=C.white; knob.BorderSizePixel=0; knob.ZIndex=14; knob.Parent=trk
+    Instance.new("UICorner",knob).CornerRadius=UDim.new(1,0)
+    local state=opts.val or false
+    local setV; setV=function(v)
+        state=v
+        TweenService:Create(trk,TweenInfo.new(0.12),{BackgroundColor3=v and C.purple or C.border}):Play()
+        TweenService:Create(knob,TweenInfo.new(0.12),{Position=v and UDim2.fromOffset(TW-KS-2,2) or UDim2.fromOffset(2,2)}):Play()
+        if opts.cb then opts.cb(v) end
+    end
+    local hit=Instance.new("ImageButton"); hit.Size=UDim2.fromScale(1,1)
+    hit.BackgroundTransparency=1; hit.Image=""; hit.AutoButtonColor=false
+    hit.ZIndex=15; hit.Parent=card
+    hit.MouseButton1Click:Connect(function() setV(not state) end)
+    hit.MouseEnter:Connect(function() TweenService:Create(card,TweenInfo.new(0.10),{BackgroundColor3=C.cardH}):Play() end)
+    hit.MouseLeave:Connect(function() TweenService:Create(card,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play() end)
+    return card, setV
+end
+
+-- Slider
+local function mkSlider(par, opts)
+    local step=opts.step or 1
+    local card=Instance.new("Frame")
+    card.Size=UDim2.new(1,0,0,40); card.BackgroundColor3=C.card
+    card.BackgroundTransparency=0; card.BorderSizePixel=0
+    card.LayoutOrder=o(); card.ZIndex=12; card.Parent=par
+    Instance.new("UICorner",card).CornerRadius=UDim.new(0,5)
+    local tl=Instance.new("TextLabel"); tl.Size=UDim2.new(0.6,0,0,12)
+    tl.Position=UDim2.fromOffset(7,5); tl.BackgroundTransparency=1; tl.Text=opts.title
+    tl.Font=Enum.Font.GothamSemibold; tl.TextSize=9; tl.TextColor3=C.pri
+    tl.TextXAlignment=Enum.TextXAlignment.Left; tl.ZIndex=13; tl.Parent=card
+    local rng=math.max(0.001,opts.max-opts.min)
+    local pct=(opts.def-opts.min)/rng
+    local defStr=step<1 and string.format("%.1f",opts.def) or tostring(math.floor(opts.def))
+    local vl=Instance.new("TextLabel"); vl.Size=UDim2.new(0.4,-7,0,12)
+    vl.Position=UDim2.new(0.6,0,0,5); vl.BackgroundTransparency=1
+    vl.Text=defStr..(opts.suf or ""); vl.Font=Enum.Font.GothamBold; vl.TextSize=9
+    vl.TextColor3=C.pri; vl.TextXAlignment=Enum.TextXAlignment.Right; vl.ZIndex=13; vl.Parent=card
+    local trk=Instance.new("Frame"); trk.Size=UDim2.new(1,-14,0,4)
+    trk.Position=UDim2.fromOffset(7,23); trk.BackgroundColor3=Color3.fromRGB(30,30,40)
+    trk.BorderSizePixel=0; trk.ZIndex=13; trk.Parent=card
+    Instance.new("UICorner",trk).CornerRadius=UDim.new(1,0)
+    local fill=Instance.new("Frame"); fill.Size=UDim2.new(pct,0,1,0)
+    fill.BackgroundColor3=C.purple; fill.BorderSizePixel=0; fill.ZIndex=14; fill.Parent=trk
+    Instance.new("UICorner",fill).CornerRadius=UDim.new(1,0)
+    local KD=10; local knob=Instance.new("Frame"); knob.Size=UDim2.fromOffset(KD,KD)
+    knob.Position=UDim2.new(pct,-KD/2,0.5,-KD/2); knob.BackgroundColor3=C.white
+    knob.BorderSizePixel=0; knob.ZIndex=15; knob.Parent=trk
+    Instance.new("UICorner",knob).CornerRadius=UDim.new(1,0)
+    local value=opts.def; local isDrag=false
+    local function updX(ax)
+        local ta=trk.AbsolutePosition; local ts=trk.AbsoluteSize
+        if ts.X<1 then return end
+        local rel=math.clamp((ax-ta.X)/ts.X,0,1)
+        value=math.floor((opts.min+rel*rng)/step+0.5)*step
+        value=math.clamp(value,opts.min,opts.max)
+        local p=(value-opts.min)/rng
+        fill.Size=UDim2.new(p,0,1,0); knob.Position=UDim2.new(p,-KD/2,0.5,-KD/2)
+        local disp=step<1 and string.format("%.1f",value) or tostring(math.floor(value))
+        vl.Text=disp..(opts.suf or "")
+        if opts.cb then opts.cb(value) end
+    end
+    local hit=Instance.new("ImageButton"); hit.Size=UDim2.fromScale(1,1)
+    hit.BackgroundTransparency=1; hit.Image=""; hit.AutoButtonColor=false; hit.ZIndex=16; hit.Parent=trk
+    hit.MouseButton1Down:Connect(function(x) isDrag=true; updX(x) end)
+    hit.TouchLongPress:Connect(function() isDrag=true end)
+    hit.TouchPan:Connect(function(_,pos) if isDrag and pos[1] then updX(pos[1].X) end end)
+    UIS.InputChanged:Connect(function(inp)
+        if not isDrag then return end
+        if inp.UserInputType==Enum.UserInputType.MouseMovement
+        or inp.UserInputType==Enum.UserInputType.Touch then updX(inp.Position.X) end
     end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
+    UIS.InputEnded:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1
+        or inp.UserInputType==Enum.UserInputType.Touch then isDrag=false end
     end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local mousePos = UserInputService:GetMouseLocation()
-            local relX = mousePos.X - track.AbsolutePosition.X
-            local fraction = math.clamp(relX / track.AbsoluteSize.X, 0, 1)
-            local value = math.floor(min + (max-min)*fraction)
-            fill.Size = UDim2.fromScale(fraction, 1)
-            knob.Position = UDim2.fromScale(fraction, -8)
-            label.Text = name .. " (" .. value .. ")"
-            callback(value)
-        end
-    end)
-    callback(default)
-    return frame
+    return card
 end
 
 -- Button
-function UI:CreateButton(sectionData, name, callback)
-    local btn = Instance.new("ImageButton")
-    btn.Size = UDim2.new(1,0,0,30)
-    btn.BackgroundColor3 = C.card
-    btn.BackgroundTransparency = 0
-    btn.BorderSizePixel = 0
-    btn.Image = ""
-    btn.AutoButtonColor = false
-    btn.Parent = sectionData.ElementsContainer
-    Instance.new("UICorner",btn).CornerRadius = UDim.new(0,6)
-    local bS = Instance.new("UIStroke",btn)
-    bS.Color = C.border
-    bS.Thickness = 0.8
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1,-10,1,0)
-    lbl.Position = UDim2.fromOffset(8,0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = name
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 10
-    lbl.TextColor3 = C.pri
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.ZIndex = 13
-    lbl.Parent = btn
-    btn.MouseButton1Click:Connect(function()
-        TweenService:Create(btn,TweenInfo.new(0.08),{BackgroundColor3=C.cardH}):Play()
-        task.delay(0.15,function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play() end)
-        callback()
-    end)
-    btn.MouseEnter:Connect(function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.cardH}):Play() end)
-    btn.MouseLeave:Connect(function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play() end)
-    return btn
-end
-
--- Toggle
-function UI:CreateToggle(sectionData, name, default, onCb, offCb)
-    local btn = Instance.new("ImageButton")
-    btn.Size = UDim2.new(1,0,0,30)
-    btn.BackgroundColor3 = C.card
-    btn.BackgroundTransparency = 0
-    btn.BorderSizePixel = 0
-    btn.Image = ""
-    btn.AutoButtonColor = false
-    btn.Parent = sectionData.ElementsContainer
-    Instance.new("UICorner",btn).CornerRadius = UDim.new(0,6)
-    local bS = Instance.new("UIStroke",btn)
-    bS.Color = C.border
-    bS.Thickness = 0.8
-
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1,-46,1,0)
-    lbl.Position = UDim2.fromOffset(8,0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = name
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 10
-    lbl.TextColor3 = C.pri
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.ZIndex = 13
-    lbl.Parent = btn
-
-    local TW, TH2 = 24, 13
-    local trk = Instance.new("Frame")
-    trk.Size = UDim2.fromOffset(TW, TH2)
-    trk.Position = UDim2.new(1, -(TW+6), 0.5, -(TH2/2))
-    trk.BackgroundColor3 = C.border
-    trk.BorderSizePixel = 0
-    trk.ZIndex = 13
-    trk.Parent = btn
-    Instance.new("UICorner",trk).CornerRadius = UDim.new(1,0)
-    local KS = TH2 - 4
-    local knob = Instance.new("Frame")
-    knob.Size = UDim2.fromOffset(KS, KS)
-    knob.Position = UDim2.fromOffset(default and TW-KS-2 or 2, 2)
-    knob.BackgroundColor3 = C.white
-    knob.BorderSizePixel = 0
-    knob.ZIndex = 14
-    knob.Parent = trk
-    Instance.new("UICorner",knob).CornerRadius = UDim.new(1,0)
-
-    local state = default
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        TweenService:Create(trk,TweenInfo.new(0.12),{BackgroundColor3 = state and C.purple or C.border}):Play()
-        TweenService:Create(knob,TweenInfo.new(0.12),{Position = state and UDim2.fromOffset(TW-KS-2,2) or UDim2.fromOffset(2,2)}):Play()
-        TweenService:Create(btn,TweenInfo.new(0.08),{BackgroundColor3=C.cardH}):Play()
-        task.delay(0.15,function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play() end)
-        if state then
-            if onCb then onCb() end
-        else
-            if offCb then offCb() end
-        end
-    end)
-    btn.MouseEnter:Connect(function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.cardH}):Play() end)
-    btn.MouseLeave:Connect(function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play() end)
-    if default and onCb then onCb() end
-    return btn
-end
-
--- Dropdown
-function UI:CreateDropdown(sectionData, name, items, default, callback)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1,0,0,32)
-    frame.BackgroundColor3 = C.card
-    frame.BackgroundTransparency = 0
-    frame.BorderSizePixel = 0
-    frame.Parent = sectionData.ElementsContainer
-    Instance.new("UICorner",frame).CornerRadius = UDim.new(0,6)
-    local bS = Instance.new("UIStroke",frame)
-    bS.Color = C.border
-    bS.Thickness = 0.8
-
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0.45,0,1,0)
-    lbl.Position = UDim2.fromOffset(8,0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = name
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 10
-    lbl.TextColor3 = C.pri
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.ZIndex = 13
-    lbl.Parent = frame
-
-    local dropBtn = Instance.new("TextButton")
-    dropBtn.Size = UDim2.new(0.45,0,1,0)
-    dropBtn.Position = UDim2.new(0.55,0,0,0)
-    dropBtn.BackgroundColor3 = C.card
-    dropBtn.Text = default
-    dropBtn.Font = Enum.Font.Gotham
-    dropBtn.TextSize = 9
-    dropBtn.TextColor3 = C.pri
-    dropBtn.BorderSizePixel = 0
-    dropBtn.ZIndex = 13
-    dropBtn.Parent = frame
-    Instance.new("UICorner",dropBtn).CornerRadius = UDim.new(0,4)
-
-    local listFrame = Instance.new("Frame")
-    listFrame.Size = UDim2.new(0.45,0,0,0)
-    listFrame.Position = UDim2.new(0.55,0,1,2)
-    listFrame.BackgroundColor3 = C.bg
-    listFrame.BorderSizePixel = 0
-    listFrame.Visible = false
-    listFrame.ZIndex = 20
-    listFrame.Parent = frame
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.FillDirection = Enum.FillDirection.Vertical
-    listLayout.Parent = listFrame
-
-    local function buildList()
-        for _,v in ipairs(listFrame:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
-        for _,item in ipairs(items) do
-            local ib = Instance.new("TextButton")
-            ib.Size = UDim2.new(1,0,0,22)
-            ib.BackgroundColor3 = C.card
-            ib.Text = item
-            ib.Font = Enum.Font.Gotham
-            ib.TextSize = 9
-            ib.TextColor3 = C.pri
-            ib.BorderSizePixel = 0
-            ib.ZIndex = 21
-            ib.Parent = listFrame
-            ib.MouseButton1Click:Connect(function()
-                dropBtn.Text = item
-                listFrame.Visible = false
-                callback(item)
-            end)
-        end
-        listFrame.Size = UDim2.new(0.45,0,0, #items*22)
+local function mkBtn(par, opts)
+    local h=opts.sub and 38 or 28
+    local btn=Instance.new("ImageButton"); btn.Size=UDim2.new(1,0,0,h)
+    btn.BackgroundColor3=C.card; btn.BackgroundTransparency=0
+    btn.BorderSizePixel=0; btn.Image=""; btn.AutoButtonColor=false
+    btn.LayoutOrder=o(); btn.ZIndex=12; btn.Parent=par
+    Instance.new("UICorner",btn).CornerRadius=UDim.new(0,5)
+    local bS=Instance.new("UIStroke",btn); bS.Color=C.border; bS.Thickness=0.8
+    local tl=Instance.new("TextLabel"); tl.Size=UDim2.new(1,-10,0,13)
+    tl.Position=UDim2.fromOffset(7,opts.sub and 4 or 7)
+    tl.BackgroundTransparency=1; tl.Text=opts.title
+    tl.Font=Enum.Font.GothamBold; tl.TextSize=9; tl.TextColor3=C.pri
+    tl.TextXAlignment=Enum.TextXAlignment.Left; tl.ZIndex=13; tl.Parent=btn
+    if opts.sub then
+        local sl=Instance.new("TextLabel"); sl.Size=UDim2.new(1,-10,0,10)
+        sl.Position=UDim2.fromOffset(7,20); sl.BackgroundTransparency=1; sl.Text=opts.sub
+        sl.Font=Enum.Font.Gotham; sl.TextSize=7; sl.TextColor3=C.sec
+        sl.TextXAlignment=Enum.TextXAlignment.Left; sl.ZIndex=13; sl.Parent=btn
     end
-    buildList()
-
-    dropBtn.MouseButton1Click:Connect(function()
-        listFrame.Visible = not listFrame.Visible
+    btn.MouseButton1Click:Connect(function()
+        TweenService:Create(btn,TweenInfo.new(0.08),{BackgroundColor3=C.cardH}):Play()
+        task.delay(0.14,function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play() end)
+        if opts.cb then opts.cb() end
     end)
-    callback(default)
-    return frame
+    btn.MouseEnter:Connect(function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.cardH}):Play() end)
+    btn.MouseLeave:Connect(function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play() end)
+    return btn
 end
 
--- Color picker (simple presets)
-function UI:CreateColorpicker(sectionData, name, default, callback)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1,0,0,30)
-    frame.BackgroundColor3 = C.card
-    frame.BackgroundTransparency = 0
-    frame.BorderSizePixel = 0
-    frame.Parent = sectionData.ElementsContainer
-    Instance.new("UICorner",frame).CornerRadius = UDim.new(0,6)
-    local bS = Instance.new("UIStroke",frame)
-    bS.Color = C.border
-    bS.Thickness = 0.8
-
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(0.45,0,1,0)
-    lbl.Position = UDim2.fromOffset(8,0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = name
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 10
-    lbl.TextColor3 = C.pri
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.ZIndex = 13
-    lbl.Parent = frame
-
-    local preview = Instance.new("Frame")
-    preview.Size = UDim2.fromOffset(24,24)
-    preview.Position = UDim2.new(0.5,0,0,3)
-    preview.BackgroundColor3 = default
-    preview.BorderSizePixel = 0
-    preview.ZIndex = 13
-    preview.Parent = frame
-    Instance.new("UICorner",preview).CornerRadius = UDim.new(0,4)
-
-    local pickerBtn = Instance.new("TextButton")
-    pickerBtn.Size = UDim2.new(0.35,0,1,0)
-    pickerBtn.Position = UDim2.new(0.65,0,0,0)
-    pickerBtn.BackgroundColor3 = C.card
-    pickerBtn.Text = "Pick"
-    pickerBtn.Font = Enum.Font.Gotham
-    pickerBtn.TextSize = 9
-    pickerBtn.TextColor3 = C.pri
-    pickerBtn.BorderSizePixel = 0
-    pickerBtn.ZIndex = 13
-    pickerBtn.Parent = frame
-    Instance.new("UICorner",pickerBtn).CornerRadius = UDim.new(0,4)
-
-    local pickerList = Instance.new("Frame")
-    pickerList.Size = UDim2.new(0.35,0,0,100)
-    pickerList.Position = UDim2.new(0.65,0,1,2)
-    pickerList.BackgroundColor3 = C.bg
-    pickerList.BorderSizePixel = 0
-    pickerList.Visible = false
-    pickerList.ZIndex = 20
-    pickerList.Parent = frame
-    local pickerLayout = Instance.new("UIListLayout")
-    pickerLayout.FillDirection = Enum.FillDirection.Vertical
-    pickerLayout.Parent = pickerList
-
-    local colors = {
-        {name="Red", col=Color3.new(1,0,0)},
-        {name="Green", col=Color3.new(0,1,0)},
-        {name="Blue", col=Color3.new(0,0,1)},
-        {name="Purple", col=Color3.fromRGB(170,110,255)},
-        {name="White", col=Color3.new(1,1,1)},
-        {name="Black", col=Color3.new(0,0,0)},
-        {name="Orange", col=Color3.new(1,0.5,0)},
-    }
-    for _,c in ipairs(colors) do
-        local cb = Instance.new("TextButton")
-        cb.Size = UDim2.new(1,0,0,22)
-        cb.BackgroundColor3 = C.card
-        cb.Text = c.name
-        cb.Font = Enum.Font.Gotham
-        cb.TextSize = 9
-        cb.TextColor3 = C.pri
-        cb.BorderSizePixel = 0
-        cb.ZIndex = 21
-        cb.Parent = pickerList
-        cb.MouseButton1Click:Connect(function()
-            preview.BackgroundColor3 = c.col
-            pickerList.Visible = false
-            callback(c.col)
+-- Dropdown (compact)
+local function mkDrop(par, opts)
+    local IH=22; local listH=#opts.opts*IH+4
+    local card=Instance.new("Frame"); card.Size=UDim2.new(1,0,0,30)
+    card.BackgroundColor3=C.card; card.BackgroundTransparency=0
+    card.BorderSizePixel=0; card.LayoutOrder=o(); card.ClipsDescendants=false
+    card.ZIndex=20; card.Parent=par
+    Instance.new("UICorner",card).CornerRadius=UDim.new(0,5)
+    local tl=Instance.new("TextLabel"); tl.Size=UDim2.new(0.48,0,0,12)
+    tl.Position=UDim2.fromOffset(7,9); tl.BackgroundTransparency=1; tl.Text=opts.title
+    tl.Font=Enum.Font.GothamSemibold; tl.TextSize=9; tl.TextColor3=C.pri
+    tl.TextXAlignment=Enum.TextXAlignment.Left; tl.ZIndex=21; tl.Parent=card
+    local sel=Instance.new("ImageButton"); sel.Size=UDim2.new(0.50,-4,0,22)
+    sel.Position=UDim2.new(0.50,2,0.5,-11); sel.BackgroundColor3=Color3.fromRGB(16,16,22)
+    sel.BackgroundTransparency=0; sel.BorderSizePixel=0; sel.Image=""
+    sel.AutoButtonColor=false; sel.ZIndex=21; sel.Parent=card
+    Instance.new("UICorner",sel).CornerRadius=UDim.new(0,4)
+    local selL=Instance.new("TextLabel"); selL.Size=UDim2.new(1,-14,1,0)
+    selL.Position=UDim2.fromOffset(5,0); selL.BackgroundTransparency=1
+    selL.Text=opts.def or opts.opts[1]; selL.Font=Enum.Font.GothamSemibold; selL.TextSize=8
+    selL.TextColor3=C.pri; selL.TextXAlignment=Enum.TextXAlignment.Left; selL.ZIndex=22; selL.Parent=sel
+    local chv=Instance.new("TextLabel"); chv.Size=UDim2.fromOffset(10,22)
+    chv.Position=UDim2.new(1,-12,0,0); chv.BackgroundTransparency=1; chv.Text="v"
+    chv.Font=Enum.Font.GothamBold; chv.TextSize=7; chv.TextColor3=C.sec; chv.ZIndex=22; chv.Parent=sel
+    local dList=Instance.new("Frame"); dList.Size=UDim2.fromOffset(10,listH)
+    dList.Position=UDim2.new(sel.Position.X.Scale,sel.Position.X.Offset,1,2)
+    dList.BackgroundColor3=Color3.fromRGB(14,14,20); dList.BackgroundTransparency=0
+    dList.BorderSizePixel=0; dList.Visible=false; dList.ZIndex=30; dList.Parent=card
+    Instance.new("UICorner",dList).CornerRadius=UDim.new(0,5)
+    local dlS=Instance.new("UIStroke",dList); dlS.Color=C.border; dlS.Thickness=0.8
+    local dlL=Instance.new("UIListLayout"); dlL.SortOrder=Enum.SortOrder.LayoutOrder; dlL.Parent=dList
+    local dlP=Instance.new("UIPadding"); dlP.PaddingTop=UDim.new(0,2); dlP.PaddingBottom=UDim.new(0,2)
+    dlP.PaddingLeft=UDim.new(0,2); dlP.PaddingRight=UDim.new(0,2); dlP.Parent=dList
+    local isOpen=false; local selected=opts.def or opts.opts[1]
+    local function closeDD() isOpen=false; dList.Visible=false end
+    local function openDD()
+        dList.Size=UDim2.fromOffset(math.max(sel.AbsoluteSize.X,80),listH)
+        isOpen=true; dList.Visible=true
+    end
+    for i,opt in ipairs(opts.opts) do
+        local o2=opt; local itm=Instance.new("ImageButton")
+        itm.Size=UDim2.new(1,0,0,IH); itm.BackgroundColor3=Color3.fromRGB(14,14,20)
+        itm.BackgroundTransparency=0; itm.BorderSizePixel=0; itm.Image=""; itm.AutoButtonColor=false
+        itm.LayoutOrder=i; itm.ZIndex=31; itm.Parent=dList
+        Instance.new("UICorner",itm).CornerRadius=UDim.new(0,3)
+        local il=Instance.new("TextLabel"); il.Size=UDim2.fromScale(1,1)
+        il.BackgroundTransparency=1; il.Text=o2; il.Font=Enum.Font.GothamSemibold; il.TextSize=8
+        il.TextColor3=C.pri; il.TextXAlignment=Enum.TextXAlignment.Left; il.ZIndex=32; il.Parent=itm
+        local ip=Instance.new("UIPadding"); ip.PaddingLeft=UDim.new(0,6); ip.Parent=il
+        itm.MouseEnter:Connect(function() itm.BackgroundColor3=C.cardH end)
+        itm.MouseLeave:Connect(function() itm.BackgroundColor3=Color3.fromRGB(14,14,20) end)
+        itm.MouseButton1Click:Connect(function()
+            selected=o2; selL.Text=o2; closeDD()
+            if opts.cb then opts.cb(o2) end
         end)
     end
-    pickerList.Size = UDim2.new(0.35,0,0, #colors*22)
-    pickerBtn.MouseButton1Click:Connect(function()
-        pickerList.Visible = not pickerList.Visible
+    sel.MouseButton1Click:Connect(function()
+        if isOpen then closeDD() else openDD() end
     end)
-    callback(default)
-    return frame
+    return card, function() return selected end
 end
 
--- ===================== Build Tabs =====================
-local spawnTab = UI:AddTab("Spawn")
-local physTab = UI:AddTab("Physics")
-local suspTab = UI:AddTab("Suspension")
-local funTab = UI:AddTab("Fun")
-local visTab = UI:AddTab("Visuals")
+local function mkDiv(par)
+    local f=Instance.new("Frame"); f.Size=UDim2.new(1,0,0,1)
+    f.BackgroundColor3=C.sep; f.BackgroundTransparency=0.3
+    f.BorderSizePixel=0; f.LayoutOrder=o(); f.ZIndex=12; f.Parent=par
+end
 
--- SPAWN TAB
-local spawnSec = UI:AddSection(spawnTab, "Vehicle Spawner")
-local presets = {"Basic Car", "Motorcycle", "Monster Truck", "Sedan", "SUV", "Sports Car"}
-local selectedPreset = "Basic Car"
-UI:CreateDropdown(spawnSec, "Preset", presets, "Basic Car", function(val) selectedPreset = val end)
-UI:CreateButton(spawnSec, "Spawn Preset", function()
-    local char = LocalPlayer.Character
-    if not char then UI:Notify("Error","No character") return end
-    local pos = char:GetPivot().Position + Vector3.new(0,5,0)
-    local vehicle = Instance.new("Model")
-    vehicle.Name = selectedPreset
-    local base = Instance.new("Part")
-    base.Size = Vector3.new(4,1.2,6)
-    base.Position = pos
-    base.Anchored = false
-    base.Color = Color3.new(1,0,0)
-    base.Material = Enum.Material.SmoothPlastic
-    base.Parent = vehicle
-    local seat = Instance.new("VehicleSeat")
-    seat.Size = Vector3.new(2,1.2,2)
-    seat.Position = pos + Vector3.new(0,1.2,0)
-    seat.Parent = vehicle
-    vehicle.PrimaryPart = base
-    vehicle.Parent = Workspace
-    UI:Notify("Spawner", selectedPreset.." spawned", 3)
-end)
-UI:CreateButton(spawnSec, "Spawn Custom Model (ID)", function()
-    local id = "rbxassetid://"
-    local box = Instance.new("TextBox")
-    box.Size = UDim2.new(1,0,0,28)
-    box.BackgroundColor3 = C.card
-    box.Text = ""
-    box.PlaceholderText = "Enter asset ID"
-    box.Font = Enum.Font.Gotham
-    box.TextSize = 9
-    box.TextColor3 = C.white
-    box.Parent = spawnSec.ElementsContainer
-    -- quick hack: add a temporary button to confirm
-    local confirm = UI:CreateButton(spawnSec, "Confirm Spawn", function()
-        local idText = box.Text
-        if idText == "" then return end
+-- ═══════════════════════════════════════════════
+-- PHYSICS TAB
+-- ═══════════════════════════════════════════════
+local pp = tabPanels["Physics"]
+
+mkSec(pp, "Anti-Bounce")
+mkToggle(pp, {title="Anti-Bounce", sub="Smooths suspension bounce + impact", val=true, cb=function(v) Phys.antiBounce=v end})
+mkSlider(pp, {title="Vel. Dampening", min=0, max=100, def=92, suf="%", step=1, cb=function(v) Phys.velDamp=v/100 end})
+mkSlider(pp, {title="Ang. Dampening", min=0, max=100, def=85, suf="%", step=1, cb=function(v) Phys.angDamp=v/100 end})
+mkSlider(pp, {title="Impact Sensitivity", min=5, max=50, def=15, suf="", step=1, cb=function(v) Phys.impactThresh=v end})
+
+mkSec(pp, "Speed Control")
+mkToggle(pp, {title="Speed Override", sub="W = accelerate  S = brake", val=false, cb=function(v) Phys.speedEnabled=v end})
+mkSlider(pp, {title="Accel Rate", min=10, max=500, def=150, suf="", step=5, cb=function(v) Phys.accelRate=v/100 end})
+mkSlider(pp, {title="Brake Rate",  min=10, max=200, def=90,  suf="%", step=1, cb=function(v) Phys.brakeRate=v/100 end})
+mkSlider(pp, {title="Max Speed",   min=50, max=400, def=250, suf="", step=5, cb=function(v) Phys.maxGroundSpeed=v end})
+
+mkSec(pp, "Flight")
+mkToggle(pp, {title="Flight Mode", sub="WASD move  E=up  Q=down", val=false, cb=function(v) Phys.flightEnabled=v end})
+mkSlider(pp, {title="Flight Speed", min=10, max=800, def=100, suf="", step=10, cb=function(v) Phys.flightSpeed=v/100 end})
+
+mkSec(pp, "Traction")
+mkToggle(pp, {title="Traction Control", sub="Reduce side-slip on corners", val=false, cb=function(v) Phys.tractionEnabled=v end})
+mkSlider(pp, {title="Grip", min=10, max=150, def=100, suf="%", step=1, cb=function(v) Phys.tractionGrip=v/100 end})
+
+mkSec(pp, "Collision")
+mkToggle(pp, {title="Freeze Vehicle", sub="Lock all parts in place", val=false, cb=function(v) Phys.freeze=v end})
+mkToggle(pp, {title="Noclip Vehicle", sub="Vehicle passes through objects", val=false, cb=function(v) Phys.noclip=v end})
+
+mkDiv(pp)
+mkBtn(pp, {title="Refresh / Reclaim Ownership", sub="Re-scan vehicle and claim network owner", cb=function()
+    if not V.vehicle then showNotif("No Vehicle","Sit in a vehicle first.",3); return end
+    cacheVehicle(V.vehicle)
+    showNotif("Refreshed", "Network ownership claimed  |  Springs: "..#V.springsCache, 3)
+end})
+
+-- ═══════════════════════════════════════════════
+-- SUSPENSION TAB
+-- ═══════════════════════════════════════════════
+local sp2 = tabPanels["Suspension"]
+
+mkSec(sp2, "Global Settings")
+mkSlider(sp2, {title="Stiffness",  min=0,   max=100, def=40,  suf="", step=1, cb=function(v) Sus.stiffness=v*100; Sus.frontStiff=v*100; Sus.rearStiff=v*100 end})
+mkSlider(sp2, {title="Front Stiff",min=100, max=20000,def=4000,suf="",step=100,cb=function(v) Sus.frontStiff=v end})
+mkSlider(sp2, {title="Rear Stiff", min=100, max=20000,def=4000,suf="",step=100,cb=function(v) Sus.rearStiff=v end})
+mkSlider(sp2, {title="Damping",    min=0,   max=100, def=20,  suf="", step=1, cb=function(v) Sus.damping=v*20 end})
+mkSlider(sp2, {title="Ride Height", min=-30, max=30, def=0,   suf="", step=1, cb=function(v) Sus.height=v/10 end})
+
+mkSec(sp2, "Quick Presets")
+local function applyPreset(name, fs, rs, d, h)
+    Sus.frontStiff=fs; Sus.rearStiff=rs; Sus.damping=d; Sus.height=h
+    showNotif("Preset: "..name, "Front:"..fs.."  Rear:"..rs.."  Damp:"..d, 3)
+end
+
+mkBtn(sp2, {title="Race",     sub="Hard + low — track use",         cb=function() applyPreset("Race",     8000,8000,1500,-1.5) end})
+mkBtn(sp2, {title="Drift",    sub="Soft rear for rotation",          cb=function() applyPreset("Drift",    6000,3000,500,0) end})
+mkBtn(sp2, {title="Off-Road", sub="Soft + high — rough terrain",     cb=function() applyPreset("Off-Road", 2000,2000,800,1.5) end})
+mkBtn(sp2, {title="Comfort",  sub="Smooth ride for daily use",       cb=function() applyPreset("Comfort",  1500,1500,1800,0.5) end})
+mkBtn(sp2, {title="Stance",   sub="Extremely low and stiff",         cb=function() applyPreset("Stance",   12000,12000,2000,-2) end})
+mkBtn(sp2, {title="Rally",    sub="High + medium — mixed terrain",   cb=function() applyPreset("Rally",    3000,3000,800,2) end})
+mkBtn(sp2, {title="Balanced", sub="Stock-like — neutral all-round",  cb=function() applyPreset("Balanced", 5000,5000,1200,0) end})
+
+mkDiv(sp2)
+mkBtn(sp2, {title="Reset All Springs", sub="Restore original SpringConstraint values", cb=function()
+    resetAllSprings()
+end})
+
+mkBtn(sp2, {title="Rescan Springs", sub="Re-detect all SpringConstraints in vehicle", cb=function()
+    if not V.vehicle then showNotif("No Vehicle","Sit in a vehicle first.",3); return end
+    cacheVehicle(V.vehicle)
+    showNotif("Rescanned", "#Springs found: "..#V.springsCache, 3)
+end})
+
+-- ═══════════════════════════════════════════════
+-- VISUAL TAB
+-- ═══════════════════════════════════════════════
+local vp2 = tabPanels["Visual"]
+
+mkSec(vp2, "Quick Color Presets")
+local COLORS = {
+    {"Red",          Color3.fromRGB(200, 25,  25)},
+    {"Blue",         Color3.fromRGB(25,  80,  220)},
+    {"Green",        Color3.fromRGB(25,  200, 50)},
+    {"Yellow",       Color3.fromRGB(240, 220, 20)},
+    {"Orange",       Color3.fromRGB(255, 128, 0)},
+    {"Purple",       Color3.fromRGB(160, 40,  200)},
+    {"Pink",         Color3.fromRGB(240, 100, 180)},
+    {"White",        Color3.fromRGB(240, 240, 240)},
+    {"Matte Black",  Color3.fromRGB(22,  22,  22)},
+    {"Chrome Silver",Color3.fromRGB(190, 190, 190)},
+    {"Gold",         Color3.fromRGB(255, 215, 0)},
+    {"Carbon Black", Color3.fromRGB(30,  30,  35)},
+}
+
+for _, col in ipairs(COLORS) do
+    local name  = col[1]
+    local color = col[2]
+    mkBtn(vp2, {title=name, cb=function() paintVehicle(color) end})
+end
+
+mkSec(vp2, "Custom Color (R,G,B 0-255)")
+
+-- Simple R/G/B sliders for custom color
+local customR, customG, customB = 200, 0, 0
+mkSlider(vp2, {title="Red",   min=0,max=255,def=200,suf="",step=1, cb=function(v) customR=v end})
+mkSlider(vp2, {title="Green", min=0,max=255,def=0,  suf="",step=1, cb=function(v) customG=v end})
+mkSlider(vp2, {title="Blue",  min=0,max=255,def=0,  suf="",step=1, cb=function(v) customB=v end})
+
+mkBtn(vp2, {title="Apply Custom Color", cb=function()
+    paintVehicle(Color3.fromRGB(customR, customG, customB))
+end})
+
+-- ═══════════════════════════════════════════════
+-- FUN TAB
+-- ═══════════════════════════════════════════════
+local fp2 = tabPanels["Fun"]
+
+mkSec(fp2, "Gravity")
+
+local gravModeSelected = "Normal"
+mkDrop(fp2, {title="Gravity Mode",
+    opts={"Normal","Moon","Heavy","Zero","Reverse"},
+    def="Normal",
+    cb=function(v)
+        gravModeSelected = v
+        if Fun.gravEnabled then
+            applyGravity(true, v)
+            showNotif("Gravity", "Mode changed to: "..v, 2)
+        end
+    end
+})
+
+mkToggle(fp2, {title="Gravity Enabled", sub="Apply selected gravity mode to vehicle", val=false, cb=function(v)
+    Fun.gravEnabled = v
+    applyGravity(v, gravModeSelected)
+    showNotif("Gravity "..(v and "ON" or "OFF"), "Mode: "..gravModeSelected, 2)
+end})
+
+mkSec(fp2, "Lighting")
+
+mkToggle(fp2, {title="Fullbright", sub="Max ambient lighting client-side", val=false, cb=function(v)
+    Fun.fullbright=v; setFullbright(v)
+    showNotif("Fullbright "..(v and "ON" or "OFF"), "Client-side lighting override.", 2)
+end})
+
+mkSec(fp2, "Utility")
+
+mkBtn(fp2, {title="Eject from Vehicle", sub="Force-exit your current vehicle seat", cb=function()
+    local c = LP.Character
+    if not c then showNotif("Error","No character.",3); return end
+    local h = c:FindFirstChildOfClass("Humanoid")
+    if h then
+        pcall(function() h.Sit = false end)
+        showNotif("Ejected","Exited vehicle seat.",2)
+    end
+end})
+
+mkBtn(fp2, {title="Reset Vehicle Position", sub="Move vehicle to your current position", cb=function()
+    if not V.vehicle then showNotif("No Vehicle","Sit in a vehicle first.",3); return end
+    local c = LP.Character
+    local hrp = c and c:FindFirstChild("HumanoidRootPart")
+    if not hrp then showNotif("Error","No HumanoidRootPart.",3); return end
+    local pp = V.vehicle.PrimaryPart
+    if pp then
         pcall(function()
-            local model = InsertService:LoadAsset(tonumber(idText:match("%d+")))
-            if model and model:IsA("Model") then
-                model:PivotTo(LocalPlayer.Character:GetPivot() + Vector3.new(0,5,0))
-                model.Parent = Workspace
-                UI:Notify("Spawner","Custom model loaded",3)
+            V.vehicle:SetPrimaryPartCFrame(
+                CFrame.new(hrp.Position + Vector3.new(0,3,10))
+            )
+        end)
+        showNotif("Repositioned","Vehicle moved near you.",3)
+    end
+end})
+
+mkBtn(fp2, {title="Stabilize Vehicle", sub="Stop all spinning and velocity", cb=function()
+    if not V.seat then showNotif("No Vehicle","Sit in a vehicle first.",3); return end
+    for _, p in ipairs(V.partsCache) do
+        pcall(function()
+            if not p.Anchored then
+                p.AssemblyLinearVelocity  = Vector3.zero
+                p.AssemblyAngularVelocity = Vector3.zero
             end
         end)
-        box:Destroy()
-        confirm:Destroy()
+    end
+    showNotif("Stabilized","All vehicle velocity zeroed.",2)
+end})
+
+mkBtn(fp2, {title="Flip Vehicle Upright", sub="Reset vehicle to upright orientation", cb=function()
+    if not V.vehicle then showNotif("No Vehicle","Sit in a vehicle first.",3); return end
+    local pp = V.vehicle.PrimaryPart
+    if not pp then showNotif("Error","No PrimaryPart on vehicle.",3); return end
+    pcall(function()
+        local pos = pp.Position
+        V.vehicle:SetPrimaryPartCFrame(
+            CFrame.new(pos + Vector3.new(0,2,0))
+        )
+        -- Zero angular velocity
+        for _, p in ipairs(V.partsCache) do
+            pcall(function()
+                p.AssemblyAngularVelocity = Vector3.zero
+            end)
+        end
     end)
-end)
+    showNotif("Flipped Upright","Vehicle orientation reset.",3)
+end})
 
--- PHYSICS TAB
-local abSec = UI:AddSection(physTab, "Anti-Bounce")
-UI:CreateToggle(abSec, "Enabled", true, function() PhysicsData.Physics.AntiBounce.Enabled = true end, function() PhysicsData.Physics.AntiBounce.Enabled = false end)
-UI:CreateToggle(abSec, "Surface Smoothing", true, function() PhysicsData.Physics.AntiBounce.SurfaceSmoothing = true end, function() PhysicsData.Physics.AntiBounce.SurfaceSmoothing = false end)
-UI:CreateSlider(abSec, "Transition Dampening", 0,100, 75, function(v) PhysicsData.Physics.AntiBounce.TransitionDampening = v/100 end)
-UI:CreateSlider(abSec, "Velocity Dampening", 0,100, 92, function(v) PhysicsData.Physics.AntiBounce.VelocityDampening = v/100 end)
-UI:CreateSlider(abSec, "Angular Dampening", 0,100, 85, function(v) PhysicsData.Physics.AntiBounce.AngularDampening = v/100 end)
-UI:CreateSlider(abSec, "Impact Sensitivity", 5,50, 15, function(v) PhysicsData.Physics.AntiBounce.ImpactThreshold = v end)
+-- ═══════════════════════════════════════════════
+-- INIT
+-- ═══════════════════════════════════════════════
+setTab("Physics")
+moveUnder("Physics")
 
-local speedSec = UI:AddSection(physTab, "Speed Control")
-UI:CreateToggle(speedSec, "Enabled", false, function() PhysicsData.Physics.Speed.Enabled = true end, function() PhysicsData.Physics.Speed.Enabled = false end)
-UI:CreateSlider(speedSec, "Accel Rate", 10,500, 150, function(v) PhysicsData.Physics.Speed.Rate = v/100 end)
-UI:CreateSlider(speedSec, "Brake Rate", 10,200, 90, function(v) PhysicsData.Physics.Speed.BrakeRate = v/100 end)
-UI:CreateSlider(speedSec, "Max Speed", 50,400, 250, function(v) PhysicsData.Physics.MaxGroundSpeed = v end)
-
-local flightSec = UI:AddSection(physTab, "Flight")
-UI:CreateToggle(flightSec, "Enabled", false, function() PhysicsData.Physics.Flight.Enabled = true end, function() PhysicsData.Physics.Flight.Enabled = false end)
-UI:CreateSlider(flightSec, "Speed", 10,800, 100, function(v) PhysicsData.Physics.Flight.Speed = v/100 end)
-
-local tractionSec = UI:AddSection(physTab, "Traction")
-UI:CreateToggle(tractionSec, "Enabled", false, function() PhysicsData.Physics.Traction.Enabled = true end, function() PhysicsData.Physics.Traction.Enabled = false end)
-UI:CreateSlider(tractionSec, "Grip", 10,150, 100, function(v) PhysicsData.Physics.Traction.Grip = v/100 end)
-
-local collisionSec = UI:AddSection(physTab, "Collision")
-UI:CreateToggle(collisionSec, "Freeze", false, function() PhysicsData.Physics.Freeze = true end, function() PhysicsData.Physics.Freeze = false end)
-UI:CreateToggle(collisionSec, "Noclip", false, function() PhysicsData.Physics.Noclip = true end, function() PhysicsData.Physics.Noclip = false end)
-
--- SUSPENSION TAB
-local globSusp = UI:AddSection(suspTab, "Global Settings")
-UI:CreateSlider(globSusp, "Stiffness", 0,100, 40, function(v)
-    local val = v*100
-    PhysicsData.Suspension.Data.Stiffness = val
-    PhysicsData.Suspension.Data.FrontStiff = val
-    PhysicsData.Suspension.Data.RearStiff = val
-end)
-UI:CreateSlider(globSusp, "Height", -30,30, 0, function(v) PhysicsData.Suspension.Data.Height = v/10 end)
-UI:CreateSlider(globSusp, "Damping", 0,100, 20, function(v) PhysicsData.Suspension.Data.Damping = v*20 end)
-
-local presetSec = UI:AddSection(suspTab, "Presets")
-UI:CreateButton(presetSec, "Race", function()
-    PhysicsData.Suspension.Data.FrontStiff = 8000
-    PhysicsData.Suspension.Data.RearStiff = 8000
-    PhysicsData.Suspension.Data.Damping = 1500
-    PhysicsData.Suspension.Data.Height = -1.5
-    UI:Notify("Preset","Race tune applied",2)
-end)
-UI:CreateButton(presetSec, "Drift", function()
-    PhysicsData.Suspension.Data.FrontStiff = 6000
-    PhysicsData.Suspension.Data.RearStiff = 3000
-    PhysicsData.Suspension.Data.Damping = 500
-    UI:Notify("Preset","Drift tune applied",2)
-end)
-UI:CreateButton(presetSec, "Off-Road", function()
-    PhysicsData.Suspension.Data.FrontStiff = 2000
-    PhysicsData.Suspension.Data.RearStiff = 2000
-    PhysicsData.Suspension.Data.Damping = 800
-    PhysicsData.Suspension.Data.Height = 1.5
-    UI:Notify("Preset","Off-road tune applied",2)
-end)
-UI:CreateButton(presetSec, "Comfort", function()
-    PhysicsData.Suspension.Data.FrontStiff = 1500
-    PhysicsData.Suspension.Data.RearStiff = 1500
-    PhysicsData.Suspension.Data.Damping = 1800
-    PhysicsData.Suspension.Data.Height = 0.5
-    UI:Notify("Preset","Comfort tune applied",2)
-end)
-
-local advSec = UI:AddSection(suspTab, "Advanced")
-UI:CreateButton(advSec, "Load Springs", function()
-    local veh = PhysicsData.Internal.Vehicle
-    if not veh then UI:Notify("Error","Sit in a vehicle first",3) return end
-    VehicleManager.CacheSuspension(veh)
-    UI:Notify("Springs","Loaded "..PhysicsData.Suspension.SpringCount.." springs",3)
-end)
-UI:CreateButton(advSec, "Reset ALL Springs", function()
-    for spring, orig in pairs(PhysicsData.Suspension.OriginalValues) do
-        pcall(function()
-            spring.Stiffness = orig.Stiffness
-            spring.Damping = orig.Damping
-            spring.FreeLength = orig.FreeLength
-        end)
-    end
-    UI:Notify("Springs","All springs reset",3)
-end)
-
--- FUN TAB
-local paintSec = UI:AddSection(funTab, "Client Paint")
-UI:CreateColorpicker(paintSec, "Paint Color", Color3.new(1,0,0), function(col) PhysicsData.Fun.Paint.Color = col end)
-UI:CreateButton(paintSec, "Apply Paint", function()
-    applyColorToVehicle(PhysicsData.Fun.Paint.Color)
-    UI:Notify("Paint","Color applied",3)
-end)
-local gravSec = UI:AddSection(funTab, "Gravity")
-UI:CreateDropdown(gravSec, "Mode", {"Normal","Moon","Heavy","Zero","Reverse"}, "Normal", function(m) PhysicsData.Fun.Gravity.Mode = m end)
-UI:CreateToggle(gravSec, "Enabled", false, function() 
-    PhysicsData.Fun.Gravity.Enabled = true
-    setGravityMode(true, PhysicsData.Fun.Gravity.Mode)
-end, function() 
-    PhysicsData.Fun.Gravity.Enabled = false
-    setGravityMode(false, PhysicsData.Fun.Gravity.Mode)
-end)
-
--- VISUALS TAB
-local fbSec = UI:AddSection(visTab, "Fullbright")
-UI:CreateToggle(fbSec, "Enabled", false, function()
-    PhysicsData.Visuals.Fullbright.Enabled = true
-    Lighting.Brightness = PhysicsData.Visuals.Fullbright.Settings.Brightness
-    Lighting.Ambient = PhysicsData.Visuals.Fullbright.Settings.Ambient
-    Lighting.FogEnd = PhysicsData.Visuals.Fullbright.Settings.FogEnd
-end, function()
-    PhysicsData.Visuals.Fullbright.Enabled = false
-    Lighting.Brightness = 1
-    Lighting.Ambient = Color3.new(0,0,0)
-    Lighting.FogEnd = 500
-end)
-UI:CreateSlider(fbSec, "Brightness", 1,10, 2, function(v)
-    PhysicsData.Visuals.Fullbright.Settings.Brightness = v
-    if PhysicsData.Visuals.Fullbright.Enabled then Lighting.Brightness = v end
-end)
-
-local hlSec = UI:AddSection(visTab, "Headlights")
-UI:CreateToggle(hlSec, "Always On", true, function() PhysicsData.Visuals.Headlights.Enabled = true end, function() PhysicsData.Visuals.Headlights.Enabled = false end)
-
--- ===================== Heartbeat Connections =====================
-local heartbeatConn = RunService.Heartbeat:Connect(function(dt)
-    if not PhysicsData.System.Active then return end
-    VehicleManager.GetVehicle()
-    local seat = PhysicsData.Internal.Seat
-    local vehicle = PhysicsData.Internal.Vehicle
-    if seat and vehicle then
-        VelocityHandler.Process(seat, vehicle)
-        PhysicsProcessor.ProcessSpeed(seat, dt)
-        PhysicsProcessor.ProcessFlight(vehicle, seat, dt)
-        PhysicsProcessor.ProcessTraction(vehicle, seat)
-        PhysicsProcessor.ProcessCollision(vehicle)
-    end
-end)
-table.insert(PhysicsData.System.Connections, heartbeatConn)
-
-local steppedConn = RunService.Stepped:Connect(function()
-    if PhysicsData.Internal.Vehicle and PhysicsData.System.Active then
-        PhysicsProcessor.ProcessSuspension(PhysicsData.Internal.Vehicle)
-    end
-end)
-table.insert(PhysicsData.System.Connections, steppedConn)
-
--- Initial notification
-UI:Notify("System Ready", "Set Car etc Anonymous9x loaded. Anti-bounce active.", 4)
+showNotif("Anonymous9x Vehicle FE", "v1.0  |  Sit in a vehicle to begin", 4)
