@@ -1,26 +1,20 @@
 --[[
     Set Car etc Anonymous9x
     Universal Vehicle Controller + Anti-Bounce Physics
-    UI by Anonymous9x
+    UI Style: Indo Hangout inspired
     Features:
-        - Vehicle Spawner (custom model, preset)
+        - Vehicle Spawner (preset + custom model)
         - Full Physics Control (anti‑bounce, speed, flight, traction, freeze, noclip)
         - Suspension Tuning (per‑spring, presets)
         - Fun Mods (paint client‑side, gravity modes)
         - Visuals (fullbright, headlights)
-    UI Style:
-        - Locked center, non‑draggable
-        - Minimize to icon (top‑right corner)
-        - Border list: white & purple
-        - Background: black (#000000), text: full white
-        - No emoji/emote
-    Works on all maps (FE compatible)
+    Works on any map (FE compatible)
     Length: 2000+ lines
 ]]
 
 -- ===================== Services =====================
-local setmetatable, rawset, getfenv, type, pairs, ipairs, table, math, string, tick, wait, task =
-      setmetatable, rawset, getfenv, type, pairs, ipairs, table, math, string, tick, wait, task
+local setmetatable, rawset, type, pairs, ipairs, table, math, string, tick, wait, task, pcall, error =
+      setmetatable, rawset, type, pairs, ipairs, table, math, string, tick, wait, task, pcall, error
 
 local Services = setmetatable({}, {
     __index = function(self, name)
@@ -40,10 +34,13 @@ local CoreGui = Services.CoreGui
 local Debris = Services.Debris
 local Players = Services.Players
 local InsertService = Services.InsertService
+local ReplicatedStorage = Services.ReplicatedStorage
+local VirtualInputManager = Services.VirtualInputManager
 
 local LocalPlayer = Players.LocalPlayer
+local Cam = Workspace.CurrentCamera
 
--- ===================== Anti-Bounce System (from original leak) =====================
+-- ===================== Vehicle Physics Data =====================
 local PhysicsData = {
     System = {
         Active = true,
@@ -128,7 +125,7 @@ local PhysicsData = {
     }
 }
 
--- Helper functions (from original)
+-- ===================== Helper Functions (from original) =====================
 local function lerp(a, b, t)
     return a + (b - a) * t
 end
@@ -245,7 +242,6 @@ VelocityHandler.ApplyStabilization = function(seat, vehicle)
         local angDamp = PhysicsData.Physics.AntiBounce.AngularDampening
         seat.AssemblyLinearVelocity = seat.AssemblyLinearVelocity * (velDamp + (1-velDamp)*t)
         seat.AssemblyAngularVelocity = seat.AssemblyAngularVelocity * (angDamp + (1-angDamp)*t)
-        -- Upward correction
         local up = vehicle.PrimaryPart.CFrame.UpVector
         local worldUp = Vector3.new(0,1,0)
         local angle = math.acos(math.clamp(up:Dot(worldUp), -1, 1))
@@ -267,7 +263,7 @@ VelocityHandler.Process = function(seat, vehicle)
     VelocityHandler.ApplyStabilization(seat, vehicle)
 end
 
--- Vehicle cache and suspension
+-- Vehicle cache
 local VehicleManager = {}
 VehicleManager.CacheSuspension = function(vehicle)
     PhysicsData.Suspension.Cache = {}
@@ -334,7 +330,6 @@ VehicleManager.GetVehicle = function()
             PhysicsData.Internal.VehicleModelName = vehicle.Name
             if tick() - PhysicsData.Internal.LastNotificationTime > 3 then
                 PhysicsData.Internal.LastNotificationTime = tick()
-                -- notification handled by UI later
             end
         end
     else
@@ -420,9 +415,6 @@ PhysicsProcessor.ProcessSuspension = function(vehicle)
                 isFront = cf:PointToObjectSpace(spring.Attachment0.WorldPosition).Z > 0
             end
             local stiff = isFront and data.FrontStiff or data.RearStiff
-            if data.ARB then
-                -- simulate anti-roll bar by stiffening during turning
-            end
             spring.Stiffness = math.clamp(stiff, 100, 50000)
             spring.Damping = math.clamp(data.Damping, 10, 5000)
             spring.FreeLength = math.clamp(2 + data.Height + data.Preload, data.MinLength, data.MaxLength)
@@ -448,7 +440,7 @@ PhysicsProcessor.ProcessCollision = function(vehicle)
     end
 end
 
--- Fun functions
+-- ===================== Fun Functions =====================
 local function applyColorToVehicle(color)
     local vehicle = PhysicsData.Internal.Vehicle
     if not vehicle then return end
@@ -476,7 +468,6 @@ local function applyColorToVehicle(color)
             end
         end
     end
-    -- notification will be sent via UI
 end
 
 local function setGravityMode(enabled, mode)
@@ -500,198 +491,339 @@ local function setGravityMode(enabled, mode)
         attach.Parent = seat
         force.Attachment0 = attach
         local mass = seat:GetMass()
-        if mode == "Moon" then
-            force.Force = Vector3.new(0, Workspace.Gravity * mass * 0.2, 0)
-        elseif mode == "Heavy" then
-            force.Force = Vector3.new(0, -Workspace.Gravity * mass, 0)
-        elseif mode == "Zero" then
-            force.Force = Vector3.new(0, Workspace.Gravity * mass, 0)
-        elseif mode == "Reverse" then
-            force.Force = Vector3.new(0, Workspace.Gravity * mass * 1.5, 0)
-        end
+        if mode == "Moon" then force.Force = Vector3.new(0, Workspace.Gravity * mass * 0.2, 0)
+        elseif mode == "Heavy" then force.Force = Vector3.new(0, -Workspace.Gravity * mass, 0)
+        elseif mode == "Zero" then force.Force = Vector3.new(0, Workspace.Gravity * mass, 0)
+        elseif mode == "Reverse" then force.Force = Vector3.new(0, Workspace.Gravity * mass * 1.5, 0)
+        else force.Force = Vector3.new(0,0,0) end
         PhysicsData.Fun.Gravity.ForceObj = force
     end
 end
 
--- ===================== UI Framework =====================
+-- ===================== UI Framework (Indo Hangout style) =====================
 local UI = {}
-UI.Objects = {}
 UI.Minimized = false
-UI.IconButton = nil
-UI.MainFrame = nil
-UI.Notifications = {}
 
 -- Colors
-local BG = Color3.new(0,0,0)
-local TextCol = Color3.new(1,1,1)
-local Purple = Color3.new(0.5, 0, 0.5)
-local White = Color3.new(1,1,1)
-local ListBorder = {White, Purple} -- used as UIStroke gradient
+local C = {
+    bg = Color3.fromRGB(7,7,9),
+    hdr = Color3.fromRGB(5,5,7),
+    card = Color3.fromRGB(15,15,19),
+    cardH = Color3.fromRGB(21,21,27),
+    sep = Color3.fromRGB(26,26,34),
+    border = Color3.fromRGB(40,40,56),
+    white = Color3.new(1,1,1),
+    pri = Color3.fromRGB(218,218,226),
+    sec = Color3.fromRGB(110,110,130),
+    dim = Color3.fromRGB(60,60,80),
+    purple = Color3.fromRGB(170,110,255),
+    purpleD = Color3.fromRGB(120,70,210),
+    safe = Color3.fromRGB(80,185,90),
+    danger = Color3.fromRGB(210,55,55),
+}
 
--- Create base ScreenGui
-local Gui = Instance.new("ScreenGui")
-Gui.Name = "SetCarUI"
-Gui.Parent = CoreGui
-Gui.IgnoreGuiInset = true
+local gui = Instance.new("ScreenGui")
+gui.Name = "SetCarUI"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.IgnoreGuiInset = true
+pcall(function() gui.Parent = CoreGui end)
+if not gui.Parent then gui.Parent = LocalPlayer.PlayerGui end
 
--- Minimize icon (top-right)
-local Icon = Instance.new("ImageButton")
-Icon.Name = "MinimizedIcon"
-Icon.Parent = Gui
-Icon.Size = UDim2.new(0, 40, 0, 40)
-Icon.Position = UDim2.new(1, -50, 0, 10)
-Icon.AnchorPoint = Vector2.new(1,0)
-Icon.BackgroundColor3 = BG
-Icon.BorderSizePixel = 0
-Icon.Visible = false
--- Placeholder image (replace with your logo asset ID)
-Icon.Image = "rbxassetid://0" -- set your logo ID here
-Icon.ImageColor3 = White
-UI.IconButton = Icon
+-- Notification system
+local notifQueue = {}
+local notifActive = false
+function UI:Notify(title, body, duration)
+    table.insert(notifQueue, {title=title, body=body, dur=duration or 3.5})
+    if notifActive then return end
+    notifActive = true
+    task.spawn(function()
+        while #notifQueue > 0 do
+            local n = table.remove(notifQueue, 1)
+            local nf = Instance.new("Frame")
+            nf.Size = UDim2.fromOffset(220, 54)
+            nf.Position = UDim2.new(1, 10, 1, -70)
+            nf.BackgroundColor3 = C.bg
+            nf.BackgroundTransparency = 0
+            nf.BorderSizePixel = 0
+            nf.ZIndex = 800
+            nf.Parent = gui
+            Instance.new("UICorner", nf).CornerRadius = UDim.new(0,7)
+            local nfS = Instance.new("UIStroke", nf)
+            nfS.Color = C.purple
+            nfS.Thickness = 1.2
+            local nt = Instance.new("TextLabel")
+            nt.Size = UDim2.new(1,-12,0,18)
+            nt.Position = UDim2.fromOffset(8,5)
+            nt.BackgroundTransparency = 1
+            nt.Text = n.title
+            nt.Font = Enum.Font.GothamBold
+            nt.TextSize = 10
+            nt.TextColor3 = C.white
+            nt.TextXAlignment = Enum.TextXAlignment.Left
+            nt.ZIndex = 801
+            nt.Parent = nf
+            local nb = Instance.new("TextLabel")
+            nb.Size = UDim2.new(1,-12,0,22)
+            nb.Position = UDim2.fromOffset(8,24)
+            nb.BackgroundTransparency = 1
+            nb.Text = n.body
+            nb.Font = Enum.Font.Gotham
+            nb.TextSize = 8
+            nb.TextColor3 = C.sec
+            nb.TextXAlignment = Enum.TextXAlignment.Left
+            nb.TextWrapped = true
+            nb.ZIndex = 801
+            nb.Parent = nf
+            TweenService:Create(nf, TweenInfo.new(0.20, Enum.EasingStyle.Quad), {Position = UDim2.new(1,-228,1,-70)}):Play()
+            task.wait(n.dur)
+            TweenService:Create(nf, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {Position = UDim2.new(1,10,1,-70)}):Play()
+            task.wait(0.20)
+            pcall(function() nf:Destroy() end)
+            task.wait(0.08)
+        end
+        notifActive = false
+    end)
+end
 
--- Main window frame
-local Main = Instance.new("Frame")
-Main.Name = "MainFrame"
-Main.Parent = Gui
-Main.Size = UDim2.new(0, 600, 0, 450)
-Main.Position = UDim2.new(0.5, -300, 0.5, -225)
-Main.BackgroundColor3 = BG
-Main.BorderSizePixel = 0
-Main.ClipsDescendants = true
-UI.MainFrame = Main
+-- Main window
+local WIDTH, HEIGHT = 260, 380
+local win = Instance.new("Frame")
+win.Name = "Win"
+win.Size = UDim2.fromOffset(WIDTH, HEIGHT)
+win.Position = UDim2.fromScale(0.5, 0.5)
+win.AnchorPoint = Vector2.new(0.5, 0.5)
+win.BackgroundColor3 = C.bg
+win.BackgroundTransparency = 0
+win.BorderSizePixel = 0
+win.ClipsDescendants = true
+win.ZIndex = 10
+win.Parent = gui
+Instance.new("UICorner", win).CornerRadius = UDim.new(0,8)
+local winStroke = Instance.new("UIStroke", win)
+winStroke.Thickness = 1.3
+winStroke.Color = C.border
+task.spawn(function()
+    local t = 0
+    while win.Parent do
+        t = t + task.wait(0.04)
+        local s = (math.sin(t * 2.4) + 1) / 2
+        winStroke.Color = Color3.new(0.86 + s * 0.14, 0.76 + s * 0.05, 0.88 + s * 0.52)
+        winStroke.Thickness = 1.2 + s * 0.6
+    end
+end)
 
--- Border stroke for main frame (white-purple gradient effect)
-local borderStroke = Instance.new("UIStroke")
-borderStroke.Color = White
-borderStroke.Thickness = 2
-borderStroke.Parent = Main
+-- Header
+local hdr = Instance.new("Frame")
+hdr.Size = UDim2.new(1,0,0,32)
+hdr.BackgroundColor3 = C.hdr
+hdr.BorderSizePixel = 0
+hdr.ZIndex = 12
+hdr.Parent = win
+Instance.new("UICorner", hdr).CornerRadius = UDim.new(0,8)
+local hPatch = Instance.new("Frame")
+hPatch.Size = UDim2.new(1,0,0,8)
+hPatch.Position = UDim2.new(0,0,1,-8)
+hPatch.BackgroundColor3 = C.hdr
+hPatch.BorderSizePixel = 0
+hPatch.ZIndex = 11
+hPatch.Parent = hdr
+local hTitle = Instance.new("TextLabel")
+hTitle.Size = UDim2.new(1,-52,1,0)
+hTitle.Position = UDim2.fromOffset(9,0)
+hTitle.BackgroundTransparency = 1
+hTitle.Text = "Set Car etc Anonymous9x"
+hTitle.Font = Enum.Font.GothamBold
+hTitle.TextSize = 10
+hTitle.TextColor3 = C.pri
+hTitle.TextXAlignment = Enum.TextXAlignment.Left
+hTitle.TextTruncate = Enum.TextTruncate.AtEnd
+hTitle.ZIndex = 13
+hTitle.Parent = hdr
 
--- Title bar
-local TitleBar = Instance.new("Frame")
-TitleBar.Name = "TitleBar"
-TitleBar.Parent = Main
-TitleBar.Size = UDim2.new(1, 0, 0, 36)
-TitleBar.BackgroundColor3 = Color3.new(0.1,0.1,0.1)
-TitleBar.BorderSizePixel = 0
+local function makeCtrl(xOff, sym)
+    local b = Instance.new("ImageButton")
+    b.Size = UDim2.fromOffset(20,18)
+    b.Position = UDim2.new(1,xOff,0.5,-9)
+    b.BackgroundColor3 = C.card
+    b.BackgroundTransparency = 0
+    b.BorderSizePixel = 0
+    b.Image = ""
+    b.AutoButtonColor = false
+    b.ZIndex = 14
+    b.Parent = hdr
+    Instance.new("UICorner",b).CornerRadius = UDim.new(0,4)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.fromScale(1,1)
+    l.BackgroundTransparency = 1
+    l.Text = sym
+    l.Font = Enum.Font.GothamBold
+    l.TextSize = 12
+    l.TextColor3 = C.sec
+    l.ZIndex = 15
+    l.Parent = b
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b,TweenInfo.new(0.10),{BackgroundColor3=C.cardH}):Play()
+        l.TextColor3 = C.white
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play()
+        l.TextColor3 = C.sec
+    end)
+    return b, l
+end
 
-local TitleText = Instance.new("TextLabel")
-TitleText.Name = "Title"
-TitleText.Parent = TitleBar
-TitleText.Size = UDim2.new(1, -80, 1, 0)
-TitleText.Position = UDim2.new(0, 10, 0, 0)
-TitleText.BackgroundTransparency = 1
-TitleText.Font = Enum.Font.GothamBold
-TitleText.Text = "Set Car etc Anonymous9x"
-TitleText.TextColor3 = TextCol
-TitleText.TextSize = 18
-TitleText.TextXAlignment = Enum.TextXAlignment.Left
+local minBtn, minL = makeCtrl(-44, "-")
+local closeBtn, _ = makeCtrl(-22, "x")
 
--- Close button
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Name = "Close"
-CloseBtn.Parent = TitleBar
-CloseBtn.Size = UDim2.new(0, 28, 0, 28)
-CloseBtn.Position = UDim2.new(1, -32, 0, 4)
-CloseBtn.BackgroundColor3 = Color3.new(0.2,0.2,0.2)
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = TextCol
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.TextSize = 16
-CloseBtn.BorderSizePixel = 0
-local closeCorner = Instance.new("UICorner", CloseBtn)
-closeCorner.CornerRadius = UDim.new(0, 6)
+-- Minimize icon
+local floatF = Instance.new("Frame")
+floatF.Name = "FloatIcon"
+floatF.Size = UDim2.fromOffset(46,46)
+floatF.BackgroundColor3 = C.hdr
+floatF.BackgroundTransparency = 0
+floatF.BorderSizePixel = 0
+floatF.Visible = false
+floatF.ZIndex = 500
+floatF.Parent = gui
+Instance.new("UICorner",floatF).CornerRadius = UDim.new(0,10)
+local fiS = Instance.new("UIStroke",floatF)
+fiS.Color = C.purple
+fiS.Thickness = 1.4
+task.spawn(function()
+    local t = 0
+    while gui.Parent do
+        t = t + task.wait(0.05)
+        local s = (math.sin(t*3)+1)/2
+        fiS.Color = Color3.new(0.8+s*0.2, 0.5+s*0.1, 1)
+        fiS.Thickness = 1.2+s*0.6
+    end
+end)
+local fiImg = Instance.new("ImageLabel")
+fiImg.Size = UDim2.fromOffset(40,40)
+fiImg.Position = UDim2.fromOffset(3,3)
+fiImg.BackgroundTransparency = 1
+fiImg.Image = "rbxassetid://97269958324726"
+fiImg.ScaleType = Enum.ScaleType.Crop
+fiImg.ZIndex = 501
+fiImg.Parent = floatF
+Instance.new("UICorner",fiImg).CornerRadius = UDim.new(0,8)
+local function anchorFloat()
+    local vp = Cam.ViewportSize
+    floatF.Position = UDim2.fromOffset(vp.X-56, math.floor(vp.Y/2)-23)
+end
+anchorFloat()
+local fiBtn = Instance.new("ImageButton")
+fiBtn.Size = UDim2.fromScale(1,1)
+fiBtn.BackgroundTransparency = 1
+fiBtn.Image = ""
+fiBtn.AutoButtonColor = false
+fiBtn.ZIndex = 502
+fiBtn.Parent = floatF
+fiBtn.MouseButton1Click:Connect(function()
+    floatF.Visible = false
+    win.Visible = true
+    minL.Text = "-"
+end)
+fiBtn.MouseEnter:Connect(function()
+    TweenService:Create(floatF,TweenInfo.new(0.12),{BackgroundColor3=C.card}):Play()
+end)
+fiBtn.MouseLeave:Connect(function()
+    TweenService:Create(floatF,TweenInfo.new(0.12),{BackgroundColor3=C.hdr}):Play()
+end)
+minBtn.MouseButton1Click:Connect(function()
+    win.Visible = false
+    anchorFloat()
+    floatF.Visible = true
+    minL.Text = "+"
+end)
+closeBtn.MouseButton1Click:Connect(function()
+    -- Cleanup
+    for _, conn in ipairs(PhysicsData.System.Connections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    PhysicsData.System.Connections = {}
+    pcall(function() gui:Destroy() end)
+end)
 
--- Minimize button
-local MinBtn = Instance.new("TextButton")
-MinBtn.Name = "Minimize"
-MinBtn.Parent = TitleBar
-MinBtn.Size = UDim2.new(0, 28, 0, 28)
-MinBtn.Position = UDim2.new(1, -64, 0, 4)
-MinBtn.BackgroundColor3 = Color3.new(0.2,0.2,0.2)
-MinBtn.Text = "_"
-MinBtn.TextColor3 = TextCol
-MinBtn.Font = Enum.Font.GothamBold
-MinBtn.TextSize = 16
-MinBtn.BorderSizePixel = 0
-local minCorner = Instance.new("UICorner", MinBtn)
-minCorner.CornerRadius = UDim.new(0, 6)
+-- Tab bar and content
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1,0,0,26)
+tabBar.Position = UDim2.new(0,0,0,32)
+tabBar.BackgroundColor3 = C.bg
+tabBar.BorderSizePixel = 0
+tabBar.ZIndex = 11
+tabBar.Parent = win
+local tabScroll = Instance.new("ScrollingFrame")
+tabScroll.Size = UDim2.new(1,0,1,0)
+tabScroll.BackgroundTransparency = 1
+tabScroll.ScrollBarThickness = 2
+tabScroll.ScrollBarImageColor3 = C.purple
+tabScroll.ScrollingDirection = Enum.ScrollingDirection.X
+tabScroll.CanvasSize = UDim2.new(2,0,0,0)
+tabScroll.BorderSizePixel = 0
+tabScroll.ZIndex = 12
+tabScroll.Parent = tabBar
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.Padding = UDim.new(0,2)
+tabLayout.Parent = tabScroll
 
--- Tab bar (scrollable)
-local TabBarFrame = Instance.new("Frame")
-TabBarFrame.Name = "TabBar"
-TabBarFrame.Parent = Main
-TabBarFrame.Size = UDim2.new(1, 0, 0, 30)
-TabBarFrame.Position = UDim2.new(0, 0, 0, 36)
-TabBarFrame.BackgroundColor3 = Color3.new(0.07,0.07,0.07)
-TabBarFrame.BorderSizePixel = 0
-
-local TabScrolling = Instance.new("ScrollingFrame")
-TabScrolling.Name = "TabScrolling"
-TabScrolling.Parent = TabBarFrame
-TabScrolling.Size = UDim2.new(1, 0, 1, 0)
-TabScrolling.CanvasSize = UDim2.new(2, 0, 0, 0)
-TabScrolling.ScrollBarThickness = 2
-TabScrolling.ScrollingDirection = Enum.ScrollingDirection.X
-TabScrolling.BackgroundTransparency = 1
-TabScrolling.BorderSizePixel = 0
-
-local TabListLayout = Instance.new("UIListLayout", TabScrolling)
-TabListLayout.FillDirection = Enum.FillDirection.Horizontal
-TabListLayout.Padding = UDim.new(0, 2)
-
--- Content area
-local ContentFrame = Instance.new("ScrollingFrame")
-ContentFrame.Name = "Content"
-ContentFrame.Parent = Main
-ContentFrame.Size = UDim2.new(1, -6, 1, -66)
-ContentFrame.Position = UDim2.new(0, 3, 0, 68)
-ContentFrame.BackgroundColor3 = BG
-ContentFrame.BorderSizePixel = 0
-ContentFrame.ScrollBarThickness = 4
-ContentFrame.CanvasSize = UDim2.new(0, 0, 1, 0)
-ContentFrame.ScrollingDirection = Enum.ScrollingDirection.Y
-ContentFrame.ClipsDescendants = true
-
-local ContentList = Instance.new("UIListLayout", ContentFrame)
-ContentList.FillDirection = Enum.FillDirection.Vertical
-ContentList.Padding = UDim.new(0, 10)
-ContentList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-ContentList.SortOrder = Enum.SortOrder.LayoutOrder
-
--- Notifications container (top of content)
-local NotifFrame = Instance.new("Frame")
-NotifFrame.Name = "Notifications"
-NotifFrame.Size = UDim2.new(1, -20, 0, 0)
-NotifFrame.BackgroundTransparency = 1
-NotifFrame.Parent = ContentFrame
+local content = Instance.new("ScrollingFrame")
+content.Size = UDim2.new(1,0,1,-58)
+content.Position = UDim2.new(0,0,0,58)
+content.BackgroundColor3 = C.bg
+content.BorderSizePixel = 0
+content.ScrollBarThickness = 3
+content.ScrollBarImageColor3 = C.purple
+content.ScrollingDirection = Enum.ScrollingDirection.Y
+content.CanvasSize = UDim2.fromOffset(0,0)
+content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+content.ZIndex = 11
+content.Parent = win
+local sLL = Instance.new("UIListLayout")
+sLL.SortOrder = Enum.SortOrder.LayoutOrder
+sLL.Padding = UDim.new(0,4)
+sLL.Parent = content
+local sPad = Instance.new("UIPadding")
+sPad.PaddingLeft = UDim.new(0,7)
+sPad.PaddingRight = UDim.new(0,7)
+sPad.PaddingTop = UDim.new(0,7)
+sPad.PaddingBottom = UDim.new(0,10)
+sPad.Parent = content
 
 -- Tab management
 UI.Tabs = {}
 UI.CurrentTab = nil
+local _order = 0
+local function ord() _order = _order + 1; return _order end
 
 function UI:AddTab(name)
     local tabBtn = Instance.new("TextButton")
     tabBtn.Name = name
-    tabBtn.Size = UDim2.new(0, 100, 0, 28)
-    tabBtn.BackgroundColor3 = Color3.new(0.1,0.1,0.1)
+    tabBtn.Size = UDim2.new(0, 80, 0, 22)
+    tabBtn.BackgroundColor3 = C.card
     tabBtn.Text = name
-    tabBtn.TextColor3 = TextCol
-    tabBtn.Font = Enum.Font.Gotham
-    tabBtn.TextSize = 14
+    tabBtn.Font = Enum.Font.GothamBold
+    tabBtn.TextSize = 9
+    tabBtn.TextColor3 = C.sec
     tabBtn.BorderSizePixel = 0
-    tabBtn.Parent = TabScrolling
+    tabBtn.ZIndex = 12
+    tabBtn.Parent = tabScroll
+    Instance.new("UICorner",tabBtn).CornerRadius = UDim.new(0,4)
 
     local tabFrame = Instance.new("Frame")
     tabFrame.Name = "Tab_"..name
-    tabFrame.Size = UDim2.new(1, -20, 0, 100)
+    tabFrame.Size = UDim2.new(1,0,0,100)
     tabFrame.BackgroundTransparency = 1
-    tabFrame.Parent = ContentFrame
+    tabFrame.BorderSizePixel = 0
     tabFrame.Visible = false
-
-    local tabLayout = Instance.new("UIListLayout", tabFrame)
+    tabFrame.Parent = content
+    local tabLayout = Instance.new("UIListLayout")
     tabLayout.FillDirection = Enum.FillDirection.Vertical
-    tabLayout.Padding = UDim.new(0, 8)
-    tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    tabLayout.Padding = UDim.new(0,6)
+    tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    tabLayout.Parent = tabFrame
 
     local tabData = {
         Button = tabBtn,
@@ -714,143 +846,116 @@ function UI:SwitchTab(name)
     for _, tab in ipairs(UI.Tabs) do
         if tab.Button.Name == name then
             tab.Frame.Visible = true
-            tab.Button.BackgroundColor3 = Purple
+            tab.Button.BackgroundColor3 = C.purple
+            tab.Button.TextColor3 = C.white
             UI.CurrentTab = tab
         else
             tab.Frame.Visible = false
-            tab.Button.BackgroundColor3 = Color3.new(0.1,0.1,0.1)
+            tab.Button.BackgroundColor3 = C.card
+            tab.Button.TextColor3 = C.sec
         end
     end
-    -- resize canvas to fit content
-    ContentFrame.CanvasSize = UDim2.new(0,0,0, UI.CurrentTab.Frame.AbsoluteSize.Y + 20)
 end
 
 function UI:AddSection(tabData, sectionName)
     local section = Instance.new("Frame")
-    section.Name = sectionName
-    section.Size = UDim2.new(1, -10, 0, 60) -- will be expanded
-    section.BackgroundColor3 = Color3.new(0.05,0.05,0.05)
+    section.Size = UDim2.new(1,0,0,18)
+    section.BackgroundTransparency = 1
     section.BorderSizePixel = 0
+    section.LayoutOrder = ord()
     section.Parent = tabData.Frame
 
-    local sectionStroke = Instance.new("UIStroke")
-    sectionStroke.Color = White
-    sectionStroke.Thickness = 1
-    sectionStroke.Parent = section
-    -- second stroke for purple? We'll use a gradient effect by placing another frame? Simpler: just white stroke.
-
-    local sectionTitle = Instance.new("TextLabel")
-    sectionTitle.Name = "Title"
-    sectionTitle.Size = UDim2.new(1, 0, 0, 22)
-    sectionTitle.Position = UDim2.new(0, 0, 0, 2)
-    sectionTitle.BackgroundTransparency = 1
-    sectionTitle.Text = sectionName
-    sectionTitle.TextColor3 = TextCol
-    sectionTitle.Font = Enum.Font.GothamBold
-    sectionTitle.TextSize = 15
-    sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
-    sectionTitle.Parent = section
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.fromScale(1,1)
+    label.BackgroundTransparency = 1
+    label.Text = sectionName:upper()
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 7
+    label.TextColor3 = C.purple
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.ZIndex = 13
+    label.Parent = section
+    local line = Instance.new("Frame")
+    line.Size = UDim2.new(1,0,0,1)
+    line.Position = UDim2.new(0,0,1,-1)
+    line.BackgroundColor3 = C.sep
+    line.BorderSizePixel = 0
+    line.ZIndex = 13
+    line.Parent = section
 
     local elementsContainer = Instance.new("Frame")
-    elementsContainer.Name = "Elements"
-    elementsContainer.Size = UDim2.new(1, 0, 0, 0)
-    elementsContainer.Position = UDim2.new(0, 0, 0, 26)
+    elementsContainer.Size = UDim2.new(1,0,0,0)
     elementsContainer.BackgroundTransparency = 1
-    elementsContainer.Parent = section
-
-    local elementsLayout = Instance.new("UIListLayout", elementsContainer)
-    elementsLayout.FillDirection = Enum.FillDirection.Vertical
-    elementsLayout.Padding = UDim.new(0, 4)
+    elementsContainer.LayoutOrder = ord()
+    elementsContainer.Parent = tabData.Frame
+    local elLayout = Instance.new("UIListLayout")
+    elLayout.FillDirection = Enum.FillDirection.Vertical
+    elLayout.Padding = UDim.new(0,4)
+    elLayout.Parent = elementsContainer
 
     local sectionData = {
         Frame = section,
         ElementsContainer = elementsContainer,
         Elements = {}
     }
-
     table.insert(tabData.Sections, sectionData)
     return sectionData
 end
 
--- Element builders
-function UI:CreateToggle(sectionData, name, default, callback)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 30)
-    frame.BackgroundTransparency = 1
-    frame.Parent = sectionData.ElementsContainer
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.7, 0, 1, 0)
-    label.Position = UDim2.new(0, 5, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = name
-    label.TextColor3 = TextCol
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = frame
-
-    local toggle = Instance.new("TextButton")
-    toggle.Size = UDim2.new(0, 40, 0, 24)
-    toggle.Position = UDim2.new(1, -45, 0, 3)
-    toggle.BackgroundColor3 = default and Purple or Color3.new(0.2,0.2,0.2)
-    toggle.Text = ""
-    toggle.BorderSizePixel = 0
-    toggle.Parent = frame
-    local toggleCorner = Instance.new("UICorner", toggle)
-    toggleCorner.CornerRadius = UDim.new(0, 12)
-
-    local state = default
-    toggle.MouseButton1Click:Connect(function()
-        state = not state
-        toggle.BackgroundColor3 = state and Purple or Color3.new(0.2,0.2,0.2)
-        callback(state)
-    end)
-    callback(default)
-    return toggle
-end
-
+-- Custom slider
 function UI:CreateSlider(sectionData, name, min, max, default, callback)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 45)
-    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1,0,0,45)
+    frame.BackgroundColor3 = C.card
+    frame.BackgroundTransparency = 0
+    frame.BorderSizePixel = 0
     frame.Parent = sectionData.ElementsContainer
+    Instance.new("UICorner",frame).CornerRadius = UDim.new(0,6)
+    local bS = Instance.new("UIStroke",frame)
+    bS.Color = C.border
+    bS.Thickness = 0.8
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 16)
+    label.Size = UDim2.new(1,-10,0,16)
+    label.Position = UDim2.fromOffset(8,4)
     label.BackgroundTransparency = 1
     label.Text = name .. " (" .. default .. ")"
-    label.TextColor3 = TextCol
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 13
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 9
+    label.TextColor3 = C.pri
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = frame
 
-    local sliderFrame = Instance.new("Frame")
-    sliderFrame.Size = UDim2.new(1, -10, 0, 20)
-    sliderFrame.Position = UDim2.new(0, 5, 0, 20)
-    sliderFrame.BackgroundColor3 = Color3.new(0.2,0.2,0.2)
-    sliderFrame.BorderSizePixel = 0
-    sliderFrame.Parent = frame
+    local track = Instance.new("Frame")
+    track.Size = UDim2.new(1,-16,0,10)
+    track.Position = UDim2.fromOffset(8,26)
+    track.BackgroundColor3 = C.dim
+    track.BorderSizePixel = 0
+    track.Parent = frame
+    Instance.new("UICorner",track).CornerRadius = UDim.new(1,0)
 
     local fill = Instance.new("Frame")
-    fill.Size = UDim2.new((default-min)/(max-min), 0, 1, 0)
-    fill.BackgroundColor3 = Purple
+    fill.Size = UDim2.fromScale((default-min)/(max-min), 1)
+    fill.BackgroundColor3 = C.purple
     fill.BorderSizePixel = 0
-    fill.Parent = sliderFrame
+    fill.Parent = track
+    Instance.new("UICorner",fill).CornerRadius = UDim.new(1,0)
 
-    local grab = Instance.new("TextButton")
-    grab.Size = UDim2.new(0, 14, 0, 20)
-    grab.BackgroundColor3 = White
-    grab.Text = ""
-    grab.BorderSizePixel = 0
-    grab.Parent = sliderFrame
-    local grabPos = (default-min)/(max-min)
-    grab.Position = UDim2.new(grabPos, -7, 0, 0)
+    local knob = Instance.new("ImageButton")
+    knob.Size = UDim2.fromOffset(16,16)
+    knob.Position = UDim2.fromScale((default-min)/(max-min), -8)
+    knob.BackgroundColor3 = C.white
+    knob.BorderSizePixel = 0
+    knob.Image = ""
+    knob.ZIndex = 14
+    knob.Parent = track
+    Instance.new("UICorner",knob).CornerRadius = UDim.new(1,0)
 
     local dragging = false
-    grab.MouseButton1Down:Connect(function()
-        dragging = true
+    knob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+        end
     end)
     UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -860,289 +965,316 @@ function UI:CreateSlider(sectionData, name, min, max, default, callback)
     UserInputService.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local mousePos = UserInputService:GetMouseLocation()
-            local relX = mousePos.X - sliderFrame.AbsolutePosition.X
-            local fraction = math.clamp(relX / sliderFrame.AbsoluteSize.X, 0, 1)
+            local relX = mousePos.X - track.AbsolutePosition.X
+            local fraction = math.clamp(relX / track.AbsoluteSize.X, 0, 1)
             local value = math.floor(min + (max-min)*fraction)
-            fill.Size = UDim2.new(fraction, 0, 1, 0)
-            grab.Position = UDim2.new(fraction, -7, 0, 0)
+            fill.Size = UDim2.fromScale(fraction, 1)
+            knob.Position = UDim2.fromScale(fraction, -8)
             label.Text = name .. " (" .. value .. ")"
             callback(value)
         end
     end)
-
     callback(default)
     return frame
 end
 
+-- Button
 function UI:CreateButton(sectionData, name, callback)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -10, 0, 32)
-    button.BackgroundColor3 = Color3.new(0.15,0.15,0.15)
-    button.Text = name
-    button.TextColor3 = TextCol
-    button.Font = Enum.Font.Gotham
-    button.TextSize = 14
-    button.BorderSizePixel = 0
-    button.Parent = sectionData.ElementsContainer
-    local btnCorner = Instance.new("UICorner", button)
-    btnCorner.CornerRadius = UDim.new(0, 6)
-    button.MouseButton1Click:Connect(callback)
-    return button
+    local btn = Instance.new("ImageButton")
+    btn.Size = UDim2.new(1,0,0,30)
+    btn.BackgroundColor3 = C.card
+    btn.BackgroundTransparency = 0
+    btn.BorderSizePixel = 0
+    btn.Image = ""
+    btn.AutoButtonColor = false
+    btn.Parent = sectionData.ElementsContainer
+    Instance.new("UICorner",btn).CornerRadius = UDim.new(0,6)
+    local bS = Instance.new("UIStroke",btn)
+    bS.Color = C.border
+    bS.Thickness = 0.8
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1,-10,1,0)
+    lbl.Position = UDim2.fromOffset(8,0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = name
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 10
+    lbl.TextColor3 = C.pri
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 13
+    lbl.Parent = btn
+    btn.MouseButton1Click:Connect(function()
+        TweenService:Create(btn,TweenInfo.new(0.08),{BackgroundColor3=C.cardH}):Play()
+        task.delay(0.15,function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play() end)
+        callback()
+    end)
+    btn.MouseEnter:Connect(function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.cardH}):Play() end)
+    btn.MouseLeave:Connect(function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play() end)
+    return btn
 end
 
+-- Toggle
+function UI:CreateToggle(sectionData, name, default, onCb, offCb)
+    local btn = Instance.new("ImageButton")
+    btn.Size = UDim2.new(1,0,0,30)
+    btn.BackgroundColor3 = C.card
+    btn.BackgroundTransparency = 0
+    btn.BorderSizePixel = 0
+    btn.Image = ""
+    btn.AutoButtonColor = false
+    btn.Parent = sectionData.ElementsContainer
+    Instance.new("UICorner",btn).CornerRadius = UDim.new(0,6)
+    local bS = Instance.new("UIStroke",btn)
+    bS.Color = C.border
+    bS.Thickness = 0.8
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1,-46,1,0)
+    lbl.Position = UDim2.fromOffset(8,0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = name
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 10
+    lbl.TextColor3 = C.pri
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 13
+    lbl.Parent = btn
+
+    local TW, TH2 = 24, 13
+    local trk = Instance.new("Frame")
+    trk.Size = UDim2.fromOffset(TW, TH2)
+    trk.Position = UDim2.new(1, -(TW+6), 0.5, -(TH2/2))
+    trk.BackgroundColor3 = C.border
+    trk.BorderSizePixel = 0
+    trk.ZIndex = 13
+    trk.Parent = btn
+    Instance.new("UICorner",trk).CornerRadius = UDim.new(1,0)
+    local KS = TH2 - 4
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.fromOffset(KS, KS)
+    knob.Position = UDim2.fromOffset(default and TW-KS-2 or 2, 2)
+    knob.BackgroundColor3 = C.white
+    knob.BorderSizePixel = 0
+    knob.ZIndex = 14
+    knob.Parent = trk
+    Instance.new("UICorner",knob).CornerRadius = UDim.new(1,0)
+
+    local state = default
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        TweenService:Create(trk,TweenInfo.new(0.12),{BackgroundColor3 = state and C.purple or C.border}):Play()
+        TweenService:Create(knob,TweenInfo.new(0.12),{Position = state and UDim2.fromOffset(TW-KS-2,2) or UDim2.fromOffset(2,2)}):Play()
+        TweenService:Create(btn,TweenInfo.new(0.08),{BackgroundColor3=C.cardH}):Play()
+        task.delay(0.15,function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play() end)
+        if state then
+            if onCb then onCb() end
+        else
+            if offCb then offCb() end
+        end
+    end)
+    btn.MouseEnter:Connect(function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.cardH}):Play() end)
+    btn.MouseLeave:Connect(function() TweenService:Create(btn,TweenInfo.new(0.10),{BackgroundColor3=C.card}):Play() end)
+    if default and onCb then onCb() end
+    return btn
+end
+
+-- Dropdown
 function UI:CreateDropdown(sectionData, name, items, default, callback)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 32)
-    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1,0,0,32)
+    frame.BackgroundColor3 = C.card
+    frame.BackgroundTransparency = 0
+    frame.BorderSizePixel = 0
     frame.Parent = sectionData.ElementsContainer
+    Instance.new("UICorner",frame).CornerRadius = UDim.new(0,6)
+    local bS = Instance.new("UIStroke",frame)
+    bS.Color = C.border
+    bS.Thickness = 0.8
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.4, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = name
-    label.TextColor3 = TextCol
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = frame
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.45,0,1,0)
+    lbl.Position = UDim2.fromOffset(8,0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = name
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 10
+    lbl.TextColor3 = C.pri
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 13
+    lbl.Parent = frame
 
-    local dropdown = Instance.new("TextButton")
-    dropdown.Size = UDim2.new(0.55, 0, 1, 0)
-    dropdown.Position = UDim2.new(0.45, 0, 0, 0)
-    dropdown.BackgroundColor3 = Color3.new(0.15,0.15,0.15)
-    dropdown.Text = default
-    dropdown.TextColor3 = TextCol
-    dropdown.Font = Enum.Font.Gotham
-    dropdown.TextSize = 14
-    dropdown.BorderSizePixel = 0
-    dropdown.Parent = frame
+    local dropBtn = Instance.new("TextButton")
+    dropBtn.Size = UDim2.new(0.45,0,1,0)
+    dropBtn.Position = UDim2.new(0.55,0,0,0)
+    dropBtn.BackgroundColor3 = C.card
+    dropBtn.Text = default
+    dropBtn.Font = Enum.Font.Gotham
+    dropBtn.TextSize = 9
+    dropBtn.TextColor3 = C.pri
+    dropBtn.BorderSizePixel = 0
+    dropBtn.ZIndex = 13
+    dropBtn.Parent = frame
+    Instance.new("UICorner",dropBtn).CornerRadius = UDim.new(0,4)
 
     local listFrame = Instance.new("Frame")
-    listFrame.Size = UDim2.new(0.55, 0, 0, 0)
-    listFrame.Position = UDim2.new(0.45, 0, 1, 2)
-    listFrame.BackgroundColor3 = Color3.new(0.1,0.1,0.1)
+    listFrame.Size = UDim2.new(0.45,0,0,0)
+    listFrame.Position = UDim2.new(0.55,0,1,2)
+    listFrame.BackgroundColor3 = C.bg
     listFrame.BorderSizePixel = 0
     listFrame.Visible = false
+    listFrame.ZIndex = 20
     listFrame.Parent = frame
-
-    local listLayout = Instance.new("UIListLayout", listFrame)
+    local listLayout = Instance.new("UIListLayout")
     listLayout.FillDirection = Enum.FillDirection.Vertical
+    listLayout.Parent = listFrame
 
     local function buildList()
-        listFrame:ClearAllChildren()
-        listLayout = Instance.new("UIListLayout", listFrame)
-        for _, item in ipairs(items) do
-            local itemBtn = Instance.new("TextButton")
-            itemBtn.Size = UDim2.new(1, 0, 0, 24)
-            itemBtn.BackgroundColor3 = Color3.new(0.2,0.2,0.2)
-            itemBtn.Text = item
-            itemBtn.TextColor3 = TextCol
-            itemBtn.Font = Enum.Font.Gotham
-            itemBtn.TextSize = 14
-            itemBtn.BorderSizePixel = 0
-            itemBtn.Parent = listFrame
-            itemBtn.MouseButton1Click:Connect(function()
-                dropdown.Text = item
+        for _,v in ipairs(listFrame:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+        for _,item in ipairs(items) do
+            local ib = Instance.new("TextButton")
+            ib.Size = UDim2.new(1,0,0,22)
+            ib.BackgroundColor3 = C.card
+            ib.Text = item
+            ib.Font = Enum.Font.Gotham
+            ib.TextSize = 9
+            ib.TextColor3 = C.pri
+            ib.BorderSizePixel = 0
+            ib.ZIndex = 21
+            ib.Parent = listFrame
+            ib.MouseButton1Click:Connect(function()
+                dropBtn.Text = item
                 listFrame.Visible = false
                 callback(item)
             end)
         end
-        listFrame.Size = UDim2.new(0.55, 0, 0, #items * 24)
+        listFrame.Size = UDim2.new(0.45,0,0, #items*22)
     end
     buildList()
 
-    dropdown.MouseButton1Click:Connect(function()
+    dropBtn.MouseButton1Click:Connect(function()
         listFrame.Visible = not listFrame.Visible
     end)
-
     callback(default)
     return frame
 end
 
+-- Color picker (simple presets)
 function UI:CreateColorpicker(sectionData, name, default, callback)
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 0, 30)
-    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1,0,0,30)
+    frame.BackgroundColor3 = C.card
+    frame.BackgroundTransparency = 0
+    frame.BorderSizePixel = 0
     frame.Parent = sectionData.ElementsContainer
+    Instance.new("UICorner",frame).CornerRadius = UDim.new(0,6)
+    local bS = Instance.new("UIStroke",frame)
+    bS.Color = C.border
+    bS.Thickness = 0.8
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.4, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = name
-    label.TextColor3 = TextCol
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 14
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = frame
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.45,0,1,0)
+    lbl.Position = UDim2.fromOffset(8,0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = name
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 10
+    lbl.TextColor3 = C.pri
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 13
+    lbl.Parent = frame
 
     local preview = Instance.new("Frame")
-    preview.Size = UDim2.new(0, 30, 0, 30)
-    preview.Position = UDim2.new(0.45, 0, 0, 0)
+    preview.Size = UDim2.fromOffset(24,24)
+    preview.Position = UDim2.new(0.5,0,0,3)
     preview.BackgroundColor3 = default
     preview.BorderSizePixel = 0
+    preview.ZIndex = 13
     preview.Parent = frame
+    Instance.new("UICorner",preview).CornerRadius = UDim.new(0,4)
 
-    local pickerFrame = Instance.new("Frame")
-    pickerFrame.Size = UDim2.new(0, 200, 0, 120)
-    pickerFrame.Position = UDim2.new(0.45, 40, 0, 35)
-    pickerFrame.BackgroundColor3 = Color3.new(0.1,0.1,0.1)
-    pickerFrame.Visible = false
-    pickerFrame.Parent = frame
+    local pickerBtn = Instance.new("TextButton")
+    pickerBtn.Size = UDim2.new(0.35,0,1,0)
+    pickerBtn.Position = UDim2.new(0.65,0,0,0)
+    pickerBtn.BackgroundColor3 = C.card
+    pickerBtn.Text = "Pick"
+    pickerBtn.Font = Enum.Font.Gotham
+    pickerBtn.TextSize = 9
+    pickerBtn.TextColor3 = C.pri
+    pickerBtn.BorderSizePixel = 0
+    pickerBtn.ZIndex = 13
+    pickerBtn.Parent = frame
+    Instance.new("UICorner",pickerBtn).CornerRadius = UDim.new(0,4)
 
-    -- simple RGB sliders inside pickerFrame
-    local function makeSlider(y, colorChan)
-        local slider = Instance.new("Frame")
-        slider.Size = UDim2.new(1, -10, 0, 25)
-        slider.Position = UDim2.new(0,5,0,y)
-        slider.BackgroundColor3 = Color3.new(0.3,0.3,0.3)
-        slider.Parent = pickerFrame
-        -- similar dragging logic omitted for brevity but would work
+    local pickerList = Instance.new("Frame")
+    pickerList.Size = UDim2.new(0.35,0,0,100)
+    pickerList.Position = UDim2.new(0.65,0,1,2)
+    pickerList.BackgroundColor3 = C.bg
+    pickerList.BorderSizePixel = 0
+    pickerList.Visible = false
+    pickerList.ZIndex = 20
+    pickerList.Parent = frame
+    local pickerLayout = Instance.new("UIListLayout")
+    pickerLayout.FillDirection = Enum.FillDirection.Vertical
+    pickerLayout.Parent = pickerList
+
+    local colors = {
+        {name="Red", col=Color3.new(1,0,0)},
+        {name="Green", col=Color3.new(0,1,0)},
+        {name="Blue", col=Color3.new(0,0,1)},
+        {name="Purple", col=Color3.fromRGB(170,110,255)},
+        {name="White", col=Color3.new(1,1,1)},
+        {name="Black", col=Color3.new(0,0,0)},
+        {name="Orange", col=Color3.new(1,0.5,0)},
+    }
+    for _,c in ipairs(colors) do
+        local cb = Instance.new("TextButton")
+        cb.Size = UDim2.new(1,0,0,22)
+        cb.BackgroundColor3 = C.card
+        cb.Text = c.name
+        cb.Font = Enum.Font.Gotham
+        cb.TextSize = 9
+        cb.TextColor3 = C.pri
+        cb.BorderSizePixel = 0
+        cb.ZIndex = 21
+        cb.Parent = pickerList
+        cb.MouseButton1Click:Connect(function()
+            preview.BackgroundColor3 = c.col
+            pickerList.Visible = false
+            callback(c.col)
+        end)
     end
-    -- (implement a full color picker would be too long; we'll use a simple button that sets to Red/Blue/Green presets)
-    local redBtn = Instance.new("TextButton", pickerFrame)
-    redBtn.Size = UDim2.new(1,0,0,25)
-    redBtn.Position = UDim2.new(0,0,0,0)
-    redBtn.Text = "Red"
-    redBtn.BackgroundColor3 = Color3.new(1,0,0)
-    redBtn.TextColor3 = TextCol
-    redBtn.Font = Enum.Font.Gotham
-    redBtn.TextSize = 14
-    redBtn.MouseButton1Click:Connect(function()
-        preview.BackgroundColor3 = Color3.new(1,0,0)
-        callback(Color3.new(1,0,0))
-    end)
-    local greenBtn = Instance.new("TextButton", pickerFrame)
-    greenBtn.Size = UDim2.new(1,0,0,25)
-    greenBtn.Position = UDim2.new(0,0,0,30)
-    greenBtn.Text = "Green"
-    greenBtn.BackgroundColor3 = Color3.new(0,1,0)
-    greenBtn.TextColor3 = TextCol
-    greenBtn.Font = Enum.Font.Gotham
-    greenBtn.TextSize = 14
-    greenBtn.MouseButton1Click:Connect(function()
-        preview.BackgroundColor3 = Color3.new(0,1,0)
-        callback(Color3.new(0,1,0))
-    end)
-    local blueBtn = Instance.new("TextButton", pickerFrame)
-    blueBtn.Size = UDim2.new(1,0,0,25)
-    blueBtn.Position = UDim2.new(0,0,0,60)
-    blueBtn.Text = "Blue"
-    blueBtn.BackgroundColor3 = Color3.new(0,0,1)
-    blueBtn.TextColor3 = TextCol
-    blueBtn.Font = Enum.Font.Gotham
-    blueBtn.TextSize = 14
-    blueBtn.MouseButton1Click:Connect(function()
-        preview.BackgroundColor3 = Color3.new(0,0,1)
-        callback(Color3.new(0,0,1))
-    end)
-    preview.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            pickerFrame.Visible = not pickerFrame.Visible
-        end
+    pickerList.Size = UDim2.new(0.35,0,0, #colors*22)
+    pickerBtn.MouseButton1Click:Connect(function()
+        pickerList.Visible = not pickerList.Visible
     end)
     callback(default)
     return frame
 end
 
-function UI:CreateLabel(sectionData, text)
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 20)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = TextCol
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 13
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = sectionData.ElementsContainer
-    return label
-end
-
--- Notification system
-function UI:Notify(title, text)
-    local notif = Instance.new("Frame")
-    notif.Size = UDim2.new(1, -10, 0, 36)
-    notif.BackgroundColor3 = Color3.new(0.2,0.2,0.2)
-    notif.BorderSizePixel = 0
-    notif.Parent = NotifFrame
-    local uiStroke = Instance.new("UIStroke", notif)
-    uiStroke.Color = Purple
-    uiStroke.Thickness = 1
-
-    local titleLabel = Instance.new("TextLabel", notif)
-    titleLabel.Size = UDim2.new(1,0,0,16)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title
-    titleLabel.TextColor3 = TextCol
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextSize = 13
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Position = UDim2.new(0,5,0,2)
-
-    local descLabel = Instance.new("TextLabel", notif)
-    descLabel.Size = UDim2.new(1,0,0,14)
-    descLabel.Position = UDim2.new(0,5,0,18)
-    descLabel.BackgroundTransparency = 1
-    descLabel.Text = text
-    descLabel.TextColor3 = TextCol
-    descLabel.Font = Enum.Font.Gotham
-    descLabel.TextSize = 12
-    descLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-    table.insert(UI.Notifications, notif)
-    task.delay(3, function()
-        notif:Destroy()
-    end)
-end
-
--- Minimize logic
-MinBtn.MouseButton1Click:Connect(function()
-    UI.Minimized = true
-    Main.Visible = false
-    Icon.Visible = true
-end)
-Icon.MouseButton1Click:Connect(function()
-    UI.Minimized = false
-    Main.Visible = true
-    Icon.Visible = false
-end)
-CloseBtn.MouseButton1Click:Connect(function()
-    Gui:Destroy()
-end)
-
 -- ===================== Build Tabs =====================
-local spawnTab = UI:AddTab("Spawner")
-local mainTab = UI:AddTab("Physics")
+local spawnTab = UI:AddTab("Spawn")
+local physTab = UI:AddTab("Physics")
 local suspTab = UI:AddTab("Suspension")
 local funTab = UI:AddTab("Fun")
 local visTab = UI:AddTab("Visuals")
 
--- SPAWNER TAB
+-- SPAWN TAB
 local spawnSec = UI:AddSection(spawnTab, "Vehicle Spawner")
-UI:CreateLabel(spawnSec, "Select a vehicle to spawn (FE Universal)")
-local vehiclePresets = {
-    "Classic Car",
-    "Motorcycle",
-    "Monster Truck",
-    "Sedan",
-    "SUV",
-    "Sports Car"
-}
-local selectedVehicle = "Classic Car"
-UI:CreateDropdown(spawnSec, "Preset", vehiclePresets, "Classic Car", function(val) selectedVehicle = val end)
-UI:CreateButton(spawnSec, "Spawn Vehicle", function()
+local presets = {"Basic Car", "Motorcycle", "Monster Truck", "Sedan", "SUV", "Sports Car"}
+local selectedPreset = "Basic Car"
+UI:CreateDropdown(spawnSec, "Preset", presets, "Basic Car", function(val) selectedPreset = val end)
+UI:CreateButton(spawnSec, "Spawn Preset", function()
     local char = LocalPlayer.Character
-    if not char then UI:Notify("Error", "No character") return end
+    if not char then UI:Notify("Error","No character") return end
     local pos = char:GetPivot().Position + Vector3.new(0,5,0)
-    local modelName = selectedVehicle
-    -- Simple placeholder: create a basic vehicle part
     local vehicle = Instance.new("Model")
-    vehicle.Name = modelName
+    vehicle.Name = selectedPreset
     local base = Instance.new("Part")
     base.Size = Vector3.new(4,1.2,6)
     base.Position = pos
     base.Anchored = false
-    base.Material = Enum.Material.SmoothPlastic
     base.Color = Color3.new(1,0,0)
+    base.Material = Enum.Material.SmoothPlastic
     base.Parent = vehicle
     local seat = Instance.new("VehicleSeat")
     seat.Size = Vector3.new(2,1.2,2)
@@ -1150,70 +1282,73 @@ UI:CreateButton(spawnSec, "Spawn Vehicle", function()
     seat.Parent = vehicle
     vehicle.PrimaryPart = base
     vehicle.Parent = Workspace
-    -- Add some wheels as constraints (simplified)
-    UI:Notify("Spawner", modelName .. " spawned at your location")
+    UI:Notify("Spawner", selectedPreset.." spawned", 3)
 end)
-UI:CreateLabel(spawnSec, "Custom Model (Asset ID)")
-local customID = ""
-local customBox = Instance.new("TextBox")
-customBox.Size = UDim2.new(1,-10,0,32)
-customBox.BackgroundColor3 = Color3.new(0.15,0.15,0.15)
-customBox.Text = ""
-customBox.PlaceholderText = "rbxassetid://..."
-customBox.TextColor3 = TextCol
-customBox.Font = Enum.Font.Gotham
-customBox.TextSize = 14
-customBox.Parent = spawnSec.ElementsContainer
-UI:CreateButton(spawnSec, "Spawn Custom Model", function()
-    local id = customBox.Text
-    if id == "" then UI:Notify("Error", "Enter asset ID") return end
-    pcall(function()
-        local model = InsertService:LoadAsset(tonumber(id:match("%d+")))
-        if model and model:IsA("Model") then
-            model:PivotTo(LocalPlayer.Character:GetPivot() + Vector3.new(0,5,0))
-            model.Parent = Workspace
-            UI:Notify("Spawner", "Custom model loaded")
-        end
+UI:CreateButton(spawnSec, "Spawn Custom Model (ID)", function()
+    local id = "rbxassetid://"
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(1,0,0,28)
+    box.BackgroundColor3 = C.card
+    box.Text = ""
+    box.PlaceholderText = "Enter asset ID"
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 9
+    box.TextColor3 = C.white
+    box.Parent = spawnSec.ElementsContainer
+    -- quick hack: add a temporary button to confirm
+    local confirm = UI:CreateButton(spawnSec, "Confirm Spawn", function()
+        local idText = box.Text
+        if idText == "" then return end
+        pcall(function()
+            local model = InsertService:LoadAsset(tonumber(idText:match("%d+")))
+            if model and model:IsA("Model") then
+                model:PivotTo(LocalPlayer.Character:GetPivot() + Vector3.new(0,5,0))
+                model.Parent = Workspace
+                UI:Notify("Spawner","Custom model loaded",3)
+            end
+        end)
+        box:Destroy()
+        confirm:Destroy()
     end)
 end)
 
 -- PHYSICS TAB
-local antiBounceSec = UI:AddSection(mainTab, "Anti-Bounce (Surface Fix)")
-UI:CreateToggle(antiBounceSec, "Enabled", true, function(val) PhysicsData.Physics.AntiBounce.Enabled = val end)
-UI:CreateToggle(antiBounceSec, "Surface Smoothing", true, function(val) PhysicsData.Physics.AntiBounce.SurfaceSmoothing = val end)
-UI:CreateSlider(antiBounceSec, "Transition Dampening", 0,100, 75, function(val) PhysicsData.Physics.AntiBounce.TransitionDampening = val/100 end)
-UI:CreateSlider(antiBounceSec, "Velocity Dampening", 0,100, 92, function(val) PhysicsData.Physics.AntiBounce.VelocityDampening = val/100 end)
-UI:CreateSlider(antiBounceSec, "Angular Dampening", 0,100, 85, function(val) PhysicsData.Physics.AntiBounce.AngularDampening = val/100 end)
-UI:CreateSlider(antiBounceSec, "Impact Sensitivity", 5,50, 15, function(val) PhysicsData.Physics.AntiBounce.ImpactThreshold = val end)
+local abSec = UI:AddSection(physTab, "Anti-Bounce")
+UI:CreateToggle(abSec, "Enabled", true, function() PhysicsData.Physics.AntiBounce.Enabled = true end, function() PhysicsData.Physics.AntiBounce.Enabled = false end)
+UI:CreateToggle(abSec, "Surface Smoothing", true, function() PhysicsData.Physics.AntiBounce.SurfaceSmoothing = true end, function() PhysicsData.Physics.AntiBounce.SurfaceSmoothing = false end)
+UI:CreateSlider(abSec, "Transition Dampening", 0,100, 75, function(v) PhysicsData.Physics.AntiBounce.TransitionDampening = v/100 end)
+UI:CreateSlider(abSec, "Velocity Dampening", 0,100, 92, function(v) PhysicsData.Physics.AntiBounce.VelocityDampening = v/100 end)
+UI:CreateSlider(abSec, "Angular Dampening", 0,100, 85, function(v) PhysicsData.Physics.AntiBounce.AngularDampening = v/100 end)
+UI:CreateSlider(abSec, "Impact Sensitivity", 5,50, 15, function(v) PhysicsData.Physics.AntiBounce.ImpactThreshold = v end)
 
-local speedSec = UI:AddSection(mainTab, "Speed Control")
-UI:CreateToggle(speedSec, "Enabled", false, function(val) PhysicsData.Physics.Speed.Enabled = val end)
-UI:CreateSlider(speedSec, "Accel Rate", 10,500, 150, function(val) PhysicsData.Physics.Speed.Rate = val/100 end)
-UI:CreateSlider(speedSec, "Brake", 10,200, 90, function(val) PhysicsData.Physics.Speed.BrakeRate = val/100 end)
-UI:CreateSlider(speedSec, "Max Speed", 50,400, 250, function(val) PhysicsData.Physics.MaxGroundSpeed = val end)
+local speedSec = UI:AddSection(physTab, "Speed Control")
+UI:CreateToggle(speedSec, "Enabled", false, function() PhysicsData.Physics.Speed.Enabled = true end, function() PhysicsData.Physics.Speed.Enabled = false end)
+UI:CreateSlider(speedSec, "Accel Rate", 10,500, 150, function(v) PhysicsData.Physics.Speed.Rate = v/100 end)
+UI:CreateSlider(speedSec, "Brake Rate", 10,200, 90, function(v) PhysicsData.Physics.Speed.BrakeRate = v/100 end)
+UI:CreateSlider(speedSec, "Max Speed", 50,400, 250, function(v) PhysicsData.Physics.MaxGroundSpeed = v end)
 
-local flightSec = UI:AddSection(mainTab, "Flight")
-UI:CreateToggle(flightSec, "Enabled", false, function(val) PhysicsData.Physics.Flight.Enabled = val end)
-UI:CreateSlider(flightSec, "Speed", 10,800, 100, function(val) PhysicsData.Physics.Flight.Speed = val/100 end)
+local flightSec = UI:AddSection(physTab, "Flight")
+UI:CreateToggle(flightSec, "Enabled", false, function() PhysicsData.Physics.Flight.Enabled = true end, function() PhysicsData.Physics.Flight.Enabled = false end)
+UI:CreateSlider(flightSec, "Speed", 10,800, 100, function(v) PhysicsData.Physics.Flight.Speed = v/100 end)
 
-local tractionSec = UI:AddSection(mainTab, "Traction")
-UI:CreateToggle(tractionSec, "Enabled", false, function(val) PhysicsData.Physics.Traction.Enabled = val end)
-UI:CreateSlider(tractionSec, "Grip", 10,150, 100, function(val) PhysicsData.Physics.Traction.Grip = val/100 end)
+local tractionSec = UI:AddSection(physTab, "Traction")
+UI:CreateToggle(tractionSec, "Enabled", false, function() PhysicsData.Physics.Traction.Enabled = true end, function() PhysicsData.Physics.Traction.Enabled = false end)
+UI:CreateSlider(tractionSec, "Grip", 10,150, 100, function(v) PhysicsData.Physics.Traction.Grip = v/100 end)
 
-local collisionSec = UI:AddSection(mainTab, "Collision")
-UI:CreateToggle(collisionSec, "Freeze", false, function(val) PhysicsData.Physics.Freeze = val end)
-UI:CreateToggle(collisionSec, "Noclip", false, function(val) PhysicsData.Physics.Noclip = val end)
+local collisionSec = UI:AddSection(physTab, "Collision")
+UI:CreateToggle(collisionSec, "Freeze", false, function() PhysicsData.Physics.Freeze = true end, function() PhysicsData.Physics.Freeze = false end)
+UI:CreateToggle(collisionSec, "Noclip", false, function() PhysicsData.Physics.Noclip = true end, function() PhysicsData.Physics.Noclip = false end)
 
 -- SUSPENSION TAB
-local globalSusp = UI:AddSection(suspTab, "Global Settings")
-UI:CreateSlider(globalSusp, "Stiffness", 0,100, 40, function(val) 
-    local v = val*100
-    PhysicsData.Suspension.Data.Stiffness = v
-    PhysicsData.Suspension.Data.FrontStiff = v
-    PhysicsData.Suspension.Data.RearStiff = v
+local globSusp = UI:AddSection(suspTab, "Global Settings")
+UI:CreateSlider(globSusp, "Stiffness", 0,100, 40, function(v)
+    local val = v*100
+    PhysicsData.Suspension.Data.Stiffness = val
+    PhysicsData.Suspension.Data.FrontStiff = val
+    PhysicsData.Suspension.Data.RearStiff = val
 end)
-UI:CreateSlider(globalSusp, "Height", -30,30, 0, function(val) PhysicsData.Suspension.Data.Height = val/10 end)
-UI:CreateSlider(globalSusp, "Damping", 0,100, 20, function(val) PhysicsData.Suspension.Data.Damping = val*20 end)
+UI:CreateSlider(globSusp, "Height", -30,30, 0, function(v) PhysicsData.Suspension.Data.Height = v/10 end)
+UI:CreateSlider(globSusp, "Damping", 0,100, 20, function(v) PhysicsData.Suspension.Data.Damping = v*20 end)
 
 local presetSec = UI:AddSection(suspTab, "Presets")
 UI:CreateButton(presetSec, "Race", function()
@@ -1221,38 +1356,37 @@ UI:CreateButton(presetSec, "Race", function()
     PhysicsData.Suspension.Data.RearStiff = 8000
     PhysicsData.Suspension.Data.Damping = 1500
     PhysicsData.Suspension.Data.Height = -1.5
-    UI:Notify("Preset", "Race tune applied")
+    UI:Notify("Preset","Race tune applied",2)
 end)
 UI:CreateButton(presetSec, "Drift", function()
     PhysicsData.Suspension.Data.FrontStiff = 6000
     PhysicsData.Suspension.Data.RearStiff = 3000
     PhysicsData.Suspension.Data.Damping = 500
-    UI:Notify("Preset", "Drift tune applied")
+    UI:Notify("Preset","Drift tune applied",2)
 end)
 UI:CreateButton(presetSec, "Off-Road", function()
     PhysicsData.Suspension.Data.FrontStiff = 2000
     PhysicsData.Suspension.Data.RearStiff = 2000
     PhysicsData.Suspension.Data.Damping = 800
     PhysicsData.Suspension.Data.Height = 1.5
-    UI:Notify("Preset", "Off-road tune applied")
+    UI:Notify("Preset","Off-road tune applied",2)
 end)
 UI:CreateButton(presetSec, "Comfort", function()
     PhysicsData.Suspension.Data.FrontStiff = 1500
     PhysicsData.Suspension.Data.RearStiff = 1500
     PhysicsData.Suspension.Data.Damping = 1800
     PhysicsData.Suspension.Data.Height = 0.5
-    UI:Notify("Preset", "Comfort tune applied")
+    UI:Notify("Preset","Comfort tune applied",2)
 end)
 
-local advancedSec = UI:AddSection(suspTab, "Advanced Tuning")
-UI:CreateLabel(advancedSec, "Load/Refresh springs to see individual controls")
-UI:CreateButton(advancedSec, "Load Springs", function()
+local advSec = UI:AddSection(suspTab, "Advanced")
+UI:CreateButton(advSec, "Load Springs", function()
     local veh = PhysicsData.Internal.Vehicle
-    if not veh then UI:Notify("Error", "Sit in a vehicle first") return end
+    if not veh then UI:Notify("Error","Sit in a vehicle first",3) return end
     VehicleManager.CacheSuspension(veh)
-    UI:Notify("Springs", "Loaded "..PhysicsData.Suspension.SpringCount.." springs")
+    UI:Notify("Springs","Loaded "..PhysicsData.Suspension.SpringCount.." springs",3)
 end)
-UI:CreateButton(advancedSec, "Reset ALL Springs", function()
+UI:CreateButton(advSec, "Reset ALL Springs", function()
     for spring, orig in pairs(PhysicsData.Suspension.OriginalValues) do
         pcall(function()
             spring.Stiffness = orig.Stiffness
@@ -1260,59 +1394,46 @@ UI:CreateButton(advancedSec, "Reset ALL Springs", function()
             spring.FreeLength = orig.FreeLength
         end)
     end
-    UI:Notify("Springs", "All springs reset to original")
+    UI:Notify("Springs","All springs reset",3)
 end)
 
 -- FUN TAB
-local colorSec = UI:AddSection(funTab, "Client Paint")
-UI:CreateColorpicker(colorSec, "Paint Color", Color3.new(1,0,0), function(col) PhysicsData.Fun.Paint.Color = col end)
-UI:CreateButton(colorSec, "Apply Custom Color", function()
+local paintSec = UI:AddSection(funTab, "Client Paint")
+UI:CreateColorpicker(paintSec, "Paint Color", Color3.new(1,0,0), function(col) PhysicsData.Fun.Paint.Color = col end)
+UI:CreateButton(paintSec, "Apply Paint", function()
     applyColorToVehicle(PhysicsData.Fun.Paint.Color)
-    UI:Notify("Paint", "Color applied (client-side)")
+    UI:Notify("Paint","Color applied",3)
 end)
-local quickColors = {"Red","Blue","Green","Yellow","Purple","Orange","Matte Black","White","Chrome Silver","Gold"}
-local quickColVals = {
-    Color3.new(0.9,0.1,0.1), Color3.new(0.1,0.3,0.9), Color3.new(0.1,0.8,0.2),
-    Color3.new(0.95,0.9,0.1), Color3.new(0.7,0.1,0.8), Color3.new(1,0.5,0),
-    Color3.new(0.1,0.1,0.1), Color3.new(0.95,0.95,0.95), Color3.new(0.75,0.75,0.75),
-    Color3.new(1,0.84,0)
-}
-for i, name in ipairs(quickColors) do
-    UI:CreateButton(colorSec, name, function()
-        applyColorToVehicle(quickColVals[i])
-        UI:Notify("Paint", name.." applied")
-    end)
-end
-
 local gravSec = UI:AddSection(funTab, "Gravity")
-local gravModes = {"Normal","Moon","Heavy","Zero","Reverse"}
-UI:CreateDropdown(gravSec, "Mode", gravModes, "Normal", function(val) PhysicsData.Fun.Gravity.Mode = val end)
-UI:CreateToggle(gravSec, "Enabled", false, function(val)
-    PhysicsData.Fun.Gravity.Enabled = val
-    setGravityMode(val, PhysicsData.Fun.Gravity.Mode)
+UI:CreateDropdown(gravSec, "Mode", {"Normal","Moon","Heavy","Zero","Reverse"}, "Normal", function(m) PhysicsData.Fun.Gravity.Mode = m end)
+UI:CreateToggle(gravSec, "Enabled", false, function() 
+    PhysicsData.Fun.Gravity.Enabled = true
+    setGravityMode(true, PhysicsData.Fun.Gravity.Mode)
+end, function() 
+    PhysicsData.Fun.Gravity.Enabled = false
+    setGravityMode(false, PhysicsData.Fun.Gravity.Mode)
 end)
 
 -- VISUALS TAB
-local fullbrightSec = UI:AddSection(visTab, "Fullbright")
-UI:CreateToggle(fullbrightSec, "Enabled", false, function(val)
-    PhysicsData.Visuals.Fullbright.Enabled = val
-    if val then
-        Lighting.Brightness = PhysicsData.Visuals.Fullbright.Settings.Brightness
-        Lighting.Ambient = PhysicsData.Visuals.Fullbright.Settings.Ambient
-        Lighting.FogEnd = PhysicsData.Visuals.Fullbright.Settings.FogEnd
-    else
-        Lighting.Brightness = 1
-        Lighting.Ambient = Color3.new(0,0,0)
-        Lighting.FogEnd = 500
-    end
+local fbSec = UI:AddSection(visTab, "Fullbright")
+UI:CreateToggle(fbSec, "Enabled", false, function()
+    PhysicsData.Visuals.Fullbright.Enabled = true
+    Lighting.Brightness = PhysicsData.Visuals.Fullbright.Settings.Brightness
+    Lighting.Ambient = PhysicsData.Visuals.Fullbright.Settings.Ambient
+    Lighting.FogEnd = PhysicsData.Visuals.Fullbright.Settings.FogEnd
+end, function()
+    PhysicsData.Visuals.Fullbright.Enabled = false
+    Lighting.Brightness = 1
+    Lighting.Ambient = Color3.new(0,0,0)
+    Lighting.FogEnd = 500
 end)
-UI:CreateSlider(fullbrightSec, "Brightness", 1,10, 2, function(val) 
-    PhysicsData.Visuals.Fullbright.Settings.Brightness = val
-    if PhysicsData.Visuals.Fullbright.Enabled then Lighting.Brightness = val end
+UI:CreateSlider(fbSec, "Brightness", 1,10, 2, function(v)
+    PhysicsData.Visuals.Fullbright.Settings.Brightness = v
+    if PhysicsData.Visuals.Fullbright.Enabled then Lighting.Brightness = v end
 end)
 
-local headlightSec = UI:AddSection(visTab, "Headlights")
-UI:CreateToggle(headlightSec, "Always On", true, function(val) PhysicsData.Visuals.Headlights.Enabled = val end)
+local hlSec = UI:AddSection(visTab, "Headlights")
+UI:CreateToggle(hlSec, "Always On", true, function() PhysicsData.Visuals.Headlights.Enabled = true end, function() PhysicsData.Visuals.Headlights.Enabled = false end)
 
 -- ===================== Heartbeat Connections =====================
 local heartbeatConn = RunService.Heartbeat:Connect(function(dt)
@@ -1337,5 +1458,5 @@ local steppedConn = RunService.Stepped:Connect(function()
 end)
 table.insert(PhysicsData.System.Connections, steppedConn)
 
--- ===================== Initial Notification =====================
-UI:Notify("System", "Set Car etc Anonymous9x active. No more mental transitions!")
+-- Initial notification
+UI:Notify("System Ready", "Set Car etc Anonymous9x loaded. Anti-bounce active.", 4)
