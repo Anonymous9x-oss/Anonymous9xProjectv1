@@ -1,47 +1,6 @@
--- Indo Voice Auto Fish | Custom UI by @Anonymous9x
--- PlaceId Indo Voice (ganti jika berbeda)
-local PLACE_ID = 113883146687716
-local inCorrectMap = game.PlaceId == PLACE_ID
+--[[ Indo Voice Auto Fish | Custom UI by @Anonymous9x ]]
 
-if not inCorrectMap then
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "_A9xIV_Notif"
-    gui.Parent = game.CoreGui or game.Players.LocalPlayer:WaitForChild("PlayerGui")
-    local nf = Instance.new("Frame")
-    nf.Size = UDim2.fromOffset(220, 54)
-    nf.Position = UDim2.new(1, 10, 1, -70)
-    nf.BackgroundColor3 = Color3.fromRGB(7, 7, 9)
-    nf.BorderSizePixel = 0
-    nf.ZIndex = 800
-    nf.Parent = gui
-    Instance.new("UICorner", nf).CornerRadius = UDim.new(0, 7)
-    local nfS = Instance.new("UIStroke", nf)
-    nfS.Color = Color3.fromRGB(170, 110, 255)
-    nfS.Thickness = 1.2
-    local nt = Instance.new("TextLabel", nf)
-    nt.Size = UDim2.new(1,-12,0,18)
-    nt.Position = UDim2.fromOffset(8, 5)
-    nt.BackgroundTransparency = 1
-    nt.Text = "Wrong Game!"
-    nt.Font = Enum.Font.GothamBold
-    nt.TextSize = 10
-    nt.TextColor3 = Color3.new(1,1,1)
-    nt.ZIndex = 801
-    local nb = Instance.new("TextLabel", nf)
-    nb.Size = UDim2.new(1,-12,0,22)
-    nb.Position = UDim2.fromOffset(8, 24)
-    nb.BackgroundTransparency = 1
-    nb.Text = "Script ini hanya untuk Indo Voice."
-    nb.Font = Enum.Font.Gotham
-    nb.TextSize = 8
-    nb.TextColor3 = Color3.fromRGB(110,110,130)
-    nb.ZIndex = 801
-    task.wait(6)
-    gui:Destroy()
-    return
-end
-
--- === Services ===
+-- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -51,7 +10,7 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
 
--- === Character ===
+-- Character
 local char, hum, hrp
 local function linkChar(c)
     char = c
@@ -61,13 +20,43 @@ end
 if LP.Character then linkChar(LP.Character) end
 LP.CharacterAdded:Connect(linkChar)
 
--- === Remotes ===
-local sellAllRemote
+-- Remotes (fallback mencari di Events/Remote)
+local sellAllRemote, rodRemote, equipRemote
 pcall(function()
-    sellAllRemote = ReplicatedStorage:FindFirstChild("SellAllFishFunction") or ReplicatedStorage:FindFirstChild("Remote"):FindFirstChild("SellAllFishFunction")
+    local Events = ReplicatedStorage:FindFirstChild("Events")
+    if Events then
+        local RemoteEvent = Events:FindFirstChild("RemoteEvent")
+        local RemoteFunction = Events:FindFirstChild("RemoteFunction")
+        if RemoteEvent then
+            rodRemote = RemoteEvent:FindFirstChild("Rod") or RemoteEvent:FindFirstChild("RodRemoteEvent")
+        end
+        if RemoteFunction then
+            sellAllRemote = RemoteFunction:FindFirstChild("SellAllFishFunction") or RemoteFunction:FindFirstChild("SellFish")
+            equipRemote = RemoteFunction:FindFirstChild("EquipTools") or RemoteFunction:FindFirstChild("EquipRod")
+        end
+    end
+    -- fallback direct
+    if not sellAllRemote then
+        sellAllRemote = ReplicatedStorage:FindFirstChild("SellAllFishFunction") or ReplicatedStorage:FindFirstChild("Remote"):FindFirstChild("SellAllFishFunction")
+    end
 end)
 
--- === Config / Timeouts ===
+-- Animation IDs
+local CAST_ANIM_ID = "rbxassetid://107858786510758"
+local PULL_ANIM_ID = "rbxassetid://136444937709795"
+
+-- State
+local autoFishing = false
+local stage = "Idle"
+local timer = 0
+local castAnimPlayed = false
+local pullAnimPlayed = false
+local fishCaught = 0
+local totalTimeouts = 0
+local animConn
+local fishingThread
+
+-- Timing config (bisa diubah nanti)
 local timeouts = {
     CAST_HOLD_DURATION = 0.7,
     POST_PULL_DELAY = 1.8,
@@ -79,23 +68,9 @@ local timeouts = {
     POST_PULL_TIMEOUT = 5,
 }
 
--- === Animation IDs ===
-local CAST_ANIM_ID = "rbxassetid://107858786510758"
-local PULL_ANIM_ID = "rbxassetid://136444937709795"
-
--- === State ===
-local autoFishing = false
-local stage = "Idle"
-local timer = 0
-local castAnimPlayed = false
-local pullAnimPlayed = false
-local fishCaught = 0
-local totalTimeouts = 0
-local animConn
-
--- === UI ===
+-- ==================== UI ====================
 local gui = Instance.new("ScreenGui")
-gui.Name = "_A9xIV_Main"
+gui.Name = "_A9xIV"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = game.CoreGui or LP.PlayerGui
@@ -110,7 +85,6 @@ local T = {
     white = Color3.new(1, 1, 1),
     pri = Color3.fromRGB(218, 218, 226),
     sec = Color3.fromRGB(110, 110, 130),
-    dim = Color3.fromRGB(60, 60, 80),
     purple = Color3.fromRGB(170, 110, 255),
     safe = Color3.fromRGB(80, 185, 90),
     danger = Color3.fromRGB(210, 55, 55),
@@ -214,41 +188,38 @@ hTitle.TextTruncate = Enum.TextTruncate.AtEnd
 hTitle.ZIndex = 13
 hTitle.Parent = hdr
 
-local minBtn, minL, closeBtn, _
-do
-    local function makeCtrl(xOff, sym)
-        local b = Instance.new("ImageButton")
-        b.Size = UDim2.fromOffset(20,18)
-        b.Position = UDim2.new(1,xOff,0.5,-9)
-        b.BackgroundColor3 = T.card
-        b.BorderSizePixel = 0
-        b.Image = ""
-        b.AutoButtonColor = false
-        b.ZIndex = 14
-        b.Parent = hdr
-        Instance.new("UICorner",b).CornerRadius = UDim.new(0,4)
-        local l = Instance.new("TextLabel")
-        l.Size = UDim2.fromScale(1,1)
-        l.BackgroundTransparency = 1
-        l.Text = sym
-        l.Font = Enum.Font.GothamBold
-        l.TextSize = 12
+local function makeCtrl(xOff, sym)
+    local b = Instance.new("ImageButton")
+    b.Size = UDim2.fromOffset(20,18)
+    b.Position = UDim2.new(1,xOff,0.5,-9)
+    b.BackgroundColor3 = T.card
+    b.BorderSizePixel = 0
+    b.Image = ""
+    b.AutoButtonColor = false
+    b.ZIndex = 14
+    b.Parent = hdr
+    Instance.new("UICorner",b).CornerRadius = UDim.new(0,4)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.fromScale(1,1)
+    l.BackgroundTransparency = 1
+    l.Text = sym
+    l.Font = Enum.Font.GothamBold
+    l.TextSize = 12
+    l.TextColor3 = T.sec
+    l.ZIndex = 15
+    l.Parent = b
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b,TweenInfo.new(0.10),{BackgroundColor3=T.cardH}):Play()
+        l.TextColor3 = T.white
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b,TweenInfo.new(0.10),{BackgroundColor3=T.card}):Play()
         l.TextColor3 = T.sec
-        l.ZIndex = 15
-        l.Parent = b
-        b.MouseEnter:Connect(function()
-            TweenService:Create(b,TweenInfo.new(0.10),{BackgroundColor3=T.cardH}):Play()
-            l.TextColor3 = T.white
-        end)
-        b.MouseLeave:Connect(function()
-            TweenService:Create(b,TweenInfo.new(0.10),{BackgroundColor3=T.card}):Play()
-            l.TextColor3 = T.sec
-        end)
-        return b, l
-    end
-    minBtn, minL = makeCtrl(-44, "-")
-    closeBtn, _ = makeCtrl(-22, "x")
+    end)
+    return b, l
 end
+local minBtn, minL = makeCtrl(-44, "-")
+local closeBtn, _ = makeCtrl(-22, "x")
 
 local floatF = Instance.new("Frame")
 floatF.Name = "FloatIcon"
@@ -316,6 +287,7 @@ closeBtn.MouseButton1Click:Connect(function()
     gui:Destroy()
 end)
 
+-- Scroll area
 local scroll = Instance.new("ScrollingFrame")
 scroll.Size = UDim2.new(1,0,1,-HDR)
 scroll.Position = UDim2.fromOffset(0,HDR)
@@ -339,6 +311,7 @@ sPad.PaddingTop = UDim.new(0,7)
 sPad.PaddingBottom = UDim.new(0,10)
 sPad.Parent = scroll
 
+-- UI Components
 local _order = 0
 local function ord() _order = _order + 1 return _order end
 local function mkSec(title)
@@ -487,7 +460,7 @@ local function mkToggleBtn(title, sub, onCb, offCb)
     return b
 end
 
--- Notifikasi
+-- Notifications
 local notifQueue = {}
 local notifActive = false
 local function showNotif(title, body, dur)
@@ -538,34 +511,23 @@ local function showNotif(title, body, dur)
 end
 
 task.delay(0.5, function()
-    showNotif("Welcome", "Indo Voice script loaded!", 4)
+    showNotif("Indo Voice", "Script loaded!", 4)
 end)
 
--- === Fishing Logic ===
+-- ==================== FISHING LOGIC ====================
 local function getRod()
     if char then
         for _, v in ipairs(char:GetChildren()) do
-            if v:IsA("Tool") and string.find(v.Name:lower(), "rod") then
-                return v
-            end
+            if v:IsA("Tool") and string.find(v.Name:lower(), "rod") then return v end
         end
     end
     local bp = LP:FindFirstChild("Backpack")
     if bp then
         for _, v in ipairs(bp:GetChildren()) do
-            if v:IsA("Tool") and string.find(v.Name:lower(), "rod") then
-                return v
-            end
+            if v:IsA("Tool") and string.find(v.Name:lower(), "rod") then return v end
         end
     end
     return nil
-end
-
-local function unequipRod()
-    local rod = getRod()
-    if rod then
-        pcall(function() hum:UnequipTools() end)
-    end
 end
 
 local function equipRod()
@@ -602,24 +564,25 @@ local function resetAnimDetection()
     if animConn then animConn:Disconnect() end
     castAnimPlayed = false
     pullAnimPlayed = false
-    animConn = hum.AnimationPlayed:Connect(function(track)
-        if track.Animation.AnimationId == CAST_ANIM_ID then
-            castAnimPlayed = true
-            animConn:Disconnect()
-        elseif track.Animation.AnimationId == PULL_ANIM_ID then
-            pullAnimPlayed = true
-            animConn:Disconnect()
-        end
-    end)
+    if hum then
+        animConn = hum.AnimationPlayed:Connect(function(track)
+            if track.Animation.AnimationId == CAST_ANIM_ID then
+                castAnimPlayed = true
+                animConn:Disconnect()
+            elseif track.Animation.AnimationId == PULL_ANIM_ID then
+                pullAnimPlayed = true
+                animConn:Disconnect()
+            end
+        end)
+    end
 end
 
-local fishingThread
 local function stopFishing()
     autoFishing = false
     if animConn then animConn:Disconnect() end
     stage = "Idle"
     timer = 0
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0) -- release click
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
 end
 
 local function startFishingLoop()
@@ -632,14 +595,14 @@ local function startFishingLoop()
             end
             -- Idle
             if stage == "Idle" then
-                if hum.MoveDirection.Magnitude < 0.1 then -- not walking
+                if hum.MoveDirection.Magnitude < 0.1 then
                     task.wait(timeouts.PRE_CAST_DELAY)
                     if not autoFishing then break end
                     stage = "Casting"
                     timer = 0
                     resetAnimDetection()
                     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                    task.wait(0.05) -- hold started
+                    task.wait(0.05)
                 else
                     task.wait(0.1)
                 end
@@ -663,7 +626,7 @@ local function startFishingLoop()
                     if timer > timeouts.VERIFY_CAST_TIMEOUT then
                         totalTimeouts = totalTimeouts + 1
                         stage = "Idle"
-                        task.spawn(function() equipRod() end)
+                        equipRod()
                     end
                     task.wait(0.05)
                 end
@@ -677,7 +640,7 @@ local function startFishingLoop()
                     if timeouts.WAITING_PULL_TIMEOUT > 0 and timer > timeouts.WAITING_PULL_TIMEOUT then
                         totalTimeouts = totalTimeouts + 1
                         stage = "Idle"
-                        task.spawn(function() equipRod() end)
+                        equipRod()
                     end
                     task.wait(0.05)
                 end
@@ -688,7 +651,7 @@ local function startFishingLoop()
                     if timer > timeouts.POST_PULL_TIMEOUT then
                         totalTimeouts = totalTimeouts + 1
                         stage = "Idle"
-                        task.spawn(function() equipRod() end)
+                        equipRod()
                     end
                     task.wait(0.05)
                 else
@@ -742,7 +705,7 @@ local function startFishingLoop()
     end)
 end
 
--- === UI Buttons ===
+-- ==================== UI CONTENT ====================
 mkSec("Fishing")
 
 mkToggleBtn("Auto Fishing", "Start bot fishing", function()
@@ -761,7 +724,7 @@ mkBtn("Sell All Fish", "Sell all caught fish", function()
     sellAllFish()
 end)
 
--- Add a label showing status (optional)
+-- Status label
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1,0,0,16)
 statusLabel.BackgroundTransparency = 1
@@ -783,7 +746,7 @@ task.spawn(function()
     end
 end)
 
--- Stop fishing when character respawns
+-- Character respawn handler
 LP.CharacterAdded:Connect(function()
     if autoFishing then
         stopFishing()
