@@ -2461,17 +2461,24 @@ function StartAttacksWithMode(mode)
         end
     end)
     
-    _G.AutoClickLoop = task.spawn(function()
-        while _G.Settings.AutoClick do
+   _G.AutoClickLoop = task.spawn(function()
+    while _G.Settings.AutoClick do
+        pcall(function()
             local char = Player.Character
-            if char and IsAlive(char) and char:FindFirstChildOfClass("Tool") then
-                game:GetService("VirtualUser"):CaptureController()
-                game:GetService("VirtualUser"):Button1Down(Vector2.new(1280, 672))
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local enemy = workspace.Enemies:GetChildren()[1]
+                if enemy and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                    local target = enemy:FindFirstChild("Head") or enemy:FindFirstChild("HumanoidRootPart")
+                    if target then
+                        RegisterAttack:FireServer(0)
+                        RegisterHit:FireServer(target, {enemy, target})
+                    end
+                end
             end
-            task.wait(0.1)
-        end
-    end)
-end
+        end)
+        task.wait(0.15)
+    end
+end)
 
 _G.FastAttack = false
 if _G.rz_FastAttack then _G.rz_FastAttack = nil end
