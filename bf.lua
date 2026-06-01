@@ -1,8 +1,3 @@
--- ============================================
--- MODIFIED BY Anonymous9x ya
--- Original script modified to grayscale theme and rebranding
--- ============================================
-
 local Services = setmetatable({}, {
     __index = function(self, serviceName)
         local service = game:GetService(serviceName)
@@ -11,8 +6,9 @@ local Services = setmetatable({}, {
     end
 })
 
+
 local HttpService = Services.HttpService
-local FolderName = "Anonymous9x VIP | Farm"
+local FolderName = "Zyn Hub | Farm"
 local FileName = "Settings.json"
 local FullPath = FolderName .. "/" .. FileName
 
@@ -153,7 +149,7 @@ elseif placeId == 4442272183 or placeId == 79091703265657 then
 elseif placeId == 7449423635 or placeId == 100117331123089 then
     World3 = true
 else
-    plr:Kick("❌ Error Anonymous9x Blox Fruit - World not recognized")
+    plr:Kick("❌ Error Blox Fruits - World not recognized")
 end
 
 Sea = World1 or World2 or World3
@@ -2461,16 +2457,17 @@ function StartAttacksWithMode(mode)
         end
     end)
     
-   _G.AutoClickLoop = task.spawn(function()
-    while _G.Settings.AutoClick do
-        local char = Player.Character
-        if char and IsAlive(char) and char:FindFirstChildOfClass("Tool") then
-            game:GetService("VirtualUser"):CaptureController()
-            game:GetService("VirtualUser"):Button1Down(Vector2.new(1280, 672))
+    _G.AutoClickLoop = task.spawn(function()
+        while _G.Settings.AutoClick do
+            local char = Player.Character
+            if char and IsAlive(char) and char:FindFirstChildOfClass("Tool") then
+                game:GetService("VirtualUser"):CaptureController()
+                game:GetService("VirtualUser"):Button1Down(Vector2.new(1280, 672))
+            end
+            task.wait(0.1)
         end
-        task.wait(0.1)
-    end
-end)
+    end)
+end
 
 _G.FastAttack = false
 if _G.rz_FastAttack then _G.rz_FastAttack = nil end
@@ -2642,55 +2639,15 @@ local function performClick()
     getgenv().AutoClickShootSettings.LastClickTime = currentTime
 end
 
-local bearlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/anolib.lua"))()
+local bearlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Jadelly/Ui/refs/heads/main/NewZynLib"))()
 local Window = bearlib:MakeWindow({
-    Title = "Anonymous9x Blox Fruit",
-    SubTitle = "VIP Script Anonymous9x",
+    Title = "Zyn Hub | Farm",
+    SubTitle = "by Jaia",
     SaveFolder = true,
-    Image = "97269958324726"
+    Image = "11354741327"
 })
-
--- Function to apply grayscale theme
-local function applyGrayscaleTheme()
-    task.wait(0.5) -- wait for UI to fully load
-    pcall(function()
-        local playerGui = game.Players.LocalPlayer.PlayerGui
-        for _, gui in pairs(playerGui:GetChildren()) do
-            if gui.Name:find("BearLib") or gui:IsA("ScreenGui") then
-                local function recolor(instance)
-                    if instance:IsA("Frame") or instance:IsA("ImageLabel") then
-                        instance.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-                        if instance.BorderColor3 ~= Color3.new(1,1,1) then
-                            instance.BorderColor3 = Color3.fromRGB(40, 40, 40)
-                        end
-                    elseif instance:IsA("TextLabel") or instance:IsA("TextButton") then
-                        instance.TextColor3 = Color3.fromRGB(220, 220, 220)
-                        instance.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-                        instance.BorderColor3 = Color3.fromRGB(50, 50, 50)
-                    elseif instance:IsA("ImageButton") then
-                        instance.ImageColor3 = Color3.fromRGB(200, 200, 200)
-                    elseif instance:IsA("ScrollingFrame") then
-                        instance.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-                    end
-                    for _, child in pairs(instance:GetChildren()) do
-                        recolor(child)
-                    end
-                end
-                recolor(gui)
-            end
-        end
-    end)
-end
-
--- Apply theme after UI creation
-task.spawn(applyGrayscaleTheme)
 
 -- Hiển thị thông báo UI đã tải xong
-bearlib:Notify({
-    Title = "Anonymous9x",
-    Message = "UI Loaded | Grayscale Theme",
-    Duration = 3
-})
 
 ------ Tab
 local v1 = Window:MakeTab({
@@ -5317,7 +5274,7 @@ task.spawn(function()
                         task.wait(0.1)
                         FishingRequest:InvokeServer("Catch", 1)
                         
-                        -- Sử dụng thông báo de bearlib khi câu được cá
+                        -- Sử dụng thông báo của bearlib khi câu được cá
                         bearlib:Notify({
                             Title = "Auto Fish",
                             Message = "New item caught",
@@ -11600,7 +11557,7 @@ v14:AddToggle({
                 local data = MeleeCoords[SelectedMelee]
                 if not data or not data.Pos then
                     bearlib:Notify({
-                        Title = "Anonymous9x",
+                        Title = "Zyn Hub",
                         Message = "Lỗi: Không tìm thấy toạ độ cho Melee này ở Sea hiện tại!",
                         Duration = 3
                     })
@@ -11626,7 +11583,7 @@ v14:AddToggle({
                         game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("BuyItem", data.Key)
                         
                         bearlib:Notify({
-                            Title = "Anonymous9x",
+                            Title = "Zyn Hub",
                             Message = "Đã mua: " .. SelectedMelee,
                             Duration = 2
                         })
