@@ -989,6 +989,7 @@ local lastThrowTime = 0
 local rodEventConn
 local fishLoopThread
 
+-- Tombol pilih rod
 local rodBtn, rodBtnTitle = mkBtn("Rod: " .. currentRod, nil, function()
 	local idx = table.find(rods, currentRod) or 1
 	idx = idx % #rods + 1
@@ -997,6 +998,7 @@ local rodBtn, rodBtnTitle = mkBtn("Rod: " .. currentRod, nil, function()
 	showNotif("Rod Changed", currentRod, 2)
 end)
 
+-- Tombol pilih sell option
 local sellBtn, sellBtnTitle = mkBtn("Sell: " .. sellOption, nil, function()
 	local idx = table.find(sellOptions, sellOption) or 1
 	idx = idx % #sellOptions + 1
@@ -1005,6 +1007,7 @@ local sellBtn, sellBtnTitle = mkBtn("Sell: " .. sellOption, nil, function()
 	showNotif("Sell Option", sellOption, 2)
 end)
 
+-- Toggle Auto Fishing
 mkToggleBtn("Auto Fishing", "Automatically fish and reel", function()
 	autoFishing = true
 	setupRodEvent()
@@ -1018,6 +1021,7 @@ end, function()
 	showNotif("Auto Fish OFF", "Fishing stopped.", 2)
 end)
 
+-- Toggle Auto Sell
 mkToggleBtn("Auto Sell", "Sell fish after catching", function()
 	autoSelling = true
 	showNotif("Auto Sell ON", "Auto sell enabled.", 3)
@@ -1026,6 +1030,7 @@ end, function()
 	showNotif("Auto Sell OFF", "Auto sell disabled.", 2)
 end)
 
+-- Tombol Sell Now
 mkBtn("Sell Now", "Manually sell fish", function()
 	pcall(function()
 		sellRemote:InvokeServer("SellFish", sellOption)
