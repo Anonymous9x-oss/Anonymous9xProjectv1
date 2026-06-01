@@ -1025,15 +1025,15 @@ function bearlib:MakeWindow(Configs)
     function Window:CloseBtn()
         local Dialog = Window:Dialog({
             Title = "Window",
-            Text = "Đóng window ?",
+            Text = "Tutup Window manis ?",
             Options = {
-                {"Đóng", function()
+                {"Tutup", function()
                     ScreenGui:Destroy()
                     if ToggleGui then
                         ToggleGui:Destroy()
                     end
                 end},
-                {"Không"}
+                {"Batal"}
             }
         })
     end
