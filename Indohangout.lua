@@ -972,16 +972,32 @@ end, function()
 	showNotif("ESP OFF", "Player ESP hidden.", 2)
 end)
 
--- ==================== FISHING SECTION (FIXED) ====================
+-- ==================== FISHING SECTION (FIXED REMOTE PATHS) ====================
 mkSec("Fishing")
 
 local rodRemote, sellRemote, equipRemote
 pcall(function()
-	local remotes = ReplicatedStorage:WaitForChild("Remote", 5)
-	if remotes then
-		rodRemote = remotes:FindFirstChild("RodRemoteEvent") or remotes:FindFirstChild("Rod")
-		sellRemote = remotes:FindFirstChild("SellItemRemoteFunction") or remotes:FindFirstChild("SellFish")
-		equipRemote = remotes:FindFirstChild("EquipTools")
+	-- Coba cari remote dengan berbagai kemungkinan path
+	local Events = ReplicatedStorage:FindFirstChild("Events")
+	if Events then
+		local RemoteEvent = Events:FindFirstChild("RemoteEvent")
+		local RemoteFunction = Events:FindFirstChild("RemoteFunction")
+		if RemoteEvent then
+			rodRemote = RemoteEvent:FindFirstChild("Rod") or RemoteEvent:FindFirstChild("RodRemoteEvent")
+		end
+		if RemoteFunction then
+			sellRemote = RemoteFunction:FindFirstChild("SellFish") or RemoteFunction:FindFirstChild("SellItemRemoteFunction")
+			equipRemote = RemoteFunction:FindFirstChild("EquipTools")
+		end
+	end
+	-- Fallback: mungkin ada di ReplicatedStorage.Remote
+	if not rodRemote or not sellRemote then
+		local Remote = ReplicatedStorage:FindFirstChild("Remote")
+		if Remote then
+			rodRemote = rodRemote or Remote:FindFirstChild("RodRemoteEvent") or Remote:FindFirstChild("Rod")
+			sellRemote = sellRemote or Remote:FindFirstChild("SellItemRemoteFunction") or Remote:FindFirstChild("SellFish")
+			equipRemote = equipRemote or Remote:FindFirstChild("EquipTools")
+		end
 	end
 end)
 
@@ -1006,7 +1022,6 @@ local fish = {
 }
 
 if rodRemote and sellRemote then
-	-- Helper functions
 	local function getEquippedRod()
 		if char then
 			for _, v in ipairs(char:GetChildren()) do
@@ -1106,7 +1121,6 @@ if rodRemote and sellRemote then
 					pcall(function()
 						rodRemote:FireServer("Catch", rod, true)
 					end)
-					fish.fishCaught = true
 				end
 				conn3:Disconnect()
 			end
@@ -1135,7 +1149,6 @@ if rodRemote and sellRemote then
 		end)
 	end
 
-	-- Main loop
 	local function startFishLoop()
 		fish.fishLoopThread = task.spawn(function()
 			while fish.autoFishing do
@@ -1227,7 +1240,6 @@ else
 	end)
 end
 
--- Reset fishing state on character added
 LP.CharacterAdded:Connect(function()
 	fish.isReeling = false
 	fish.waitingStopShake = false
