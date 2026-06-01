@@ -2646,7 +2646,7 @@ end
 local bearlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Jadelly/Ui/refs/heads/main/NewZynLib"))()
 local Window = bearlib:MakeWindow({
     Title = "Anonymous9x Blox Fruit",
-    SubTitle = "by Anonymous9x",
+    SubTitle = "VIP Script Anonymous9x",
     SaveFolder = true,
     Image = "97269958324726"
 })
