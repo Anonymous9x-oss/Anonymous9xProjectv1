@@ -2643,7 +2643,7 @@ local function performClick()
     getgenv().AutoClickShootSettings.LastClickTime = currentTime
 end
 
-local bearlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Jadelly/Ui/refs/heads/main/NewZynLib"))()
+local bearlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/anolib.lua"))()
 local Window = bearlib:MakeWindow({
     Title = "Anonymous9x Blox Fruit",
     SubTitle = "VIP Script Anonymous9x",
