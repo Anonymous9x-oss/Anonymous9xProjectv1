@@ -124,9 +124,7 @@ task.delay(0.6, function()
 		showNotif("Wrong game!", "This script is for Indo Hangout only. By @Anonymous9x", 6)
 	end
 end)
-if not inCorrectMap then
-	return
-end
+if not inCorrectMap then return end
 local vp = Cam.ViewportSize
 if vp.X < 10 then task.wait(0.1); vp = Cam.ViewportSize end
 local win = Instance.new("Frame")
@@ -665,6 +663,8 @@ local function mkToggleBtn(title, sub, onCb, offCb)
 	b.MouseLeave:Connect(function() TweenService:Create(b,TweenInfo.new(0.10),{BackgroundColor3=T.card}):Play() end)
 	return b
 end
+
+-- ==================== AVATAR SECTION ====================
 mkSec("Avatar")
 mkBtn("Copy Avatar", "Clone target player outfit FE", function()
 	if not inCorrectMap then showNotif("Wrong Game", "Only works in Indo Hangout.", 3) return end
@@ -764,6 +764,8 @@ mkBtn("Reset Avatar", "Restore your original outfit", function()
 	pcall(function() CatalogOnApplyOutfit:FireServer(unpack(outfitData)) end)
 	showNotif("Avatar Reset", "Restored your original look.", 3)
 end)
+
+-- ==================== MOVEMENT SECTION ====================
 mkSec("Movement")
 mkBtn("Teleport to Target", "Instantly move to selected player", function()
 	if not selectedPlayer then showNotif("No Target","Select a player first.",3) return end
@@ -799,6 +801,8 @@ end, function()
 	if lastCamSubject then pcall(function() Cam.CameraSubject = lastCamSubject end) lastCamSubject = nil end
 	showNotif("Spectate OFF", "Camera restored.", 2)
 end)
+
+-- ==================== EXTRAS SECTION ====================
 mkSec("Extras")
 mkToggleBtn("Noclip", "Walk through parts and walls", function()
 	isNoclip = true
@@ -968,357 +972,266 @@ end, function()
 	showNotif("ESP OFF", "Player ESP hidden.", 2)
 end)
 
--- ==================== FISHING SECTION (UPGRADED FROM LEAK) ====================
+-- ==================== FISHING SECTION (FIXED) ====================
 mkSec("Fishing")
 
--- Remote definitions (from leak)
-local rodRemote, sellRemote, equipRemote, backRemote
+local rodRemote, sellRemote, equipRemote
 pcall(function()
-	local remotes = ReplicatedStorage:WaitForChild("Events")
-	local remoteEvent = remotes:WaitForChild("RemoteEvent")
-	local remoteFunc = remotes:WaitForChild("RemoteFunction")
-	rodRemote = remoteEvent:WaitForChild("Rod")
-	sellRemote = remoteFunc:WaitForChild("SellFish")
-	equipRemote = remoteFunc:WaitForChild("EquipTools")
-	backRemote = remoteFunc:WaitForChild("Backpack")
+	local remotes = ReplicatedStorage:WaitForChild("Remote", 5)
+	if remotes then
+		rodRemote = remotes:FindFirstChild("RodRemoteEvent") or remotes:FindFirstChild("Rod")
+		sellRemote = remotes:FindFirstChild("SellItemRemoteFunction") or remotes:FindFirstChild("SellFish")
+		equipRemote = remotes:FindFirstChild("EquipTools")
+	end
 end)
 
 local rods = {"Basic Rod", "Coconut Rod", "VIP Rod", "Party Rod", "Shark Rod", "Piranha Rod", "Thermo Rod", "Flowers Rod", "Trisula Rod", "Feather Rod", "Wave Rod", "Duck Rod", "Planet Rod", "Earth Rod", "Bat Rod", "Pumkin Rod", "Reindeer Rod", "Canny Rod", "Jinggle Rod", "Gopay Rod"}
-local sellOptions = {"All under 50 Kg", "All under 100 Kg", "All under 400 Kg", "All under 600 Kg", "All under 800 Kg", "All under 1000 Kg", "Sell All"}
+local sellOptions = {"Sell All", "All under 50 Kg", "All under 100 Kg", "All under 400 Kg", "All under 600 Kg", "All under 800 Kg", "All under 1000 Kg"}
 
-local currentRod = "Basic Rod"
-local sellOption = "Sell All"
-local autoFishing = false
-local autoSelling = false
-local instantCatch = true  -- semi-instant mode
-local fixCamera = true
-local autoStopShake = true
-local blockStartShake = true
+local fish = {
+	autoFishing = false,
+	autoSelling = false,
+	instantCatch = true,
+	currentRod = "Basic Rod",
+	sellOption = "Sell All",
+	sellInterval = 30,
+	lastSellTime = 0,
+	isReeling = false,
+	waitingStopShake = false,
+	lastThrowTime = 0,
+	reelGui = nil,
+	reelConns = {},
+	rodEventConn = nil,
+	fishLoopThread = nil,
+}
 
-local isReeling = false
-local reelGui = nil
-local reelConnections = {}
-local lastThrowTime = 0
-local throwCooldown = false
-local waitingStopShake = false
-local fishCaught = false
-local catchCount = 0
-local lastSellTime = 0
-local sellInterval = 30
-local ownedRods = {}
-local rodListBuilt = false
-
--- Helper: get current rod tool equipped
-local function getEquippedRod()
-	if LP.Character then
-		for _, v in ipairs(LP.Character:GetChildren()) do
-			if v:IsA("Tool") and v.Name:lower():find("rod") then
-				return v
+if rodRemote and sellRemote then
+	-- Helper functions
+	local function getEquippedRod()
+		if char then
+			for _, v in ipairs(char:GetChildren()) do
+				if v:IsA("Tool") and v.Name:lower():find("rod") then return v end
 			end
 		end
+		return nil
 	end
-	return nil
-end
 
--- Equip rod via remote (leak method)
-local function equipRodRemote(rodName)
-	if not equipRemote then return false end
-	local success, err = pcall(function()
-		equipRemote:InvokeServer("EquipRod", rodName)
-	end)
-	if success then
-		return true
-	else
-		warn("Equip remote failed:", err)
-		return false
-	end
-end
-
--- Standard equip via humanoid (may fail on some executors)
-local function equipRodStandard(tool)
-	if not hum or not tool then return false end
-	pcall(function()
-		hum:EquipTool(tool)
-	end)
-	task.wait(0.3)
-	return getEquippedRod() == tool
-end
-
--- Robust equip function
-local function equipRod(rodName)
-	local tool = LP.Backpack and LP.Backpack:FindFirstChild(rodName)
-	if not tool and LP.Character then
-		tool = LP.Character:FindFirstChild(rodName)
-	end
-	if not tool then
-		-- try to get it via remote equip
-		if equipRodRemote(rodName) then
-			task.wait(0.5)
-			return getEquippedRod()
+	local function equipRod(rodName)
+		local tool = LP.Backpack and LP.Backpack:FindFirstChild(rodName)
+		if not tool and char then tool = char:FindFirstChild(rodName) end
+		if not tool then
+			if equipRemote then
+				pcall(function() equipRemote:InvokeServer("EquipRod", rodName) end)
+				task.wait(0.5)
+				return getEquippedRod()
+			end
+			return false
 		end
-		return false
-	end
-	-- try standard equip first
-	if equipRodStandard(tool) then
-		return tool
-	end
-	-- fallback to remote equip
-	if equipRodRemote(rodName) then
-		task.wait(0.5)
+		pcall(function() hum:EquipTool(tool) end)
+		task.wait(0.3)
 		return getEquippedRod()
 	end
-	return false
-end
 
--- Sell fish
-local function sellFish()
-	if not sellRemote then return end
-	pcall(function()
-		sellRemote:InvokeServer("SellFish", sellOption)
-	end)
-	lastSellTime = tick()
-end
-
--- Clear reeling helpers
-local function clearReeling()
-	for _, conn in ipairs(reelConnections) do
-		conn:Disconnect()
-	end
-	reelConnections = {}
-	if reelGui and reelGui.Parent then
-		reelGui:Destroy()
-	end
-	reelGui = nil
-end
-
-local function stopReeling()
-	clearReeling()
-	isReeling = false
-end
-
--- Instant catch logic (from leak r132)
-local function startInstantCatch(gui)
-	if not gui then return end
-	local frame = gui:WaitForChild("Frame", 4)
-	if not frame then return end
-	local inner = frame:WaitForChild("Frame", 4)
-	if not inner then return end
-	local whiteBar = inner:FindFirstChild("WhiteBar")
-	local redBar = inner:FindFirstChild("RedBar")
-	local progressBg = frame:FindFirstChild("ProgressBg")
-	local progressBar = progressBg and progressBg:FindFirstChild("ProgressBar")
-	if not whiteBar or not redBar or not progressBar then return end
-
-	-- Set progress to almost full and lock it
-	progressBar.Size = UDim2.new(0.98, 0, progressBar.Size.Y.Scale, progressBar.Size.Y.Offset)
-	local function update()
-		if not whiteBar.Parent or not redBar.Parent or not progressBar.Parent or not gui.Parent then return false end
-		if not autoFishing then return false end
-		whiteBar.Position = UDim2.new(math.clamp(redBar.Position.X.Scale + redBar.Size.X.Scale/2 - whiteBar.Size.X.Scale/2, 0, 1 - whiteBar.Size.X.Scale), 0, whiteBar.Position.Y.Scale, whiteBar.Position.Y.Offset)
-		progressBar.Size = UDim2.new(0.98, 0, progressBar.Size.Y.Scale, progressBar.Size.Y.Offset)
-		return true
+	local function sellFish()
+		if not sellRemote then return end
+		pcall(function()
+			sellRemote:InvokeServer("SellFish", fish.sellOption)
+		end)
+		fish.lastSellTime = tick()
 	end
 
-	local conn1 = RunService.RenderStepped:Connect(function()
-		if not update() then
-			clearReeling()
+	local function clearReeling()
+		for _, conn in ipairs(fish.reelConns) do
+			conn:Disconnect()
 		end
-	end)
-	local conn2 = RunService.Heartbeat:Connect(function()
-		if not update() then
-			clearReeling()
+		fish.reelConns = {}
+		if fish.reelGui and fish.reelGui.Parent then
+			fish.reelGui:Destroy()
 		end
-	end)
-	table.insert(reelConnections, conn1)
-	table.insert(reelConnections, conn2)
-end
+		fish.reelGui = nil
+	end
 
--- Rod event handler
-local rodEventConn
-local function setupRodEvent()
-	if rodEventConn then rodEventConn:Disconnect() end
-	if not rodRemote then return end
-	rodEventConn = rodRemote.OnClientEvent:Connect(function(action, arg)
-		if action == "StartShake" then
-			if autoStopShake and arg then
-				pcall(function()
-					rodRemote:FireServer("StopShake", arg)
-				end)
-				if blockStartShake then
-					task.spawn(function()
-						for i = 1, 3 do
-							task.wait(0.01)
-							pcall(function()
-								rodRemote:FireServer("StopShake", arg)
-							end)
-						end
-					end)
-				end
-			end
-			isReeling = true
-			local gui = LP.PlayerGui:FindFirstChild("Reeling")
-			if gui then
-				reelGui = gui
-				if instantCatch then
-					startInstantCatch(gui)
-				else
-					-- fallback to basic reeling (just follow)
-					-- not implementing basic for now
-				end
-			end
-		elseif action == "StopShake" then
-			waitingStopShake = false
-			stopReeling()
-			if autoSelling and tick() - lastSellTime >= sellInterval then
-				task.wait(0.3)
-				sellFish()
-			end
-		elseif action == "Zoom" then
-			-- ignore
-		end
-	end)
-end
+	local function stopReeling()
+		clearReeling()
+		fish.isReeling = false
+	end
 
--- Main fishing loop
-local fishLoopThread
-local function startFishLoop()
-	fishLoopThread = task.spawn(function()
-		while autoFishing do
-			if not isReeling and not throwCooldown and not waitingStopShake then
-				local rod = getEquippedRod()
-				if not rod then
-					-- equip current rod
-					equipRod(currentRod)
-					task.wait(1)
-					rod = getEquippedRod()
-				end
+	local function startInstantCatch(gui)
+		local frame = gui:WaitForChild("Frame", 4)
+		if not frame then return end
+		local inner = frame:WaitForChild("Frame", 4)
+		if not inner then return end
+		local whiteBar = inner:FindFirstChild("WhiteBar")
+		local redBar = inner:FindFirstChild("RedBar")
+		local progressBg = frame:FindFirstChild("ProgressBg")
+		local progressBar = progressBg and progressBg:FindFirstChild("ProgressBar")
+		if not whiteBar or not redBar or not progressBar then return end
+
+		progressBar.Size = UDim2.new(0.5, 0, progressBar.Size.Y.Scale, progressBar.Size.Y.Offset)
+
+		local function update()
+			if not whiteBar.Parent or not redBar.Parent or not progressBar.Parent or not gui.Parent then return false end
+			if not fish.autoFishing then return false end
+			whiteBar.Position = UDim2.new(math.clamp(redBar.Position.X.Scale + redBar.Size.X.Scale/2 - whiteBar.Size.X.Scale/2, 0, 1 - whiteBar.Size.X.Scale), 0, whiteBar.Position.Y.Scale, whiteBar.Position.Y.Offset)
+			if fish.instantCatch then
+				progressBar.Size = UDim2.new(0.98, 0, progressBar.Size.Y.Scale, progressBar.Size.Y.Offset)
+			end
+			return true
+		end
+
+		local conn1 = RunService.RenderStepped:Connect(function()
+			if not update() then clearReeling() end
+		end)
+		local conn2 = RunService.Heartbeat:Connect(function()
+			if not update() then clearReeling() end
+		end)
+		table.insert(fish.reelConns, conn1)
+		table.insert(fish.reelConns, conn2)
+
+		-- Catch trigger
+		local conn3 = RunService.Heartbeat:Connect(function()
+			if not gui.Parent then
+				conn3:Disconnect()
+				return
+			end
+			local frame = gui:FindFirstChild("Frame")
+			if not frame then return end
+			local progressBg = frame:FindFirstChild("ProgressBg")
+			local progressBar = progressBg and progressBg:FindFirstChild("ProgressBar")
+			if not progressBar then return end
+			if progressBar.Size.X.Scale >= 0.99 then
+				local tool = gui:FindFirstChild("Tool")
+				local rod = tool and tool.Value
 				if rod then
-					if tick() - lastThrowTime < 1.2 then
-						task.wait(0.2)
-						continue
-					end
-					lastThrowTime = tick()
-					waitingStopShake = true
 					pcall(function()
-						rodRemote:FireServer("Throw", rod)
+						rodRemote:FireServer("Catch", rod, true)
 					end)
-					task.wait(0.5)
-					-- wait for shake or timeout
-					local startTime = tick()
-					while waitingStopShake and autoFishing do
-						if tick() - startTime > 60 then
-							waitingStopShake = false
-							break
+					fish.fishCaught = true
+				end
+				conn3:Disconnect()
+			end
+		end)
+		table.insert(fish.reelConns, conn3)
+	end
+
+	local function setupRodEvent()
+		if fish.rodEventConn then fish.rodEventConn:Disconnect() end
+		fish.rodEventConn = rodRemote.OnClientEvent:Connect(function(action, arg)
+			if action == "StartShake" then
+				fish.isReeling = true
+				local gui = LP.PlayerGui:FindFirstChild("Reeling")
+				if gui then
+					fish.reelGui = gui
+					startInstantCatch(gui)
+				end
+			elseif action == "StopShake" then
+				fish.waitingStopShake = false
+				stopReeling()
+				if fish.autoSelling and tick() - fish.lastSellTime >= fish.sellInterval then
+					task.wait(0.3)
+					sellFish()
+				end
+			end
+		end)
+	end
+
+	-- Main loop
+	local function startFishLoop()
+		fish.fishLoopThread = task.spawn(function()
+			while fish.autoFishing do
+				if not fish.isReeling and not fish.waitingStopShake then
+					local rod = getEquippedRod()
+					if not rod then
+						equipRod(fish.currentRod)
+						task.wait(1)
+						rod = getEquippedRod()
+					end
+					if rod and tick() - fish.lastThrowTime >= 1.5 then
+						fish.lastThrowTime = tick()
+						fish.waitingStopShake = true
+						pcall(function()
+							rodRemote:FireServer("Throw", rod)
+						end)
+						local startTime = tick()
+						while fish.waitingStopShake and fish.autoFishing do
+							if tick() - startTime > 60 then
+								fish.waitingStopShake = false
+								break
+							end
+							task.wait(0.5)
 						end
+					else
 						task.wait(0.5)
 					end
 				else
-					task.wait(2)
+					task.wait(0.5)
 				end
-			else
-				task.wait(0.5)
 			end
-		end
-		stopReeling()
-	end)
-end
+			stopReeling()
+		end)
+	end
 
--- UI Buttons
-if rodRemote and sellRemote then
-	-- Rod selector
-	local rodBtn, rodBtnTitle = mkBtn("Rod: " .. currentRod, nil, function()
-		local idx = table.find(rods, currentRod) or 1
+	-- UI Elements
+	local rodBtn, rodBtnTitle = mkBtn("Rod: " .. fish.currentRod, nil, function()
+		local idx = table.find(rods, fish.currentRod) or 1
 		idx = idx % #rods + 1
-		currentRod = rods[idx]
-		rodBtnTitle.Text = "Rod: " .. currentRod
-		showNotif("Rod Changed", currentRod, 2)
+		fish.currentRod = rods[idx]
+		rodBtnTitle.Text = "Rod: " .. fish.currentRod
+		showNotif("Rod Changed", fish.currentRod, 2)
 	end)
 
-	-- Sell option
-	local sellBtn, sellBtnTitle = mkBtn("Sell: " .. sellOption, nil, function()
-		local idx = table.find(sellOptions, sellOption) or 1
+	local sellBtn, sellBtnTitle = mkBtn("Sell: " .. fish.sellOption, nil, function()
+		local idx = table.find(sellOptions, fish.sellOption) or 1
 		idx = idx % #sellOptions + 1
-		sellOption = sellOptions[idx]
-		sellBtnTitle.Text = "Sell: " .. sellOption
-		showNotif("Sell Option", sellOption, 2)
+		fish.sellOption = sellOptions[idx]
+		sellBtnTitle.Text = "Sell: " .. fish.sellOption
+		showNotif("Sell Option", fish.sellOption, 2)
 	end)
 
-	-- Auto Fishing
 	mkToggleBtn("Auto Fishing", "Automatically fish", function()
-		autoFishing = true
+		fish.autoFishing = true
 		setupRodEvent()
 		startFishLoop()
 		showNotif("Auto Fish ON", "Fishing started.", 3)
 	end, function()
-		autoFishing = false
+		fish.autoFishing = false
 		stopReeling()
-		if rodEventConn then rodEventConn:Disconnect() rodEventConn = nil end
-		if fishLoopThread then task.cancel(fishLoopThread) fishLoopThread = nil end
+		if fish.rodEventConn then fish.rodEventConn:Disconnect() fish.rodEventConn = nil end
+		if fish.fishLoopThread then task.cancel(fish.fishLoopThread) fish.fishLoopThread = nil end
 		showNotif("Auto Fish OFF", "Fishing stopped.", 2)
 	end)
 
-	-- Auto Sell
-	mkToggleBtn("Auto Sell", "Sell fish after catch", function()
-		autoSelling = true
+	mkToggleBtn("Auto Sell", "Sell fish after catching", function()
+		fish.autoSelling = true
 		showNotif("Auto Sell ON", "Auto sell enabled.", 3)
 	end, function()
-		autoSelling = false
+		fish.autoSelling = false
 		showNotif("Auto Sell OFF", "Auto sell disabled.", 2)
 	end)
 
-	-- Instant Catch
-	mkToggleBtn("Instant Catch", "Semi-instant catch mode", function()
-		instantCatch = true
-		showNotif("Instant Catch ON", "Catch almost instantly.", 2)
+	mkToggleBtn("Instant Catch", "Catch fish instantly", function()
+		fish.instantCatch = true
+		showNotif("Instant Catch ON", "Instant catch mode.", 2)
 	end, function()
-		instantCatch = false
-		showNotif("Instant Catch OFF", "Normal catch.", 2)
+		fish.instantCatch = false
+		showNotif("Instant Catch OFF", "Normal catch mode.", 2)
 	end)
 
-	-- Fix Camera
-	mkToggleBtn("Fix Camera", "Lock camera settings", function()
-		fixCamera = true
-		showNotif("Fix Camera ON", "Camera locked.", 2)
-	end, function()
-		fixCamera = false
-		showNotif("Fix Camera OFF", "Camera released.", 2)
-	end)
-
-	-- Auto Stop Shake
-	mkToggleBtn("Auto Stop Shake", "Stop shake instantly", function()
-		autoStopShake = true
-		blockStartShake = true
-		showNotif("Stop Shake ON", "Shake blocked.", 2)
-	end, function()
-		autoStopShake = false
-		blockStartShake = false
-		showNotif("Stop Shake OFF", "Normal shake.", 2)
-	end)
-
-	-- Sell Now
 	mkBtn("Sell Now", "Manually sell fish", function()
 		sellFish()
-		showNotif("Sell Now", "Sold fish.", 3)
+		showNotif("Sell Now", "Fish sold.", 3)
 	end)
 else
-	-- Remotes not available
 	task.spawn(function()
 		showNotif("Fishing Error", "Fishing remotes not available.", 3)
 	end)
 end
 
--- Camera fix loop
-task.spawn(function()
-	while true do
-		if fixCamera and autoFishing then
-			pcall(function()
-				if Cam.CameraType == Enum.CameraType.Scriptable then
-					Cam.CameraType = Enum.CameraType.Custom
-				end
-			end)
-		end
-		task.wait(0.5)
-	end
+-- Reset fishing state on character added
+LP.CharacterAdded:Connect(function()
+	fish.isReeling = false
+	fish.waitingStopShake = false
+	stopReeling()
 end)
 
 RunService.Heartbeat:Connect(function()
