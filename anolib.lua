@@ -1738,7 +1738,7 @@ function bearlib:MakeWindow(Configs)
                 if WaitClick then return end
                 WaitClick = true
                 if NoClickFrame.Visible then
-                    Arrow.Image = "rbxassetid://10709791523"
+                    Arrow.Image = "rbxassetid://97269958324726"
                     CreateTween({Arrow, "ImageColor3", Color3.fromRGB(255, 255, 255), 0.2})
                     CreateTween({DropFrame, "Size", UDim2.new(0, 152, 0, 0), 0.2, true})
                     NoClickFrame.Visible = false
@@ -2601,7 +2601,7 @@ function bearlib:MakeWindow(Configs)
                 local VerifyIcon = Create("ImageLabel", Card, {
                     Size = UDim2.fromOffset(16, 16),
                     Position = UDim2.new(0, 75 + NameLabel.TextBounds.X + 5, 0, 50),
-                    Image = "rbxassetid://10709752907",
+                    Image = "rbxassetid://97269958324726",
                     ImageColor3 = Color3.fromRGB(60, 140, 255),
                     BackgroundTransparency = 1,
                     ZIndex = 4
@@ -2870,7 +2870,7 @@ function bearlib:MakeWindow(Configs)
                 local VerifyIcon = Create("ImageLabel", Card, {
                     Size = UDim2.fromOffset(14, 14),
                     Position = UDim2.new(0, 65 + NameLabel.TextBounds.X + 4, 0, 52),
-                    Image = "rbxassetid://10709752907",
+                    Image = "rbxassetid://97269958324726",
                     ImageColor3 = Color3.fromRGB(60, 140, 255),
                     BackgroundTransparency = 1,
                     ZIndex = 4
@@ -3039,7 +3039,7 @@ function bearlib:MakeWindow(Configs)
         ToggleButton.Name = "ToggleButton"
         ToggleButton.Size = UDim2.new(0, 50, 0, 50)
         ToggleButton.Position = UDim2.new(0.12, 0, 0.12, 0)
-        ToggleButton.Image = "rbxassetid://11354741327"
+        ToggleButton.Image = "rbxassetid://97269958324726"
         ToggleButton.BackgroundColor3 = Theme["Color Hub 2"]
         ToggleButton.BackgroundTransparency = 0.2
         ToggleButton.Active = true
