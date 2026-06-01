@@ -1,5 +1,5 @@
 -- ============================================
--- MODIFIED BY Anonymous9x
+-- MODIFIED BY Anonymous9x ya
 -- Original script modified to grayscale theme and rebranding
 -- ============================================
 
@@ -12,7 +12,7 @@ local Services = setmetatable({}, {
 })
 
 local HttpService = Services.HttpService
-local FolderName = "Anonymous9x | Farm"
+local FolderName = "Anonymous9x VIP | Farm"
 local FileName = "Settings.json"
 local FullPath = FolderName .. "/" .. FileName
 
