@@ -972,38 +972,279 @@ end, function()
 	showNotif("ESP OFF", "Player ESP hidden.", 2)
 end)
 
--- ==================== FISHING SECTION ====================
+-- ==================== FISHING SECTION (FIXED REMOTE PATHS) ====================
 mkSec("Fishing")
 
-local sellRemote
+local rodRemote, sellRemote, equipRemote
 pcall(function()
+	-- Coba cari remote dengan berbagai kemungkinan path
 	local Events = ReplicatedStorage:FindFirstChild("Events")
 	if Events then
+		local RemoteEvent = Events:FindFirstChild("RemoteEvent")
 		local RemoteFunction = Events:FindFirstChild("RemoteFunction")
+		if RemoteEvent then
+			rodRemote = RemoteEvent:FindFirstChild("Rod") or RemoteEvent:FindFirstChild("RodRemoteEvent")
+		end
 		if RemoteFunction then
 			sellRemote = RemoteFunction:FindFirstChild("SellFish") or RemoteFunction:FindFirstChild("SellItemRemoteFunction")
+			equipRemote = RemoteFunction:FindFirstChild("EquipTools")
 		end
 	end
-	if not sellRemote then
+	-- Fallback: mungkin ada di ReplicatedStorage.Remote
+	if not rodRemote or not sellRemote then
 		local Remote = ReplicatedStorage:FindFirstChild("Remote")
 		if Remote then
-			sellRemote = Remote:FindFirstChild("SellItemRemoteFunction") or Remote:FindFirstChild("SellFish")
+			rodRemote = rodRemote or Remote:FindFirstChild("RodRemoteEvent") or Remote:FindFirstChild("Rod")
+			sellRemote = sellRemote or Remote:FindFirstChild("SellItemRemoteFunction") or Remote:FindFirstChild("SellFish")
+			equipRemote = equipRemote or Remote:FindFirstChild("EquipTools")
 		end
 	end
 end)
 
-if sellRemote then
-	mkBtn("Sell All Fish", "Sell all fish in your inventory", function()
+local rods = {"Basic Rod", "Coconut Rod", "VIP Rod", "Party Rod", "Shark Rod", "Piranha Rod", "Thermo Rod", "Flowers Rod", "Trisula Rod", "Feather Rod", "Wave Rod", "Duck Rod", "Planet Rod", "Earth Rod", "Bat Rod", "Pumkin Rod", "Reindeer Rod", "Canny Rod", "Jinggle Rod", "Gopay Rod"}
+local sellOptions = {"Sell All", "All under 50 Kg", "All under 100 Kg", "All under 400 Kg", "All under 600 Kg", "All under 800 Kg", "All under 1000 Kg"}
+
+local fish = {
+	autoFishing = false,
+	autoSelling = false,
+	instantCatch = true,
+	currentRod = "Basic Rod",
+	sellOption = "Sell All",
+	sellInterval = 30,
+	lastSellTime = 0,
+	isReeling = false,
+	waitingStopShake = false,
+	lastThrowTime = 0,
+	reelGui = nil,
+	reelConns = {},
+	rodEventConn = nil,
+	fishLoopThread = nil,
+}
+
+if rodRemote and sellRemote then
+	local function getEquippedRod()
+		if char then
+			for _, v in ipairs(char:GetChildren()) do
+				if v:IsA("Tool") and v.Name:lower():find("rod") then return v end
+			end
+		end
+		return nil
+	end
+
+	local function equipRod(rodName)
+		local tool = LP.Backpack and LP.Backpack:FindFirstChild(rodName)
+		if not tool and char then tool = char:FindFirstChild(rodName) end
+		if not tool then
+			if equipRemote then
+				pcall(function() equipRemote:InvokeServer("EquipRod", rodName) end)
+				task.wait(0.5)
+				return getEquippedRod()
+			end
+			return false
+		end
+		pcall(function() hum:EquipTool(tool) end)
+		task.wait(0.3)
+		return getEquippedRod()
+	end
+
+	local function sellFish()
+		if not sellRemote then return end
 		pcall(function()
-			sellRemote:InvokeServer("SellFish", "Sell All")
+			sellRemote:InvokeServer("SellFish", fish.sellOption)
 		end)
-		showNotif("Sell All", "All fish sold!", 3)
+		fish.lastSellTime = tick()
+	end
+
+	local function clearReeling()
+		for _, conn in ipairs(fish.reelConns) do
+			conn:Disconnect()
+		end
+		fish.reelConns = {}
+		if fish.reelGui and fish.reelGui.Parent then
+			fish.reelGui:Destroy()
+		end
+		fish.reelGui = nil
+	end
+
+	local function stopReeling()
+		clearReeling()
+		fish.isReeling = false
+	end
+
+	local function startInstantCatch(gui)
+		local frame = gui:WaitForChild("Frame", 4)
+		if not frame then return end
+		local inner = frame:WaitForChild("Frame", 4)
+		if not inner then return end
+		local whiteBar = inner:FindFirstChild("WhiteBar")
+		local redBar = inner:FindFirstChild("RedBar")
+		local progressBg = frame:FindFirstChild("ProgressBg")
+		local progressBar = progressBg and progressBg:FindFirstChild("ProgressBar")
+		if not whiteBar or not redBar or not progressBar then return end
+
+		progressBar.Size = UDim2.new(0.5, 0, progressBar.Size.Y.Scale, progressBar.Size.Y.Offset)
+
+		local function update()
+			if not whiteBar.Parent or not redBar.Parent or not progressBar.Parent or not gui.Parent then return false end
+			if not fish.autoFishing then return false end
+			whiteBar.Position = UDim2.new(math.clamp(redBar.Position.X.Scale + redBar.Size.X.Scale/2 - whiteBar.Size.X.Scale/2, 0, 1 - whiteBar.Size.X.Scale), 0, whiteBar.Position.Y.Scale, whiteBar.Position.Y.Offset)
+			if fish.instantCatch then
+				progressBar.Size = UDim2.new(0.98, 0, progressBar.Size.Y.Scale, progressBar.Size.Y.Offset)
+			end
+			return true
+		end
+
+		local conn1 = RunService.RenderStepped:Connect(function()
+			if not update() then clearReeling() end
+		end)
+		local conn2 = RunService.Heartbeat:Connect(function()
+			if not update() then clearReeling() end
+		end)
+		table.insert(fish.reelConns, conn1)
+		table.insert(fish.reelConns, conn2)
+
+		-- Catch trigger
+		local conn3 = RunService.Heartbeat:Connect(function()
+			if not gui.Parent then
+				conn3:Disconnect()
+				return
+			end
+			local frame = gui:FindFirstChild("Frame")
+			if not frame then return end
+			local progressBg = frame:FindFirstChild("ProgressBg")
+			local progressBar = progressBg and progressBg:FindFirstChild("ProgressBar")
+			if not progressBar then return end
+			if progressBar.Size.X.Scale >= 0.99 then
+				local tool = gui:FindFirstChild("Tool")
+				local rod = tool and tool.Value
+				if rod then
+					pcall(function()
+						rodRemote:FireServer("Catch", rod, true)
+					end)
+				end
+				conn3:Disconnect()
+			end
+		end)
+		table.insert(fish.reelConns, conn3)
+	end
+
+	local function setupRodEvent()
+		if fish.rodEventConn then fish.rodEventConn:Disconnect() end
+		fish.rodEventConn = rodRemote.OnClientEvent:Connect(function(action, arg)
+			if action == "StartShake" then
+				fish.isReeling = true
+				local gui = LP.PlayerGui:FindFirstChild("Reeling")
+				if gui then
+					fish.reelGui = gui
+					startInstantCatch(gui)
+				end
+			elseif action == "StopShake" then
+				fish.waitingStopShake = false
+				stopReeling()
+				if fish.autoSelling and tick() - fish.lastSellTime >= fish.sellInterval then
+					task.wait(0.3)
+					sellFish()
+				end
+			end
+		end)
+	end
+
+	local function startFishLoop()
+		fish.fishLoopThread = task.spawn(function()
+			while fish.autoFishing do
+				if not fish.isReeling and not fish.waitingStopShake then
+					local rod = getEquippedRod()
+					if not rod then
+						equipRod(fish.currentRod)
+						task.wait(1)
+						rod = getEquippedRod()
+					end
+					if rod and tick() - fish.lastThrowTime >= 1.5 then
+						fish.lastThrowTime = tick()
+						fish.waitingStopShake = true
+						pcall(function()
+							rodRemote:FireServer("Throw", rod)
+						end)
+						local startTime = tick()
+						while fish.waitingStopShake and fish.autoFishing do
+							if tick() - startTime > 60 then
+								fish.waitingStopShake = false
+								break
+							end
+							task.wait(0.5)
+						end
+					else
+						task.wait(0.5)
+					end
+				else
+					task.wait(0.5)
+				end
+			end
+			stopReeling()
+		end)
+	end
+
+	-- UI Elements
+	local rodBtn, rodBtnTitle = mkBtn("Rod: " .. fish.currentRod, nil, function()
+		local idx = table.find(rods, fish.currentRod) or 1
+		idx = idx % #rods + 1
+		fish.currentRod = rods[idx]
+		rodBtnTitle.Text = "Rod: " .. fish.currentRod
+		showNotif("Rod Changed", fish.currentRod, 2)
+	end)
+
+	local sellBtn, sellBtnTitle = mkBtn("Sell: " .. fish.sellOption, nil, function()
+		local idx = table.find(sellOptions, fish.sellOption) or 1
+		idx = idx % #sellOptions + 1
+		fish.sellOption = sellOptions[idx]
+		sellBtnTitle.Text = "Sell: " .. fish.sellOption
+		showNotif("Sell Option", fish.sellOption, 2)
+	end)
+
+	mkToggleBtn("Auto Fishing", "Automatically fish", function()
+		fish.autoFishing = true
+		setupRodEvent()
+		startFishLoop()
+		showNotif("Auto Fish ON", "Fishing started.", 3)
+	end, function()
+		fish.autoFishing = false
+		stopReeling()
+		if fish.rodEventConn then fish.rodEventConn:Disconnect() fish.rodEventConn = nil end
+		if fish.fishLoopThread then task.cancel(fish.fishLoopThread) fish.fishLoopThread = nil end
+		showNotif("Auto Fish OFF", "Fishing stopped.", 2)
+	end)
+
+	mkToggleBtn("Auto Sell", "Sell fish after catching", function()
+		fish.autoSelling = true
+		showNotif("Auto Sell ON", "Auto sell enabled.", 3)
+	end, function()
+		fish.autoSelling = false
+		showNotif("Auto Sell OFF", "Auto sell disabled.", 2)
+	end)
+
+	mkToggleBtn("Instant Catch", "Catch fish instantly", function()
+		fish.instantCatch = true
+		showNotif("Instant Catch ON", "Instant catch mode.", 2)
+	end, function()
+		fish.instantCatch = false
+		showNotif("Instant Catch OFF", "Normal catch mode.", 2)
+	end)
+
+	mkBtn("Sell Now", "Manually sell fish", function()
+		sellFish()
+		showNotif("Sell Now", "Fish sold.", 3)
 	end)
 else
 	task.spawn(function()
-		showNotif("Fishing Error", "Sell remote not available.", 3)
+		showNotif("Fishing Error", "Fishing remotes not available.", 3)
 	end)
 end
+
+LP.CharacterAdded:Connect(function()
+	fish.isReeling = false
+	fish.waitingStopShake = false
+	stopReeling()
+end)
 
 RunService.Heartbeat:Connect(function()
 	if speedVal ~= 16 and hum then pcall(function() if hum.WalkSpeed ~= speedVal then hum.WalkSpeed = speedVal end end) end
