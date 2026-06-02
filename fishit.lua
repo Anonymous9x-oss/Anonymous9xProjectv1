@@ -6,7 +6,7 @@
                 return; 
             end);
         end;
-        W = "https://raw.githubusercontent.com/vinxonez/ViKai-HUB/main/";
+        W = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/fishlib.lua";
         v2 = game;
         r24 = loadstring(v2.HttpGet(v2, W .. "Library.lua"))();
         v6 = game;
