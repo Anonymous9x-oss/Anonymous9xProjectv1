@@ -2641,8 +2641,8 @@ end
 
 local bearlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/anolib.lua"))()
 local Window = bearlib:MakeWindow({
-    Title = "Blox Fruit",
-    SubTitle = "VIP Script Dev @Anonymous9x",
+    Title = "Anonymous9x VIP",
+    SubTitle = "For Blox Fruit Full Fitur | Dev? @Anonymous9x",
     SaveFolder = true,
     Image = "97269958324726"
 })
