@@ -1,5 +1,3 @@
---[[ deobfuscated by fiqLeak | discord.gg/ ]]
-
 });
         if Library then
             pcall(function(...)
@@ -17,9 +15,9 @@
         loadstring(r.HttpGet(r, W .. "SaveManager.lua"))();
         v6 = r24;
         r = v6.CreateWindow(v6, {
-            ["Title"] = "ViKai",
-            ["Footer"] = "premium version",
-            ["Icon"] = 88271133677376,
+            ["Title"] = "Anonymous9x",
+            ["Footer"] = "VIP Fish it",
+            ["Icon"] = 97269958324726,
             ["NotifySide"] = "Right",
             ["Size"] = UDim2.fromOffset(540, 350),
             ["ShowCustomCursor"] = false
