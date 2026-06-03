@@ -8,19 +8,17 @@ if not bearlib then
     error("Gagal memuat bearlib dari raw URL")
 end
 
--- Helper untuk notifikasi (agar durasi 3 detik)
+-- Helper untuk notifikasi (durasi 3 detik, seperti bf1.lua)
 local function Notify(Title, Message, Duration)
     Duration = Duration or 3
-    bearlib:Notify({
-        Title = Title,
-        Message = Message,
-        Duration = Duration
-    })
+    pcall(function()
+        bearlib:Notify({ Title = Title, Message = Message, Duration = Duration })
+    end)
 end
 
--- ==================== EVADE SCRIPT ====================
 repeat task.wait() until game:IsLoaded()
 
+-- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -29,18 +27,18 @@ local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 local Workspace = game:GetService("Workspace")
 
--- Membuat window (sama seperti bf1.lua)
+-- Buat window (sama seperti bf1.lua)
 local Window = bearlib:MakeWindow({
     Name = "Evade Script by SARpastes | SARHUB",
     SubTitle = "Powered by bearlib (raw URL)",
     SaveFolder = "EvadeConfig.json"
 })
 
--- ✅ Buat tab dengan TABEL (seperti bf1.lua)
-local PlayerTab = Window:MakeTab({ Title = "Player" })
-local AutoTab   = Window:MakeTab({ Title = "Auto" })
-local EspTab    = Window:MakeTab({ Title = "ESP" })
-local MiscTab   = Window:MakeTab({ Title = "Misc" })
+-- Buat tab dengan Icon (seperti bf1.lua)
+local PlayerTab = Window:MakeTab({ Title = "Player", Icon = "rbxassetid://10734975692" })
+local AutoTab   = Window:MakeTab({ Title = "Auto", Icon = "rbxassetid://10709769508" })
+local EspTab    = Window:MakeTab({ Title = "ESP", Icon = "rbxassetid://10723346959" })
+local MiscTab   = Window:MakeTab({ Title = "Misc", Icon = "rbxassetid://10734950309" })
 
 -- Variabel
 local ValueSpeed = 16
@@ -70,12 +68,11 @@ local originalFogStart = game.Lighting.FogStart
 local originalColorCorrectionEnabled = game.Lighting.ColorCorrection.Enabled
 local originalSaturation = game.Lighting.ColorCorrection.Saturation
 local originalContrast = game.Lighting.ColorCorrection.Contrast
-
 local autoReviveEnabled = false
 local lastCheckTime = 0
 local checkInterval = 5
 
--- Helper functions (sama)
+-- Helper functions (sama seperti sebelumnya)
 local function fireVoteServer(selectedMapNumber)
     local eventsFolder = ReplicatedStorage:WaitForChild("Events", 10)
     if eventsFolder then
@@ -135,7 +132,6 @@ end
 local function CreateEsp(Char, Color, Text, ParentPart, YOffset)
     if not Char or not ParentPart or not ParentPart:IsA("BasePart") then return end
     if Char:FindFirstChild("ESP_Highlight") and ParentPart:FindFirstChild("ESP") then return end
-
     local highlight = Instance.new("Highlight")
     highlight.Name = "ESP_Highlight"
     highlight.Adornee = Char
@@ -146,7 +142,6 @@ local function CreateEsp(Char, Color, Text, ParentPart, YOffset)
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.Enabled = true
     highlight.Parent = Char
-
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "ESP"
     billboard.Size = UDim2.new(0, 100, 0, 50)
@@ -155,7 +150,6 @@ local function CreateEsp(Char, Color, Text, ParentPart, YOffset)
     billboard.Adornee = ParentPart
     billboard.Enabled = true
     billboard.Parent = ParentPart
-
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
@@ -164,7 +158,6 @@ local function CreateEsp(Char, Color, Text, ParentPart, YOffset)
     label.TextScaled = true
     label.Font = Enum.Font.SourceSansBold
     label.Parent = billboard
-
     spawn(function()
         local Camera = Workspace.CurrentCamera
         while highlight.Parent and billboard.Parent and ParentPart.Parent and Camera do
@@ -200,14 +193,11 @@ local function handlePlayerEsp(player)
                 CreateEsp(character, Color3.new(0.4, 0.8, 0.4), player.Name, character.Head, 1)
             end
         end
-
         createPlayerEspOnCharacter(player.Character)
-
         player.CharacterAdded:Connect(function(newCharacter)
             task.wait(0.1)
             createPlayerEspOnCharacter(newCharacter)
         end)
-
         player.CharacterRemoving:Connect(function(oldCharacter)
             if oldCharacter:FindFirstChild("Head") then
                 RemoveEsp(oldCharacter, oldCharacter.Head)
@@ -221,12 +211,10 @@ local function MobileBhopButton(Character)
         ButtonGui:Destroy()
         ButtonGui = nil
     end
-
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "BhopButtonGui"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
     local Button = Instance.new("TextButton")
     Button.Size = UDim2.new(0,50,0,50)
     Button.Position = UDim2.new(0.9, -25, 0.8, 0)
@@ -236,10 +224,8 @@ local function MobileBhopButton(Character)
     Button.TextScaled = true
     Button.Parent = ScreenGui
     ButtonGui = ScreenGui
-
     local dragging = false
     local dragInput, mousePos, framePos
-
     Button.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
@@ -248,28 +234,23 @@ local function MobileBhopButton(Character)
             IsHoldingButton = true
         end
     end)
-
     Button.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
             dragInput = input
         end
     end)
-
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - mousePos
-            Button.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X,
-                                        framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+            Button.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
         end
     end)
-
     Button.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = false
             IsHoldingButton = false
         end
     end)
-
     local Humanoid = Character:WaitForChild("Humanoid")
     table.insert(InputConnections, RunService.RenderStepped:Connect(function()
         if IsHoldingButton and Humanoid.FloorMaterial ~= Enum.Material.Air then
@@ -292,13 +273,12 @@ end)
 -- ==================== PLAYER TAB ====================
 PlayerTab:AddSection("Movement")
 
--- Slider Speed
 PlayerTab:AddSlider({
     Name = "Speed Value",
-    Min = 1,
-    Max = 50,
+    Range = {1, 50},
     Increment = 1,
-    Default = 16,
+    Suffix = "Speed",
+    CurrentValue = 16,
     Flag = "SpeedValue",
     Callback = function(Value)
         ValueSpeed = Value
@@ -309,10 +289,9 @@ PlayerTab:AddSlider({
     end,
 })
 
--- Toggle Speed Power
 PlayerTab:AddToggle({
     Name = "Speed Power",
-    Default = false,
+    CurrentValue = false,
     Flag = "CFrameSpeed",
     Callback = function(Value)
         ActiveCFrameSpeedBoost = Value
@@ -337,10 +316,9 @@ PlayerTab:AddToggle({
     end,
 })
 
--- Toggle Jump Power Enable
 PlayerTab:AddToggle({
     Name = "Jump Power (Enable)",
-    Default = false,
+    CurrentValue = false,
     Flag = "JumpBoost",
     Callback = function(Value)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
@@ -350,13 +328,12 @@ PlayerTab:AddToggle({
     end,
 })
 
--- Slider Jump Power Value
 PlayerTab:AddSlider({
     Name = "Jump Power Value",
-    Min = 0,
-    Max = 1000,
+    Range = {0, 1000},
     Increment = 1,
-    Default = 50,
+    Suffix = "%",
+    CurrentValue = 50,
     Flag = "JumpBoostSlider",
     Callback = function(Value)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
@@ -366,10 +343,9 @@ PlayerTab:AddSlider({
     end,
 })
 
--- Toggle Auto Bhop
 PlayerTab:AddToggle({
     Name = "Auto Bhop (Just hold space)",
-    Default = false,
+    CurrentValue = false,
     Flag = "AutoBhopToggle",
     Callback = function(Value)
         bhopEnabled = Value
@@ -377,7 +353,6 @@ PlayerTab:AddToggle({
     end,
 })
 
--- Button Auto Bhop Mobile
 PlayerTab:AddButton({
     Name = "Auto Bhop (Mobile)",
     Callback = function()
@@ -394,10 +369,10 @@ PlayerTab:AddSection("Gravity")
 
 local GravitySlider = PlayerTab:AddSlider({
     Name = "Gravity",
-    Min = 0,
-    Max = 1000,
+    Range = {0, 1000},
     Increment = 1,
-    Default = 50,
+    Suffix = "%",
+    CurrentValue = 50,
     Flag = "GravitySlider",
     Callback = function(Value)
         Workspace.Gravity = Value
@@ -453,7 +428,7 @@ AutoTab:AddSection("Map Voting")
 AutoTab:AddDropdown({
     Name = "Select Map",
     Options = {"Map 1", "Map 2", "Map 3", "Map 4"},
-    Default = "Map 1",
+    CurrentOption = "Map 1",
     Flag = "MapSelection",
     Callback = function(Option)
         if Option == "Map 1" then selectedMapNumber = 1
@@ -474,7 +449,7 @@ AutoTab:AddButton({
 
 AutoTab:AddToggle({
     Name = "Auto Vote",
-    Default = false,
+    CurrentValue = false,
     Flag = "AutoVote",
     Callback = function(Value)
         autoVoteEnabled = Value
@@ -509,7 +484,7 @@ AutoTab:AddButton({
 
 AutoTab:AddToggle({
     Name = "Auto Revive Yourself",
-    Default = false,
+    CurrentValue = false,
     Flag = "AutoRevive",
     Callback = function(Value)
         autoReviveEnabled = Value
@@ -520,7 +495,7 @@ AutoTab:AddToggle({
 -- ==================== ESP TAB ====================
 EspTab:AddToggle({
     Name = "Players ESP",
-    Default = false,
+    CurrentValue = false,
     Flag = "PlayersESP",
     Callback = function(Value)
         ActiveEspPlayers = Value
@@ -544,7 +519,7 @@ EspTab:AddToggle({
 
 EspTab:AddToggle({
     Name = "NextBot ESP",
-    Default = false,
+    CurrentValue = false,
     Flag = "BotsESP",
     Callback = function(Value)
         ActiveEspBots = Value
@@ -579,7 +554,7 @@ EspTab:AddToggle({
 
 EspTab:AddToggle({
     Name = "Distance ESP",
-    Default = false,
+    CurrentValue = false,
     Flag = "DistanceESP",
     Callback = function(Value)
         ActiveDistanceEsp = Value
@@ -590,7 +565,7 @@ EspTab:AddToggle({
 -- ==================== MISC TAB ====================
 MiscTab:AddToggle({
     Name = "Anti-AFK",
-    Default = true,
+    CurrentValue = true,
     Flag = "AntiAFK",
     Callback = function(Value)
         afk = Value
@@ -612,7 +587,7 @@ MiscTab:AddToggle({
 
 MiscTab:AddToggle({
     Name = "Full Brightness",
-    Default = false,
+    CurrentValue = false,
     Flag = "FullBright",
     Callback = function(Value)
         if Value then
@@ -627,7 +602,7 @@ MiscTab:AddToggle({
 
 MiscTab:AddToggle({
     Name = "Super Full Brightness",
-    Default = false,
+    CurrentValue = false,
     Flag = "SuperFullBright",
     Callback = function(Value)
         if Value then
@@ -642,7 +617,7 @@ MiscTab:AddToggle({
 
 MiscTab:AddToggle({
     Name = "No Fog",
-    Default = false,
+    CurrentValue = false,
     Flag = "NoFog",
     Callback = function(Value)
         if Value then
@@ -657,7 +632,7 @@ MiscTab:AddToggle({
 
 MiscTab:AddToggle({
     Name = "Vibrant Colors",
-    Default = false,
+    CurrentValue = false,
     Flag = "Vibrant",
     Callback = function(Value)
         if Value then
@@ -672,7 +647,7 @@ MiscTab:AddToggle({
 
 MiscTab:AddToggle({
     Name = "FPS Boost",
-    Default = false,
+    CurrentValue = false,
     Flag = "FPSBoost",
     Callback = function(Value)
         if Value then
@@ -706,3 +681,4 @@ RunService.Heartbeat:Connect(function()
 end)
 
 Notify("Evade Script", "Loaded successfully! UI ready.", 3)
+print("✓ Evade script dengan UI bearlib (raw URL) berhasil dimuat. GUI akan muncul dengan 4 tab berisi elemen.")
