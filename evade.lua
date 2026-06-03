@@ -8,8 +8,10 @@ if not bearlib then
     error("Gagal memuat bearlib dari raw URL")
 end
 
--- Helper untuk notifikasi (durasi 3 detik, seperti bf1.lua)
+-- Helper untuk notifikasi (durasi 3 detik, dengan pengecekan inisialisasi)
+local _initializing = true  -- Flag untuk mencegah notifikasi saat init
 local function Notify(Title, Message, Duration)
+    if _initializing then return end  -- Jangan tampilkan notifikasi saat inisialisasi
     Duration = Duration or 3
     pcall(function()
         bearlib:Notify({ Title = Title, Message = Message, Duration = Duration })
@@ -27,14 +29,14 @@ local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 local Workspace = game:GetService("Workspace")
 
--- Buat window (sama seperti bf1.lua)
+-- Buat window
 local Window = bearlib:MakeWindow({
-    Name = "Evade Script by SARpastes | SARHUB",
-    SubTitle = "Powered by bearlib (raw URL)",
+    Name = "Anonymous9x VIP",
+    SubTitle = "For Evade Full Fitur | Dev? @Anonymous9x",
     SaveFolder = "EvadeConfig.json"
 })
 
--- Buat tab dengan Icon (seperti bf1.lua)
+-- Buat tab dengan Icon
 local PlayerTab = Window:MakeTab({ Title = "Player", Icon = "rbxassetid://10734975692" })
 local AutoTab   = Window:MakeTab({ Title = "Auto", Icon = "rbxassetid://10709769508" })
 local EspTab    = Window:MakeTab({ Title = "ESP", Icon = "rbxassetid://10723346959" })
@@ -270,7 +272,9 @@ LocalPlayer.CharacterAdded:Connect(function(Character)
     InputConnections = {}
 end)
 
--- ==================== PLAYER TAB ====================
+-- ==================== MEMBUAT ELEMEN UI (Inisialisasi) ====================
+-- Selama proses ini, _initializing = true, jadi tidak ada notifikasi yang muncul
+
 PlayerTab:AddSection("Movement")
 
 PlayerTab:AddSlider({
@@ -422,7 +426,7 @@ LocalPlayer.CharacterAdded:Connect(function(NewCharacter)
     ConnectBhop(Humanoid)
 end)
 
--- ==================== AUTO TAB ====================
+-- Auto Tab
 AutoTab:AddSection("Map Voting")
 
 AutoTab:AddDropdown({
@@ -492,7 +496,7 @@ AutoTab:AddToggle({
     end,
 })
 
--- ==================== ESP TAB ====================
+-- ESP Tab
 EspTab:AddToggle({
     Name = "Players ESP",
     CurrentValue = false,
@@ -562,7 +566,7 @@ EspTab:AddToggle({
     end,
 })
 
--- ==================== MISC TAB ====================
+-- Misc Tab
 MiscTab:AddToggle({
     Name = "Anti-AFK",
     CurrentValue = true,
@@ -680,5 +684,16 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-Notify("Evade Script", "Loaded successfully! UI ready.", 3)
-print("✓ Evade script dengan UI bearlib (raw URL) berhasil dimuat. GUI akan muncul dengan 4 tab berisi elemen.")
+-- ==================== AKHIR INISIALISASI ====================
+_initializing = false  -- Sekarang notifikasi baru akan aktif
+
+-- Tampilkan notifikasi selamat datang satu kali
+pcall(function()
+    bearlib:Notify({
+        Title = "Anonymous9x VIP",
+        Message = "Loaded For Evade Full Fitur | Dev? @Anonymous9x",
+        Duration = 4
+    })
+end)
+
+print("Anonymous9x VIP Evade.")
