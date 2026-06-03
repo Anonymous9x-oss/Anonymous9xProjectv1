@@ -3,7 +3,7 @@ local ANOLIB_RAW_URL = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonym
 local REQUIRED_PLACE_ID = 9872472334  -- Place ID game Evade
 -- =================================
 
--- Load library dari raw URL (persis seperti Blox Fruit)
+-- Load library dari raw URL
 local bearlib = loadstring(game:HttpGet(ANOLIB_RAW_URL))()
 if not bearlib then
     error("Gagal memuat bearlib dari raw URL")
@@ -11,57 +11,22 @@ end
 
 -- ========== PENGECEKAN MAP (HARUS GAME EVADE) ==========
 if game.PlaceId ~= REQUIRED_PLACE_ID then
-    -- Tampilkan pesan error di CoreGui
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "WrongGameWarning"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = game:GetService("CoreGui")
-    
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 400, 0, 120)
-    frame.Position = UDim2.new(0.5, -200, 0.5, -60)
-    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    frame.BackgroundTransparency = 0.1
-    frame.BorderSizePixel = 0
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 10)
-    corner.Parent = frame
-    
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(255, 80, 80)
-    stroke.Thickness = 2
-    stroke.Parent = frame
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = "WRONG GAME!\nThis script only works for Evade.\nPlace ID: " .. REQUIRED_PLACE_ID
-    label.TextColor3 = Color3.fromRGB(255, 100, 100)
-    label.TextScaled = true
-    label.Font = Enum.Font.GothamBold
-    label.TextWrapped = true
-    label.Parent = frame
-    
-    frame.Parent = screenGui
-    
-    -- Notifikasi via bearlib (jika memungkinkan)
+    -- Hanya tampilkan notifikasi via bearlib, tidak ada GUI manual
     pcall(function()
         bearlib:Notify({
-            Title = "Error",
-            Message = "You are in the wrong game! Only Evade supported.",
+            Title = "Wrong Game",
+            Message = "This script only works for Evade. Place ID: " .. REQUIRED_PLACE_ID,
             Duration = 5
         })
     end)
-    
-    task.wait(5)
-    screenGui:Destroy()
-    error("Script stopped: Wrong game. Please run this script only in Evade (Place ID: " .. REQUIRED_PLACE_ID .. ")")
+    -- Hentikan script
+    return
 end
 
 -- Helper untuk notifikasi (durasi 3 detik, dengan pengecekan inisialisasi)
 local _initializing = true  -- Flag untuk mencegah notifikasi saat init
 local function Notify(Title, Message, Duration)
-    if _initializing then return end  -- Jangan tampilkan notifikasi saat inisialisasi
+    if _initializing then return end
     Duration = Duration or 3
     pcall(function()
         bearlib:Notify({ Title = Title, Message = Message, Duration = Duration })
@@ -92,7 +57,7 @@ local AutoTab   = Window:MakeTab({ Title = "Auto", Icon = "rbxassetid://10709769
 local EspTab    = Window:MakeTab({ Title = "ESP", Icon = "rbxassetid://10723346959" })
 local MiscTab   = Window:MakeTab({ Title = "Misc", Icon = "rbxassetid://10734950309" })
 
--- Variabel
+-- Variabel (sama seperti sebelumnya)
 local ValueSpeed = 16
 local ActiveCFrameSpeedBoost = false
 local cframeSpeedConnection = nil
@@ -124,7 +89,7 @@ local autoReviveEnabled = false
 local lastCheckTime = 0
 local checkInterval = 5
 
--- Helper functions (sama seperti sebelumnya)
+-- Helper functions (sama)
 local function fireVoteServer(selectedMapNumber)
     local eventsFolder = ReplicatedStorage:WaitForChild("Events", 10)
     if eventsFolder then
@@ -322,9 +287,7 @@ LocalPlayer.CharacterAdded:Connect(function(Character)
     InputConnections = {}
 end)
 
--- ==================== MEMBUAT ELEMEN UI (Inisialisasi) ====================
--- Selama proses ini, _initializing = true, jadi tidak ada notifikasi yang muncul
-
+-- ==================== MEMBUAT ELEMEN UI ====================
 PlayerTab:AddSection("Movement")
 
 PlayerTab:AddSlider({
@@ -735,7 +698,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==================== AKHIR INISIALISASI ====================
-_initializing = false  -- Sekarang notifikasi baru akan aktif
+_initializing = false
 
 -- Tampilkan notifikasi selamat datang satu kali
 pcall(function()
