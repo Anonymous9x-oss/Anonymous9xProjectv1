@@ -3,19 +3,22 @@ local ANOLIB_RAW_URL = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonym
 -- =================================
 
 -- Load library dari raw URL (persis seperti Blox Fruit)
-local bearlib
-local success, err = pcall(function()
-    local content = game:HttpGet(ANOLIB_RAW_URL)
-    bearlib = loadstring(content)()
-end)
-
-if not success or not bearlib then
-    error("Gagal memuat bearlib dari raw URL:\n" .. tostring(err))
+local bearlib = loadstring(game:HttpGet(ANOLIB_RAW_URL))()
+if not bearlib then
+    error("Gagal memuat bearlib dari raw URL")
 end
 
-print("bearlib loaded, version:", bearlib.Info.Version)
+-- Helper untuk notifikasi (agar durasi 3 detik)
+local function Notify(Title, Message, Duration)
+    Duration = Duration or 3
+    bearlib:Notify({
+        Title = Title,
+        Message = Message,
+        Duration = Duration
+    })
+end
 
--- ==================== EVADE SCRIPT (UI diperbaiki) ====================
+-- ==================== EVADE SCRIPT ====================
 repeat task.wait() until game:IsLoaded()
 
 local Players = game:GetService("Players")
@@ -26,20 +29,20 @@ local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 local Workspace = game:GetService("Workspace")
 
--- Membuat window (sama seperti Blox Fruit)
+-- Membuat window (sama seperti bf1.lua)
 local Window = bearlib:MakeWindow({
-    Title = "Evade Script by SARpastes | SARHUB",
+    Name = "Evade Script by SARpastes | SARHUB",
     SubTitle = "Powered by bearlib (raw URL)",
     SaveFolder = "EvadeConfig.json"
 })
 
--- ✅ PERBAIKAN 1: Buat tab dengan TABEL, bukan string
+-- ✅ Buat tab dengan TABEL (seperti bf1.lua)
 local PlayerTab = Window:MakeTab({ Title = "Player" })
 local AutoTab   = Window:MakeTab({ Title = "Auto" })
 local EspTab    = Window:MakeTab({ Title = "ESP" })
 local MiscTab   = Window:MakeTab({ Title = "Misc" })
 
--- Variabel (semua fitur tetap sama, tidak diubah)
+-- Variabel
 local ValueSpeed = 16
 local ActiveCFrameSpeedBoost = false
 local cframeSpeedConnection = nil
@@ -72,7 +75,7 @@ local autoReviveEnabled = false
 local lastCheckTime = 0
 local checkInterval = 5
 
--- Helper functions (sama persis seperti script Evade asli)
+-- Helper functions (sama)
 local function fireVoteServer(selectedMapNumber)
     local eventsFolder = ReplicatedStorage:WaitForChild("Events", 10)
     if eventsFolder then
@@ -127,14 +130,6 @@ local function removeVibrant()
     game.Lighting.ColorCorrection.Enabled = originalColorCorrectionEnabled
     game.Lighting.ColorCorrection.Saturation = originalSaturation
     game.Lighting.ColorCorrection.Contrast = originalContrast
-end
-
-local function getLocalPlayerCharacter()
-    local player = Players.LocalPlayer
-    if player then
-        return player.Character or player.CharacterAdded:Wait()
-    end
-    return nil
 end
 
 local function CreateEsp(Char, Color, Text, ParentPart, YOffset)
@@ -240,7 +235,6 @@ local function MobileBhopButton(Character)
     Button.Text = "Bhop"
     Button.TextScaled = true
     Button.Parent = ScreenGui
-
     ButtonGui = ScreenGui
 
     local dragging = false
@@ -298,7 +292,7 @@ end)
 -- ==================== PLAYER TAB ====================
 PlayerTab:AddSection("Movement")
 
--- ✅ PERBAIKAN 2: Gunakan 'Default' bukan 'CurrentValue'
+-- Slider Speed
 PlayerTab:AddSlider({
     Name = "Speed Value",
     Min = 1,
@@ -311,16 +305,18 @@ PlayerTab:AddSlider({
         if ActiveCFrameSpeedBoost and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
             LocalPlayer.Character.Humanoid.WalkSpeed = ValueSpeed
         end
+        Notify("Speed", "Set to " .. Value, 2)
     end,
 })
 
+-- Toggle Speed Power
 PlayerTab:AddToggle({
     Name = "Speed Power",
     Default = false,
     Flag = "CFrameSpeed",
     Callback = function(Value)
         ActiveCFrameSpeedBoost = Value
-        if ActiveCFrameSpeedBoost then
+        if Value then
             if cframeSpeedConnection then cframeSpeedConnection:Disconnect() end
             cframeSpeedConnection = RunService.RenderStepped:Connect(function()
                 local char = LocalPlayer.Character
@@ -333,12 +329,15 @@ PlayerTab:AddToggle({
                     end
                 end
             end)
+            Notify("Speed Power", "Enabled", 2)
         else
             if cframeSpeedConnection then cframeSpeedConnection:Disconnect(); cframeSpeedConnection = nil end
+            Notify("Speed Power", "Disabled", 2)
         end
     end,
 })
 
+-- Toggle Jump Power Enable
 PlayerTab:AddToggle({
     Name = "Jump Power (Enable)",
     Default = false,
@@ -347,9 +346,11 @@ PlayerTab:AddToggle({
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
             LocalPlayer.Character.Humanoid.UseJumpPower = Value
         end
+        Notify("Jump Power", Value and "Enabled" or "Disabled", 2)
     end,
 })
 
+-- Slider Jump Power Value
 PlayerTab:AddSlider({
     Name = "Jump Power Value",
     Min = 0,
@@ -361,23 +362,30 @@ PlayerTab:AddSlider({
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
             LocalPlayer.Character.Humanoid.JumpPower = Value
         end
+        Notify("Jump Power", "Set to " .. Value, 2)
     end,
 })
 
+-- Toggle Auto Bhop
 PlayerTab:AddToggle({
     Name = "Auto Bhop (Just hold space)",
     Default = false,
     Flag = "AutoBhopToggle",
     Callback = function(Value)
         bhopEnabled = Value
+        Notify("Bhop", Value and "Enabled" or "Disabled", 2)
     end,
 })
 
+-- Button Auto Bhop Mobile
 PlayerTab:AddButton({
     Name = "Auto Bhop (Mobile)",
     Callback = function()
         if LocalPlayer.Character then
             MobileBhopButton(LocalPlayer.Character)
+            Notify("Bhop", "Mobile button added", 2)
+        else
+            Notify("Error", "No character found", 2)
         end
     end
 })
@@ -393,6 +401,7 @@ local GravitySlider = PlayerTab:AddSlider({
     Flag = "GravitySlider",
     Callback = function(Value)
         Workspace.Gravity = Value
+        Notify("Gravity", "Set to " .. Value, 2)
     end,
 })
 
@@ -401,10 +410,11 @@ PlayerTab:AddButton({
     Callback = function()
         Workspace.Gravity = 50
         GravitySlider:Set(50)
-    end,
+        Notify("Gravity", "Reset to 50", 2)
+    end
 })
 
--- Bhop input handling (sama)
+-- Bhop input handling
 UserInputService.InputBegan:Connect(function(InputObject, GameProcessedEvent)
     if InputObject.KeyCode == Enum.KeyCode.Space and not GameProcessedEvent then
         IsHoldingSpace = true
@@ -450,6 +460,7 @@ AutoTab:AddDropdown({
         elseif Option == "Map 2" then selectedMapNumber = 2
         elseif Option == "Map 3" then selectedMapNumber = 3
         elseif Option == "Map 4" then selectedMapNumber = 4 end
+        Notify("Map", "Selected " .. Option, 2)
     end,
 })
 
@@ -457,6 +468,7 @@ AutoTab:AddButton({
     Name = "Vote Map",
     Callback = function()
         fireVoteServer(selectedMapNumber)
+        Notify("Vote", "Voted for Map " .. selectedMapNumber, 2)
     end,
 })
 
@@ -466,14 +478,16 @@ AutoTab:AddToggle({
     Flag = "AutoVote",
     Callback = function(Value)
         autoVoteEnabled = Value
-        if autoVoteEnabled then
+        if Value then
             if not voteConnection then
                 voteConnection = RunService.Heartbeat:Connect(function()
                     fireVoteServer(selectedMapNumber)
                 end)
             end
+            Notify("Auto Vote", "Enabled", 2)
         else
             if voteConnection then voteConnection:Disconnect(); voteConnection = nil end
+            Notify("Auto Vote", "Disabled", 2)
         end
     end,
 })
@@ -486,6 +500,9 @@ AutoTab:AddButton({
         local char = LocalPlayer.Character
         if char and char:GetAttribute("Downed") then
             ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
+            Notify("Revive", "Attempted to revive", 2)
+        else
+            Notify("Revive", "You are not downed", 2)
         end
     end,
 })
@@ -496,6 +513,7 @@ AutoTab:AddToggle({
     Flag = "AutoRevive",
     Callback = function(Value)
         autoReviveEnabled = Value
+        Notify("Auto Revive", Value and "Enabled" or "Disabled", 2)
     end,
 })
 
@@ -506,11 +524,12 @@ EspTab:AddToggle({
     Flag = "PlayersESP",
     Callback = function(Value)
         ActiveEspPlayers = Value
-        if ActiveEspPlayers then
+        if Value then
             for _, plr in pairs(Players:GetPlayers()) do
                 handlePlayerEsp(plr)
             end
             playerAddedConnection = Players.PlayerAdded:Connect(handlePlayerEsp)
+            Notify("ESP", "Players ESP enabled", 2)
         else
             if playerAddedConnection then playerAddedConnection:Disconnect(); playerAddedConnection = nil end
             for _, plr in pairs(Players:GetPlayers()) do
@@ -518,6 +537,7 @@ EspTab:AddToggle({
                     RemoveEsp(plr.Character, plr.Character.Head)
                 end
             end
+            Notify("ESP", "Players ESP disabled", 2)
         end
     end,
 })
@@ -528,7 +548,7 @@ EspTab:AddToggle({
     Flag = "BotsESP",
     Callback = function(Value)
         ActiveEspBots = Value
-        if ActiveEspBots then
+        if Value then
             botLoopConnection = RunService.Heartbeat:Connect(function()
                 local botsFolder = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Players")
                 if botsFolder then
@@ -540,6 +560,7 @@ EspTab:AddToggle({
                     end
                 end
             end)
+            Notify("ESP", "Bots ESP enabled", 2)
         else
             if botLoopConnection then botLoopConnection:Disconnect(); botLoopConnection = nil end
             local botsFolder = Workspace:FindFirstChild("Game") and Workspace.Game:FindFirstChild("Players")
@@ -551,6 +572,7 @@ EspTab:AddToggle({
                     end
                 end
             end
+            Notify("ESP", "Bots ESP disabled", 2)
         end
     end,
 })
@@ -561,6 +583,7 @@ EspTab:AddToggle({
     Flag = "DistanceESP",
     Callback = function(Value)
         ActiveDistanceEsp = Value
+        Notify("ESP", "Distance " .. (Value and "ON" or "OFF"), 2)
     end,
 })
 
@@ -580,6 +603,9 @@ MiscTab:AddToggle({
                     task.wait(60)
                 end
             end)
+            Notify("Anti-AFK", "Enabled", 2)
+        else
+            Notify("Anti-AFK", "Disabled", 2)
         end
     end
 })
@@ -588,28 +614,60 @@ MiscTab:AddToggle({
     Name = "Full Brightness",
     Default = false,
     Flag = "FullBright",
-    Callback = function(Value) if Value then applyFullBrightness() else removeFullBrightness() end end,
+    Callback = function(Value)
+        if Value then
+            applyFullBrightness()
+            Notify("Brightness", "Full Bright ON", 2)
+        else
+            removeFullBrightness()
+            Notify("Brightness", "Full Bright OFF", 2)
+        end
+    end,
 })
 
 MiscTab:AddToggle({
     Name = "Super Full Brightness",
     Default = false,
     Flag = "SuperFullBright",
-    Callback = function(Value) if Value then applySuperFullBrightness() else removeFullBrightness() end end,
+    Callback = function(Value)
+        if Value then
+            applySuperFullBrightness()
+            Notify("Brightness", "Super Full Bright ON", 2)
+        else
+            removeFullBrightness()
+            Notify("Brightness", "Super Full Bright OFF", 2)
+        end
+    end,
 })
 
 MiscTab:AddToggle({
     Name = "No Fog",
     Default = false,
     Flag = "NoFog",
-    Callback = function(Value) if Value then applyNoFog() else removeNoFog() end end,
+    Callback = function(Value)
+        if Value then
+            applyNoFog()
+            Notify("Fog", "No Fog ON", 2)
+        else
+            removeNoFog()
+            Notify("Fog", "No Fog OFF", 2)
+        end
+    end,
 })
 
 MiscTab:AddToggle({
     Name = "Vibrant Colors",
     Default = false,
     Flag = "Vibrant",
-    Callback = function(Value) if Value then applyVibrant() else removeVibrant() end end,
+    Callback = function(Value)
+        if Value then
+            applyVibrant()
+            Notify("Colors", "Vibrant ON", 2)
+        else
+            removeVibrant()
+            Notify("Colors", "Vibrant OFF", 2)
+        end
+    end,
 })
 
 MiscTab:AddToggle({
@@ -627,6 +685,9 @@ MiscTab:AddToggle({
                 end
             end
             settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            Notify("FPS", "Boost enabled", 2)
+        else
+            Notify("FPS", "Boost disabled (rejoin to reset)", 2)
         end
     end,
 })
@@ -644,4 +705,4 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-print("✓ Evade script dengan UI bearlib (raw URL) berhasil dimuat. GUI akan muncul dengan 4 tab berisi elemen.")
+Notify("Evade Script", "Loaded successfully! UI ready.", 3)
