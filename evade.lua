@@ -1,11 +1,61 @@
 -- ========== KONFIGURASI ==========
 local ANOLIB_RAW_URL = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/anolib.lua"
+local REQUIRED_PLACE_ID = 9872472334  -- Place ID game Evade
 -- =================================
 
 -- Load library dari raw URL (persis seperti Blox Fruit)
 local bearlib = loadstring(game:HttpGet(ANOLIB_RAW_URL))()
 if not bearlib then
     error("Gagal memuat bearlib dari raw URL")
+end
+
+-- ========== PENGECEKAN MAP (HARUS GAME EVADE) ==========
+if game.PlaceId ~= REQUIRED_PLACE_ID then
+    -- Tampilkan pesan error di CoreGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "WrongGameWarning"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = game:GetService("CoreGui")
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 400, 0, 120)
+    frame.Position = UDim2.new(0.5, -200, 0.5, -60)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    frame.BackgroundTransparency = 0.1
+    frame.BorderSizePixel = 0
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = frame
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 80, 80)
+    stroke.Thickness = 2
+    stroke.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "WRONG GAME!\nThis script only works for Evade.\nPlace ID: " .. REQUIRED_PLACE_ID
+    label.TextColor3 = Color3.fromRGB(255, 100, 100)
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.TextWrapped = true
+    label.Parent = frame
+    
+    frame.Parent = screenGui
+    
+    -- Notifikasi via bearlib (jika memungkinkan)
+    pcall(function()
+        bearlib:Notify({
+            Title = "Error",
+            Message = "You are in the wrong game! Only Evade supported.",
+            Duration = 5
+        })
+    end)
+    
+    task.wait(5)
+    screenGui:Destroy()
+    error("Script stopped: Wrong game. Please run this script only in Evade (Place ID: " .. REQUIRED_PLACE_ID .. ")")
 end
 
 -- Helper untuk notifikasi (durasi 3 detik, dengan pengecekan inisialisasi)
