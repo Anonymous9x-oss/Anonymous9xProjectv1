@@ -1,26 +1,21 @@
 -- ========== KONFIGURASI ==========
-local ANOLIB_RAW_URL = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/anolib.lua"  -- ← GANTI DENGAN RAW URL ANDA
+local ANOLIB_RAW_URL = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/anolib.lua"
 -- =================================
 
--- Load library dengan error handling
+-- Load library dari raw URL (persis seperti Blox Fruit)
 local bearlib
 local success, err = pcall(function()
-    print("Mengambil bearlib dari:", ANOLIB_RAW_URL)
     local content = game:HttpGet(ANOLIB_RAW_URL)
-    print("Berhasil mengambil file, panjang:", #content)
-    local func = loadstring(content)
-    if not func then error("Gagal loadstring") end
-    return func()
+    bearlib = loadstring(content)()
 end)
 
-if not success or type(err) ~= "table" then
-    error("BEARLIB GAGAL DIMUAT!\n\n" .. tostring(err) .. "\n\nPeriksa URL atau koneksi internet.")
+if not success or not bearlib then
+    error("Gagal memuat bearlib dari raw URL:\n" .. tostring(err))
 end
 
-bearlib = err
-print("✓ bearlib versi", bearlib.Info.Version, "berhasil dimuat")
+print("bearlib loaded, version:", bearlib.Info.Version)
 
--- ==================== EVADE SCRIPT ====================
+-- ==================== EVADE SCRIPT (UI diperbaiki) ====================
 repeat task.wait() until game:IsLoaded()
 
 local Players = game:GetService("Players")
@@ -31,20 +26,20 @@ local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 local Workspace = game:GetService("Workspace")
 
--- Buat window
+-- Membuat window (sama seperti Blox Fruit)
 local Window = bearlib:MakeWindow({
-    Name = "Anonymous9x VIP",
-    SubTitle = "Anonymus9x",
+    Title = "Evade Script by SARpastes | SARHUB",
+    SubTitle = "Powered by bearlib (raw URL)",
     SaveFolder = "EvadeConfig.json"
 })
 
--- ✅ PERBAIKAN: Buat tab dengan tabel, bukan string
-local PlayerTab = Window:MakeTab({Title = "Player"})
-local AutoTab   = Window:MakeTab({Title = "Auto"})
-local EspTab    = Window:MakeTab({Title = "ESP"})
-local MiscTab   = Window:MakeTab({Title = "Misc"})
+-- ✅ PERBAIKAN 1: Buat tab dengan TABEL, bukan string
+local PlayerTab = Window:MakeTab({ Title = "Player" })
+local AutoTab   = Window:MakeTab({ Title = "Auto" })
+local EspTab    = Window:MakeTab({ Title = "ESP" })
+local MiscTab   = Window:MakeTab({ Title = "Misc" })
 
--- Variabel (sama seperti sebelumnya, tidak diubah semua fungsi helper)
+-- Variabel (semua fitur tetap sama, tidak diubah)
 local ValueSpeed = 16
 local ActiveCFrameSpeedBoost = false
 local cframeSpeedConnection = nil
@@ -62,6 +57,7 @@ local ActiveEspBots = false
 local ActiveDistanceEsp = false
 local playerAddedConnection = nil
 local botLoopConnection = nil
+
 local originalBrightness = game.Lighting.Brightness
 local originalOutdoorAmbient = game.Lighting.OutdoorAmbient
 local originalAmbient = game.Lighting.Ambient
@@ -71,11 +67,12 @@ local originalFogStart = game.Lighting.FogStart
 local originalColorCorrectionEnabled = game.Lighting.ColorCorrection.Enabled
 local originalSaturation = game.Lighting.ColorCorrection.Saturation
 local originalContrast = game.Lighting.ColorCorrection.Contrast
+
 local autoReviveEnabled = false
 local lastCheckTime = 0
 local checkInterval = 5
 
--- ==================== FUNGSI HELPER (sama seperti sebelumnya, disingkat di sini) ====================
+-- Helper functions (sama persis seperti script Evade asli)
 local function fireVoteServer(selectedMapNumber)
     local eventsFolder = ReplicatedStorage:WaitForChild("Events", 10)
     if eventsFolder then
@@ -132,6 +129,14 @@ local function removeVibrant()
     game.Lighting.ColorCorrection.Contrast = originalContrast
 end
 
+local function getLocalPlayerCharacter()
+    local player = Players.LocalPlayer
+    if player then
+        return player.Character or player.CharacterAdded:Wait()
+    end
+    return nil
+end
+
 local function CreateEsp(Char, Color, Text, ParentPart, YOffset)
     if not Char or not ParentPart or not ParentPart:IsA("BasePart") then return end
     if Char:FindFirstChild("ESP_Highlight") and ParentPart:FindFirstChild("ESP") then return end
@@ -177,8 +182,8 @@ local function CreateEsp(Char, Color, Text, ParentPart, YOffset)
             end
             task.wait(0.1)
         end
-        highlight:Destroy()
-        billboard:Destroy()
+        if highlight then highlight:Destroy() end
+        if billboard then billboard:Destroy() end
     end)
 end
 
@@ -293,12 +298,13 @@ end)
 -- ==================== PLAYER TAB ====================
 PlayerTab:AddSection("Movement")
 
+-- ✅ PERBAIKAN 2: Gunakan 'Default' bukan 'CurrentValue'
 PlayerTab:AddSlider({
     Name = "Speed Value",
-    Range = {1, 50},
+    Min = 1,
+    Max = 50,
     Increment = 1,
-    Suffix = "Speed",
-    CurrentValue = 16,
+    Default = 16,
     Flag = "SpeedValue",
     Callback = function(Value)
         ValueSpeed = Value
@@ -310,18 +316,18 @@ PlayerTab:AddSlider({
 
 PlayerTab:AddToggle({
     Name = "Speed Power",
-    CurrentValue = false,
+    Default = false,
     Flag = "CFrameSpeed",
     Callback = function(Value)
         ActiveCFrameSpeedBoost = Value
         if ActiveCFrameSpeedBoost then
             if cframeSpeedConnection then cframeSpeedConnection:Disconnect() end
             cframeSpeedConnection = RunService.RenderStepped:Connect(function()
-                local character = LocalPlayer.Character
-                local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-                local hrp = character and character:FindFirstChild("HumanoidRootPart")
-                if character and humanoid and hrp then
-                    local moveDir = humanoid.MoveDirection
+                local char = LocalPlayer.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if char and hum and hrp then
+                    local moveDir = hum.MoveDirection
                     if moveDir.Magnitude > 0 then
                         hrp.CFrame = hrp.CFrame + moveDir * math.max(ValueSpeed, 1) * 0.080
                     end
@@ -335,7 +341,7 @@ PlayerTab:AddToggle({
 
 PlayerTab:AddToggle({
     Name = "Jump Power (Enable)",
-    CurrentValue = false,
+    Default = false,
     Flag = "JumpBoost",
     Callback = function(Value)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
@@ -346,10 +352,10 @@ PlayerTab:AddToggle({
 
 PlayerTab:AddSlider({
     Name = "Jump Power Value",
-    Range = {0, 1000},
+    Min = 0,
+    Max = 1000,
     Increment = 1,
-    Suffix = "%",
-    CurrentValue = 50,
+    Default = 50,
     Flag = "JumpBoostSlider",
     Callback = function(Value)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
@@ -360,7 +366,7 @@ PlayerTab:AddSlider({
 
 PlayerTab:AddToggle({
     Name = "Auto Bhop (Just hold space)",
-    CurrentValue = false,
+    Default = false,
     Flag = "AutoBhopToggle",
     Callback = function(Value)
         bhopEnabled = Value
@@ -380,10 +386,10 @@ PlayerTab:AddSection("Gravity")
 
 local GravitySlider = PlayerTab:AddSlider({
     Name = "Gravity",
-    Range = {0, 1000},
+    Min = 0,
+    Max = 1000,
     Increment = 1,
-    Suffix = "%",
-    CurrentValue = 50,
+    Default = 50,
     Flag = "GravitySlider",
     Callback = function(Value)
         Workspace.Gravity = Value
@@ -398,7 +404,7 @@ PlayerTab:AddButton({
     end,
 })
 
--- Bhop input handling
+-- Bhop input handling (sama)
 UserInputService.InputBegan:Connect(function(InputObject, GameProcessedEvent)
     if InputObject.KeyCode == Enum.KeyCode.Space and not GameProcessedEvent then
         IsHoldingSpace = true
@@ -437,7 +443,7 @@ AutoTab:AddSection("Map Voting")
 AutoTab:AddDropdown({
     Name = "Select Map",
     Options = {"Map 1", "Map 2", "Map 3", "Map 4"},
-    CurrentOption = "Map 1",
+    Default = "Map 1",
     Flag = "MapSelection",
     Callback = function(Option)
         if Option == "Map 1" then selectedMapNumber = 1
@@ -456,7 +462,7 @@ AutoTab:AddButton({
 
 AutoTab:AddToggle({
     Name = "Auto Vote",
-    CurrentValue = false,
+    Default = false,
     Flag = "AutoVote",
     Callback = function(Value)
         autoVoteEnabled = Value
@@ -477,8 +483,8 @@ AutoTab:AddSection("Revive")
 AutoTab:AddButton({
     Name = "Revive Yourself",
     Callback = function()
-        local character = LocalPlayer.Character
-        if character and character:GetAttribute("Downed") then
+        local char = LocalPlayer.Character
+        if char and char:GetAttribute("Downed") then
             ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
         end
     end,
@@ -486,7 +492,7 @@ AutoTab:AddButton({
 
 AutoTab:AddToggle({
     Name = "Auto Revive Yourself",
-    CurrentValue = false,
+    Default = false,
     Flag = "AutoRevive",
     Callback = function(Value)
         autoReviveEnabled = Value
@@ -496,12 +502,14 @@ AutoTab:AddToggle({
 -- ==================== ESP TAB ====================
 EspTab:AddToggle({
     Name = "Players ESP",
-    CurrentValue = false,
+    Default = false,
     Flag = "PlayersESP",
     Callback = function(Value)
         ActiveEspPlayers = Value
         if ActiveEspPlayers then
-            for _, plr in pairs(Players:GetPlayers()) do handlePlayerEsp(plr) end
+            for _, plr in pairs(Players:GetPlayers()) do
+                handlePlayerEsp(plr)
+            end
             playerAddedConnection = Players.PlayerAdded:Connect(handlePlayerEsp)
         else
             if playerAddedConnection then playerAddedConnection:Disconnect(); playerAddedConnection = nil end
@@ -516,7 +524,7 @@ EspTab:AddToggle({
 
 EspTab:AddToggle({
     Name = "NextBot ESP",
-    CurrentValue = false,
+    Default = false,
     Flag = "BotsESP",
     Callback = function(Value)
         ActiveEspBots = Value
@@ -549,7 +557,7 @@ EspTab:AddToggle({
 
 EspTab:AddToggle({
     Name = "Distance ESP",
-    CurrentValue = false,
+    Default = false,
     Flag = "DistanceESP",
     Callback = function(Value)
         ActiveDistanceEsp = Value
@@ -559,7 +567,7 @@ EspTab:AddToggle({
 -- ==================== MISC TAB ====================
 MiscTab:AddToggle({
     Name = "Anti-AFK",
-    CurrentValue = true,
+    Default = true,
     Flag = "AntiAFK",
     Callback = function(Value)
         afk = Value
@@ -578,35 +586,35 @@ MiscTab:AddToggle({
 
 MiscTab:AddToggle({
     Name = "Full Brightness",
-    CurrentValue = false,
+    Default = false,
     Flag = "FullBright",
     Callback = function(Value) if Value then applyFullBrightness() else removeFullBrightness() end end,
 })
 
 MiscTab:AddToggle({
     Name = "Super Full Brightness",
-    CurrentValue = false,
+    Default = false,
     Flag = "SuperFullBright",
     Callback = function(Value) if Value then applySuperFullBrightness() else removeFullBrightness() end end,
 })
 
 MiscTab:AddToggle({
     Name = "No Fog",
-    CurrentValue = false,
+    Default = false,
     Flag = "NoFog",
     Callback = function(Value) if Value then applyNoFog() else removeNoFog() end end,
 })
 
 MiscTab:AddToggle({
     Name = "Vibrant Colors",
-    CurrentValue = false,
+    Default = false,
     Flag = "Vibrant",
     Callback = function(Value) if Value then applyVibrant() else removeVibrant() end end,
 })
 
 MiscTab:AddToggle({
     Name = "FPS Boost",
-    CurrentValue = false,
+    Default = false,
     Flag = "FPSBoost",
     Callback = function(Value)
         if Value then
@@ -625,13 +633,15 @@ MiscTab:AddToggle({
 
 -- Auto-revive loop
 RunService.Heartbeat:Connect(function()
-    if autoReviveEnabled and tick() - lastCheckTime >= checkInterval then
-        lastCheckTime = tick()
-        local character = LocalPlayer.Character
-        if character and character:GetAttribute("Downed") then
-            ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
+    if autoReviveEnabled then
+        if tick() - lastCheckTime >= checkInterval then
+            lastCheckTime = tick()
+            local char = LocalPlayer.Character
+            if char and char:GetAttribute("Downed") then
+                ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
+            end
         end
     end
 end)
 
-print("✓ Evade script siap! GUI seharusnya muncul dengan 4 tab.")
+print("✓ Evade script dengan UI bearlib (raw URL) berhasil dimuat. GUI akan muncul dengan 4 tab berisi elemen.")
