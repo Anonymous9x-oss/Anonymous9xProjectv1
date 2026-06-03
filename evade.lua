@@ -1,5 +1,5 @@
 -- ========== KONFIGURASI ==========
-local ANOLIB_RAW_URL = "https://raw.githubusercontent.com/username/repo/main/anolib.lua"  -- ← GANTI DENGAN RAW URL ANDA
+local ANOLIB_RAW_URL = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/anolib.lua"  -- ← GANTI DENGAN RAW URL ANDA
 -- =================================
 
 -- Load library dengan error handling
@@ -33,8 +33,8 @@ local Workspace = game:GetService("Workspace")
 
 -- Buat window
 local Window = bearlib:MakeWindow({
-    Name = "Evade Script by SARpastes | SARHUB",
-    SubTitle = "Memuat library dari raw URL",
+    Name = "Anonymous9x VIP",
+    SubTitle = "Anonymus9x",
     SaveFolder = "EvadeConfig.json"
 })
 
