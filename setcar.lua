@@ -12,7 +12,7 @@ local accelLimit = 1500
 local seat
 local rootPart
 
--- Color Config (dipertahankan)
+-- Color Config
 local PrimaryColor = Color3.fromRGB(100, 180, 250)
 local SecondaryColor = Color3.fromRGB(250, 120, 140)
 local GlowColor = Color3.fromRGB(80, 160, 255)
@@ -32,10 +32,10 @@ local function showMiniNotification(message, type)
     notif.BackgroundColor3 = CardBg
     notif.BackgroundTransparency = 0.1
     notif.ZIndex = 20
-
+    
     local notifCorner = Instance.new("UICorner", notif)
     notifCorner.CornerRadius = UDim.new(0, 10)
-
+    
     local notifStroke = Instance.new("UIStroke", notif)
     notifStroke.Thickness = 1
     if type == "error" then
@@ -46,7 +46,7 @@ local function showMiniNotification(message, type)
         notifStroke.Color = PrimaryColor
     end
     notifStroke.Transparency = 0.3
-
+    
     local icon = Instance.new("TextLabel", notif)
     icon.Size = UDim2.fromOffset(22, 22)
     icon.Position = UDim2.new(0, 8, 0.5, -11)
@@ -55,7 +55,7 @@ local function showMiniNotification(message, type)
     icon.TextColor3 = notifStroke.Color
     icon.Font = Enum.Font.GothamBold
     icon.TextSize = 14
-
+    
     local msgLabel = Instance.new("TextLabel", notif)
     msgLabel.Size = UDim2.new(1, -38, 1, 0)
     msgLabel.Position = UDim2.new(0, 34, 0, 0)
@@ -65,13 +65,13 @@ local function showMiniNotification(message, type)
     msgLabel.Font = Enum.Font.Gotham
     msgLabel.TextSize = 11
     msgLabel.TextXAlignment = Enum.TextXAlignment.Left
-
+    
     TweenService:Create(notif, TweenInfo.new(0.25, Enum.EasingStyle.Back), {
         Position = UDim2.fromScale(0.5, 0.02)
     }):Play()
-
+    
     task.wait(2)
-
+    
     TweenService:Create(notif, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
         Position = UDim2.fromScale(0.5, -0.05)
     }):Play()
@@ -128,7 +128,7 @@ RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- ===================== MODERN PREMIUM GUI =====================
+-- Modern GUI
 local gui = Instance.new("ScreenGui", player.PlayerGui)
 gui.ResetOnSpawn = false
 gui.Name = "FIQQZR7_Farm"
@@ -191,10 +191,10 @@ local titleText = Instance.new("TextLabel", titleBar)
 titleText.Size = UDim2.new(1, -100, 1, 0)
 titleText.Position = UDim2.new(0, 54, 0, 0)
 titleText.BackgroundTransparency = 1
-titleText.Text = "FIQQZR7xANONYMOUS9X SET SPEED"
+titleText.Text = "FIQQZR7xANONYMOUS9X"
 titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleText.Font = Enum.Font.GothamBold
-titleText.TextSize = 14
+titleText.TextSize = 11
 titleText.TextXAlignment = Enum.TextXAlignment.Left
 titleText.ZIndex = 10
 
@@ -203,10 +203,10 @@ local subText = Instance.new("TextLabel", titleBar)
 subText.Size = UDim2.new(1, -100, 0, 14)
 subText.Position = UDim2.new(0, 54, 0, 32)
 subText.BackgroundTransparency = 1
-subText.Text = "Fiqqzr7XCode"
+subText.Text = "SET CAR"
 subText.TextColor3 = SoftGray
 subText.Font = Enum.Font.Gotham
-subText.TextSize = 9
+subText.TextSize = 7
 subText.TextXAlignment = Enum.TextXAlignment.Left
 subText.ZIndex = 10
 
@@ -278,17 +278,17 @@ contentCanvas.ZIndex = 2
 
 -- UIListLayout
 local layout = Instance.new("UIListLayout", contentCanvas)
-layout.Padding = UDim.new(0, 10)
+layout.Padding = UDim.new(0, 12)
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 -- ========== SPEED CARD ==========
 local speedCard = Instance.new("Frame", contentCanvas)
-speedCard.Size = UDim2.new(0.92, 0, 0, 65)
+speedCard.Size = UDim2.new(0.92, 0, 0, 70)
 speedCard.BackgroundColor3 = CardBg
 speedCard.BorderSizePixel = 0
 
 local cardCorner = Instance.new("UICorner", speedCard)
-cardCorner.CornerRadius = UDim.new(0, 14)
+cardCorner.CornerRadius = UDim.new(0, 16)
 
 local cardGlow = Instance.new("UIStroke", speedCard)
 cardGlow.Thickness = 1
@@ -302,18 +302,18 @@ speedValue.BackgroundTransparency = 1
 speedValue.Text = "500"
 speedValue.TextColor3 = PrimaryColor
 speedValue.Font = Enum.Font.GothamBold
-speedValue.TextSize = 28
+speedValue.TextSize = 38
 speedValue.TextXAlignment = Enum.TextXAlignment.Center
 
 -- Speed Unit
 local speedUnit = Instance.new("TextLabel", speedCard)
-speedUnit.Size = UDim2.new(0.3, 0, 0, 16)
-speedUnit.Position = UDim2.new(0.62, 0, 0.5, -8)
+speedUnit.Size = UDim2.new(0.3, 0, 0, 18)
+speedUnit.Position = UDim2.new(0.62, 0, 0.5, -9)
 speedUnit.BackgroundTransparency = 1
 speedUnit.Text = "km/h"
 speedUnit.TextColor3 = SoftGray
 speedUnit.Font = Enum.Font.Gotham
-speedUnit.TextSize = 10
+speedUnit.TextSize = 11
 
 -- Status Dot
 local statusDot = Instance.new("Frame", speedCard)
@@ -325,8 +325,8 @@ local dotCorner = Instance.new("UICorner", statusDot)
 dotCorner.CornerRadius = UDim.new(1, 0)
 
 local statusText = Instance.new("TextLabel", speedCard)
-statusText.Size = UDim2.new(0.3, 0, 0, 12)
-statusText.Position = UDim2.new(0.85, 0, 0.65, -2)
+statusText.Size = UDim2.new(0.3, 0, 0, 14)
+statusText.Position = UDim2.new(0.85, 0, 0.65, 0)
 statusText.BackgroundTransparency = 1
 statusText.Text = "off"
 statusText.TextColor3 = SoftGray
@@ -335,23 +335,23 @@ statusText.TextSize = 9
 
 -- ========== SPEED CONTROL ==========
 local controlSection = Instance.new("Frame", contentCanvas)
-controlSection.Size = UDim2.new(0.92, 0, 0, 85)
+controlSection.Size = UDim2.new(0.92, 0, 0, 0)
 controlSection.BackgroundTransparency = 1
 
 -- Speed Label
 local speedLabel = Instance.new("TextLabel", controlSection)
-speedLabel.Size = UDim2.new(1, 0, 0, 20)
+speedLabel.Size = UDim2.new(1, 0, 0, 24)
 speedLabel.BackgroundTransparency = 1
-speedLabel.Text = "Set Speed"
+speedLabel.Text = "set speed"
 speedLabel.TextColor3 = SoftGray
 speedLabel.Font = Enum.Font.GothamBold
-speedLabel.TextSize = 11
+speedLabel.TextSize = 12
 speedLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 -- Slider Background
 local sliderBg = Instance.new("Frame", controlSection)
-sliderBg.Size = UDim2.new(1, 0, 0, 6)
-sliderBg.Position = UDim2.new(0, 0, 0, 24)
+sliderBg.Size = UDim2.new(1, 0, 0, 5)
+sliderBg.Position = UDim2.new(0, 0, 0, 28)
 sliderBg.BackgroundColor3 = Color3.fromRGB(35, 33, 43)
 sliderBg.BorderSizePixel = 0
 
@@ -367,78 +367,14 @@ sliderFill.BorderSizePixel = 0
 local sliderFillCorner = Instance.new("UICorner", sliderFill)
 sliderFillCorner.CornerRadius = UDim.new(1, 0)
 
--- Slider Knob (draggable)
-local sliderKnob = Instance.new("Frame", sliderBg)
-sliderKnob.Size = UDim2.fromOffset(14, 18)
-sliderKnob.Position = UDim2.new(0.5, -7, 0, -6)
-sliderKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-sliderKnob.BorderSizePixel = 0
-sliderKnob.ZIndex = 5
-
-local knobCorner = Instance.new("UICorner", sliderKnob)
-knobCorner.CornerRadius = UDim.new(0, 4)
-
--- Slider interactivity
-local draggingSlider = false
-
-sliderKnob.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingSlider = true
-    end
-end)
-
-sliderBg.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingSlider = true
-        local mousePos = UserInputService:GetMouseLocation()
-        local relX = mousePos.X - sliderBg.AbsolutePosition.X
-        local fraction = math.clamp(relX / sliderBg.AbsoluteSize.X, 0, 1)
-        updateSliderFromFraction(fraction)
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingSlider = false
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mousePos = UserInputService:GetMouseLocation()
-        local relX = mousePos.X - sliderBg.AbsolutePosition.X
-        local fraction = math.clamp(relX / sliderBg.AbsoluteSize.X, 0, 1)
-        updateSliderFromFraction(fraction)
-    end
-end)
-
-function updateSliderFromFraction(fraction)
-    -- Map fraction to speed (1 to 1e6 logarithmic)
-    local v
-    if fraction <= 0.5 then
-        v = 1 + (999 * (fraction / 0.5))
-    else
-        -- 1000 to 1,000,000 on a log scale for the upper half
-        local logMin, logMax = math.log10(1000), math.log10(1000000)
-        local logFrac = (fraction - 0.5) / 0.5
-        v = 10 ^ (logMin + (logMax - logMin) * logFrac)
-    end
-    targetSpeed = math.floor(v)
-    speedInput.Text = tostring(targetSpeed)
-    updateSlider()
-    if enabled then
-        showMiniNotification("⚡ speed changed to " .. formatSpeed(targetSpeed), "success")
-    end
-end
-
 -- Speed Input
 local speedInput = Instance.new("TextBox", controlSection)
-speedInput.Size = UDim2.new(1, 0, 0, 38)
+speedInput.Size = UDim2.new(1, 0, 0, 40)
 speedInput.Position = UDim2.new(0, 0, 0, 42)
 speedInput.PlaceholderText = "enter speed"
 speedInput.Text = "500"
 speedInput.Font = Enum.Font.GothamBold
-speedInput.TextSize = 14
+speedInput.TextSize = 16
 speedInput.BackgroundColor3 = Color3.fromRGB(28, 26, 36)
 speedInput.TextColor3 = PrimaryColor
 speedInput.BorderSizePixel = 0
@@ -446,68 +382,16 @@ speedInput.BorderSizePixel = 0
 local inputCorner = Instance.new("UICorner", speedInput)
 inputCorner.CornerRadius = UDim.new(0, 10)
 
--- Format speed display
-function formatSpeed(spd)
-    if spd >= 1000000 then
-        return string.format("%.1fM", spd / 1000000)
-    elseif spd >= 1000 then
-        return string.format("%.0fk", spd / 1000)
-    else
-        return tostring(spd)
-    end
-end
-
--- Update Slider and speed card
-local function updateSlider()
-    local fraction
-    if targetSpeed <= 1000 then
-        fraction = (targetSpeed - 1) / 999 * 0.5
-    else
-        local logMin, logMax = math.log10(1000), math.log10(1000000)
-        local logVal = math.log10(targetSpeed)
-        fraction = 0.5 + ((logVal - logMin) / (logMax - logMin)) * 0.5
-    end
-    fraction = math.clamp(fraction, 0, 1)
-    
-    TweenService:Create(sliderFill, TweenInfo.new(0.15), {
-        Size = UDim2.new(fraction, 0, 1, 0)
-    }):Play()
-    TweenService:Create(sliderKnob, TweenInfo.new(0.15), {
-        Position = UDim2.new(fraction, -7, 0, -6)
-    }):Play()
-    
-    speedValue.Text = formatSpeed(targetSpeed)
-    
-    if enabled and rootPart then
-        appliedSpeed = targetSpeed
-    end
-end
-
--- Speed Input
-speedInput.FocusLost:Connect(function()
-    local v = tonumber(speedInput.Text)
-    if v and v >= 1 then
-        targetSpeed = math.floor(v)
-    elseif v and v < 1 then
-        targetSpeed = 1
-    else
-        targetSpeed = 500
-    end
-    speedInput.Text = tostring(targetSpeed)
-    updateSlider()
-    if enabled then
-        showMiniNotification("⚡ speed changed to " .. formatSpeed(targetSpeed), "success")
-    end
-end)
+controlSection.Size = UDim2.new(0.92, 0, 0, 90)
 
 -- ========== UNLIMITED BADGE ==========
 local badge = Instance.new("Frame", contentCanvas)
-badge.Size = UDim2.new(0.92, 0, 0, 32)
+badge.Size = UDim2.new(0.92, 0, 0, 36)
 badge.BackgroundColor3 = Color3.fromRGB(28, 26, 36)
 badge.BorderSizePixel = 0
 
 local badgeCorner = Instance.new("UICorner", badge)
-badgeCorner.CornerRadius = UDim.new(0, 10)
+badgeCorner.CornerRadius = UDim.new(0, 12)
 
 local badgeGlow = Instance.new("UIStroke", badge)
 badgeGlow.Thickness = 1
@@ -520,14 +404,14 @@ badgeText.BackgroundTransparency = 1
 badgeText.Text = "∞ unlimited speed • instant response"
 badgeText.TextColor3 = PrimaryColor
 badgeText.Font = Enum.Font.Gotham
-badgeText.TextSize = 10
+badgeText.TextSize = 11
 
 -- ========== JUMP BUTTON ==========
 local jumpBtn = Instance.new("TextButton", contentCanvas)
-jumpBtn.Size = UDim2.new(0.92, 0, 0, 40)
-jumpBtn.Text = "💨 Jump Boost"
+jumpBtn.Size = UDim2.new(0.92, 0, 0, 44)
+jumpBtn.Text = "💨 jump boost"
 jumpBtn.Font = Enum.Font.GothamBold
-jumpBtn.TextSize = 13
+jumpBtn.TextSize = 14
 jumpBtn.BackgroundColor3 = Color3.fromRGB(45, 55, 75)
 jumpBtn.TextColor3 = Color3.new(1, 1, 1)
 jumpBtn.BorderSizePixel = 0
@@ -539,29 +423,29 @@ addHover(jumpBtn, Color3.fromRGB(65, 75, 95))
 
 -- ========== INFO NOTE ==========
 local noteContainer = Instance.new("Frame", contentCanvas)
-noteContainer.Size = UDim2.new(0.92, 0, 0, 80)
+noteContainer.Size = UDim2.new(0.92, 0, 0, 0)
 noteContainer.BackgroundColor3 = Color3.fromRGB(28, 26, 36)
 noteContainer.BackgroundTransparency = 0.3
 noteContainer.BorderSizePixel = 0
 
 local noteCorner = Instance.new("UICorner", noteContainer)
-noteCorner.CornerRadius = UDim.new(0, 10)
+noteCorner.CornerRadius = UDim.new(0, 12)
 
 local noteTitle = Instance.new("TextLabel", noteContainer)
-noteTitle.Size = UDim2.new(1, -16, 0, 20)
+noteTitle.Size = UDim2.new(1, -16, 0, 24)
 noteTitle.Position = UDim2.new(0, 8, 0, 6)
 noteTitle.BackgroundTransparency = 1
-noteTitle.Text = "📋 Info"
+noteTitle.Text = "📋 info"
 noteTitle.TextColor3 = PrimaryColor
 noteTitle.Font = Enum.Font.GothamBold
 noteTitle.TextSize = 11
 noteTitle.TextXAlignment = Enum.TextXAlignment.Left
 
 local noteText = Instance.new("TextLabel", noteContainer)
-noteText.Size = UDim2.new(1, -16, 0, 48)
-noteText.Position = UDim2.new(0, 8, 0, 28)
+noteText.Size = UDim2.new(1, -16, 0, 0)
+noteText.Position = UDim2.new(0, 8, 0, 32)
 noteText.BackgroundTransparency = 1
-noteText.Text = "• Sit in vehicle to start\n• Work all game\n• Fiqqzr7xAnonymous9x build this script"
+noteText.Text = "• sit in vehicle to start\n•Work all game\n• Fiqqzr7xAnonymous9x build this script"
 noteText.TextColor3 = SoftGray
 noteText.Font = Enum.Font.Gotham
 noteText.TextSize = 10
@@ -569,12 +453,19 @@ noteText.TextXAlignment = Enum.TextXAlignment.Left
 noteText.TextYAlignment = Enum.TextYAlignment.Top
 noteText.LineHeight = 1.2
 
+local function updateNoteHeight()
+    local lineCount = 4
+    noteText.Size = UDim2.new(1, -16, 0, lineCount * 14)
+    noteContainer.Size = UDim2.new(0.92, 0, 0, 32 + (lineCount * 14) + 8)
+end
+updateNoteHeight()
+
 -- ========== START BUTTON ==========
 local toggleBtn = Instance.new("TextButton", contentCanvas)
-toggleBtn.Size = UDim2.new(0.92, 0, 0, 46)
-toggleBtn.Text = "Start"
+toggleBtn.Size = UDim2.new(0.92, 0, 0, 50)
+toggleBtn.Text = "start"
 toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextSize = 15
+toggleBtn.TextSize = 16
 toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 70)
 toggleBtn.TextColor3 = Color3.new(1, 1, 1)
 toggleBtn.BorderSizePixel = 0
@@ -596,6 +487,54 @@ local function updateCanvas()
     scrollContainer.CanvasSize = UDim2.new(0, 0, 0, totalHeight + 15)
 end
 
+-- Update Slider
+local function updateSlider()
+    local percent
+    if targetSpeed <= 1000 then
+        percent = (targetSpeed - 1) / 999
+    elseif targetSpeed <= 10000 then
+        percent = 0.5 + ((targetSpeed - 1000) / 9000) * 0.5
+    else
+        percent = math.min(1, 0.75 + math.log10(targetSpeed / 10000) / 10)
+    end
+    percent = math.clamp(percent, 0, 1)
+    
+    TweenService:Create(sliderFill, TweenInfo.new(0.15), {
+        Size = UDim2.new(percent, 0, 1, 0)
+    }):Play()
+    
+    if targetSpeed >= 1000000 then
+        speedValue.Text = string.format("%.1fM", targetSpeed / 1000000)
+    elseif targetSpeed >= 1000 then
+        speedValue.Text = string.format("%.0fk", targetSpeed / 1000)
+    else
+        speedValue.Text = tostring(targetSpeed)
+    end
+    
+    if enabled and rootPart then
+        appliedSpeed = targetSpeed
+    end
+end
+
+-- Speed Input
+speedInput.FocusLost:Connect(function()
+    local v = tonumber(speedInput.Text)
+    if v and v >= 1 then
+        targetSpeed = math.floor(v)
+        updateSlider()
+        if enabled then
+            showMiniNotification("⚡ speed changed to " .. (targetSpeed >= 1000000 and string.format("%.1fM", targetSpeed/1000000) or (targetSpeed >= 1000 and string.format("%.0fk", targetSpeed/1000) or tostring(targetSpeed))) .. " km/h", "success")
+        end
+    elseif v and v < 1 then
+        targetSpeed = 1
+        updateSlider()
+    else
+        targetSpeed = 500
+        updateSlider()
+    end
+    speedInput.Text = tostring(targetSpeed)
+end)
+
 -- Toggle Logic
 toggleBtn.MouseButton1Click:Connect(function()
     enabled = not enabled
@@ -605,15 +544,15 @@ toggleBtn.MouseButton1Click:Connect(function()
             rootPart = getCarRoot(seat)
             if rootPart then
                 appliedSpeed = targetSpeed
-                toggleBtn.Text = "Stop"
+                toggleBtn.Text = "stop"
                 toggleBtn.BackgroundColor3 = Color3.fromRGB(70, 150, 90)
                 statusDot.BackgroundColor3 = Color3.fromRGB(100, 220, 120)
                 statusText.Text = "active"
                 statusText.TextColor3 = Color3.fromRGB(100, 220, 120)
-                showMiniNotification("✓ active • " .. formatSpeed(targetSpeed), "success")
+                showMiniNotification("✓ active • " .. (targetSpeed >= 1000000 and string.format("%.1fM", targetSpeed/1000000) or (targetSpeed >= 1000 and string.format("%.0fk", targetSpeed/1000) or tostring(targetSpeed))) .. " km/h", "success")
             else
                 enabled = false
-                toggleBtn.Text = "Start"
+                toggleBtn.Text = "start"
                 toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 70)
                 statusDot.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
                 statusText.Text = "no car"
@@ -622,7 +561,7 @@ toggleBtn.MouseButton1Click:Connect(function()
             end
         else
             enabled = false
-            toggleBtn.Text = "Start"
+            toggleBtn.Text = "start"
             toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 70)
             statusDot.BackgroundColor3 = Color3.fromRGB(220, 160, 80)
             statusText.Text = "sit"
@@ -630,7 +569,7 @@ toggleBtn.MouseButton1Click:Connect(function()
             showMiniNotification("⚠ please sit in vehicle", "warning")
         end
     else
-        toggleBtn.Text = "Start"
+        toggleBtn.Text = "start"
         toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 70)
         statusDot.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
         statusText.Text = "off"
@@ -646,12 +585,12 @@ jumpBtn.MouseButton1Click:Connect(function()
         local jumpForce = Vector3.new(0, 650 * (1 + boostMultiplier * 0.1), 0)
         local forwardBoost = rootPart.CFrame.LookVector * (400 + targetSpeed * 2)
         rootPart:ApplyImpulse((jumpForce + forwardBoost) * rootPart.AssemblyMass / 10)
-
+        
         TweenService:Create(jumpBtn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(85, 95, 115)}):Play()
         task.wait(0.08)
         TweenService:Create(jumpBtn, TweenInfo.new(0.08), {BackgroundColor3 = Color3.fromRGB(45, 55, 75)}):Play()
-
-        showMiniNotification("💨 jump boost • " .. formatSpeed(targetSpeed) .. " power", "success")
+        
+        showMiniNotification("💨 jump boost • " .. (targetSpeed >= 1000000 and string.format("%.1fM", targetSpeed/1000000) or (targetSpeed >= 1000 and string.format("%.0fk", targetSpeed/1000) or tostring(targetSpeed))) .. " km/h power", "success")
     else
         showMiniNotification("⚠ no vehicle to jump", "error")
     end
@@ -668,7 +607,7 @@ minBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Close
+-- Close (tanpa mini icon)
 closeBtn.MouseButton1Click:Connect(function()
     gui:Destroy()
 end)
@@ -696,7 +635,7 @@ end)
 
 hum.Died:Connect(function()
     enabled = false
-    toggleBtn.Text = "Start"
+    toggleBtn.Text = "start"
     toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 70)
     statusText.Text = "died"
     statusText.TextColor3 = Color3.fromRGB(220, 100, 100)
@@ -709,7 +648,7 @@ player.CharacterAdded:Connect(function(newChar)
     hum = newChar:WaitForChild("Humanoid")
     enabled = false
     appliedSpeed = 0
-    toggleBtn.Text = "Start"
+    toggleBtn.Text = "start"
     toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 70)
     statusText.Text = "off"
     statusText.TextColor3 = SoftGray
@@ -731,4 +670,4 @@ end)
 updateCanvas()
 updateSlider()
 
-print(" FIQQZR7 x Anonymous9x FARM • Clean Premium Edition")
+print(" FIQQZR7 x Anonymous9x FARM • Clean Edition")
