@@ -193,6 +193,8 @@ local function doPlay()
     local ok2, track = pcall(function() return hum:LoadAnimation(anim) end)
     if not ok2 or not track then return false, "Failed to load animation" end
 
+    track.Looped = true   -- FIX: Skybox2 & all static poses
+
     track.Priority = Enum.AnimationPriority.Action4
     local w = S.Weight == 0 and 0.001 or S.Weight
     -- Use tiny non-zero speed if Speed=0 so track actually starts
@@ -204,7 +206,7 @@ local function doPlay()
     task.spawn(function()
         task.wait(0.12)
         for _ = 1, 6 do
-            if CurrentTrack and CurrentTrack.IsPlaying then
+            if CurrentTrack then  -- FIX: removed IsPlaying check
                 pcall(function()
                     CurrentTrack.TimePosition = S.TimePosition
                     CurrentTrack:AdjustSpeed(S.Speed)  -- set to real speed (0 = frozen pose)
@@ -513,6 +515,7 @@ Sep()
 
 SecLabel("EXTRAS")
 local Spin1Btn, UnzoomBtn = Row2("Spin 1  OFF", "Unzoom  OFF", 40)
+local FlyBtn = SecBtn("Fly Script", 36)  -- ADDED: Fly Script button
 Sep()
 
 InfoBox(
@@ -645,6 +648,21 @@ UnzoomBtn.MouseButton1Click:Connect(function()
     end
     Notif(unzoomOn and "Unzoom ON — wide view!" or "Unzoom OFF — normal view.",
           unzoomOn and Color3.fromRGB(68,135,205) or Color3.fromRGB(82,82,82))
+end)
+
+-- Fly Script (ADDED)
+FlyBtn.MouseButton1Click:Connect(function()
+    Notif("Loading fly script...", Color3.fromRGB(148,0,185))
+    task.spawn(function()
+        local ok, err = pcall(function()
+            loadstring(game:HttpGet("https://pastebin.com/raw/ZrRwsPAe"))()
+        end)
+        if not ok then
+            Notif("Fly failed: " .. tostring(err), Color3.fromRGB(195,50,50))
+        else
+            Notif("Fly script executed.", Color3.fromRGB(48,182,92))
+        end
+    end)
 end)
 
 -- ============================================================
