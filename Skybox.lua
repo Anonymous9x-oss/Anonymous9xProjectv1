@@ -52,15 +52,6 @@ local MODES = {
         FadeIn       = 0.00,
         FadeOut      = 0.00,
     },
-    Skybox2 = {
-        StopOnMove   = false,
-        AllowInvis   = true,
-        TimePosition = 0.15,
-        Speed        = 0.00,
-        Weight       = 0.19,
-        FadeIn       = 0.00,
-        FadeOut      = 0.00,
-    },
 }
 
 local S = {
@@ -510,12 +501,12 @@ Sep()
 SecLabel("SELECT MODE")
 local SB1Btn,  SB1Stroke   = ModeBtn("Skybox 1",   40)
 local FlickBtn,FlickStroke = ModeBtn("Flickering", 40)
-local SB2Btn,  SB2Stroke   = ModeBtn("Skybox 2",   40)
+-- Skybox 2 removed
 Sep()
 
 SecLabel("EXTRAS")
 local Spin1Btn, UnzoomBtn = Row2("Spin 1  OFF", "Unzoom  OFF", 40)
-local FlyBtn = SecBtn("Fly Script", 36)  -- ADDED: Fly Script button
+local FlyBtn = SecBtn("Fly Script", 36)
 Sep()
 
 InfoBox(
@@ -559,7 +550,7 @@ local MODE_OFF_STR = Color3.fromRGB(60,0,80)
 local modeButtons = {
     {btn=SB1Btn,   stroke=SB1Stroke,   key="Skybox1",    label="Skybox 1"},
     {btn=FlickBtn, stroke=FlickStroke, key="Flickering", label="Flickering"},
-    {btn=SB2Btn,   stroke=SB2Stroke,   key="Skybox2",    label="Skybox 2"},
+    -- Skybox 2 entry removed
 }
 
 local function setModeVisuals(activeKey)
@@ -585,7 +576,7 @@ end
 
 SB1Btn.MouseButton1Click:Connect(function()   applyMode("Skybox1")    end)
 FlickBtn.MouseButton1Click:Connect(function()  applyMode("Flickering") end)
-SB2Btn.MouseButton1Click:Connect(function()   applyMode("Skybox2")    end)
+-- Skybox 2 connection removed
 
 -- ============================================================
 -- ACTIVATE / STOP
@@ -650,7 +641,7 @@ UnzoomBtn.MouseButton1Click:Connect(function()
           unzoomOn and Color3.fromRGB(68,135,205) or Color3.fromRGB(82,82,82))
 end)
 
--- Fly Script (ADDED)
+-- Fly Script
 FlyBtn.MouseButton1Click:Connect(function()
     Notif("Loading fly script...", Color3.fromRGB(148,0,185))
     task.spawn(function()
