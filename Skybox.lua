@@ -494,6 +494,7 @@ NoteBox("NOTE: Fly high above the map FIRST before pressing Activate!", 34)
 Sep()
 
 SecLabel("SKYBOX CONTROL")
+local CopyBtn = SecBtn("Copy Free", 30)        -- ADDED: Copy username button
 local ActiveBtn = BigBtn("ACTIVATE ON", 44)
 local StopBtn   = SecBtn("STOP",        30)
 Sep()
@@ -577,6 +578,16 @@ end
 SB1Btn.MouseButton1Click:Connect(function()   applyMode("Skybox1")    end)
 FlickBtn.MouseButton1Click:Connect(function()  applyMode("Flickering") end)
 -- Skybox 2 connection removed
+
+-- ============================================================
+-- COPY FREE
+-- ============================================================
+CopyBtn.MouseButton1Click:Connect(function()
+    pcall(function()
+        setclipboard("have2sidee")
+    end)
+    Notif("By Anonymous9x!", Color3.fromRGB(148,0,185))
+end)
 
 -- ============================================================
 -- ACTIVATE / STOP
