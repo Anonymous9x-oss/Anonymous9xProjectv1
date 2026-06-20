@@ -83,52 +83,52 @@ local C = {
 local LOGO_ID = "rbxassetid://97269958324726"
 
 -- ═══════════════════════════════════════════════
--- WINDOW DIMENSIONS  — wide, short, mobile friendly
+-- WINDOW DIMENSIONS  — compact, mobile friendly
 -- ═══════════════════════════════════════════════
-local W   = 340
-local H   = 400
-local HDR = 34
-local SRCH= 30
-local TAB = 28
+local W   = 250
+local H   = 290
+local HDR = 26
+local SRCH= 22
+local TAB = 22
 
 -- ═══════════════════════════════════════════════
--- SMOOTH NOTIFICATION SYSTEM
+-- SMOOTH NOTIFICATION SYSTEM  (scaled down)
 -- ═══════════════════════════════════════════════
 local notifStack = {}
 
 local function showNotif(title, body, dur)
     local f = Instance.new("Frame")
-    f.Size               = UDim2.fromOffset(230, 50)
-    f.Position           = UDim2.new(1, 12, 1, -64)
+    f.Size               = UDim2.fromOffset(200, 40)
+    f.Position           = UDim2.new(1, 12, 1, -54)
     f.BackgroundColor3   = C.bg
     f.BackgroundTransparency = 0
     f.BorderSizePixel    = 0
     f.ZIndex             = 900
     f.Parent             = gui
     f.ClipsDescendants   = true
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 7)
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
     local fs = Instance.new("UIStroke", f)
-    fs.Color = C.white; fs.Thickness = 1.1; fs.Transparency = 0.25
+    fs.Color = C.white; fs.Thickness = 1.0; fs.Transparency = 0.25
 
     local t1 = Instance.new("TextLabel")
-    t1.Size               = UDim2.new(1, -12, 0, 18)
-    t1.Position           = UDim2.fromOffset(8, 5)
+    t1.Size               = UDim2.new(1, -10, 0, 16)
+    t1.Position           = UDim2.fromOffset(6, 4)
     t1.BackgroundTransparency = 1
     t1.Text               = title
     t1.Font               = Enum.Font.GothamBold
-    t1.TextSize            = 10
+    t1.TextSize            = 9
     t1.TextColor3          = C.white
     t1.TextXAlignment      = Enum.TextXAlignment.Left
     t1.ZIndex              = 901
     t1.Parent              = f
 
     local t2 = Instance.new("TextLabel")
-    t2.Size               = UDim2.new(1, -12, 0, 20)
-    t2.Position           = UDim2.fromOffset(8, 22)
+    t2.Size               = UDim2.new(1, -10, 0, 14)
+    t2.Position           = UDim2.fromOffset(6, 20)
     t2.BackgroundTransparency = 1
     t2.Text               = body
     t2.Font               = Enum.Font.Gotham
-    t2.TextSize            = 8
+    t2.TextSize            = 7
     t2.TextColor3          = C.sec
     t2.TextXAlignment      = Enum.TextXAlignment.Left
     t2.TextWrapped         = true
@@ -138,9 +138,9 @@ local function showNotif(title, body, dur)
     -- Calculate stacked Y offset
     local function recalcPositions()
         for i, nf in ipairs(notifStack) do
-            local targetY = -64 - ((i-1) * 58)
+            local targetY = -54 - ((i-1) * 48)
             TweenService:Create(nf, TweenInfo.new(0.22, Enum.EasingStyle.Quad), {
-                Position = UDim2.new(1, -242, 1, targetY)
+                Position = UDim2.new(1, -212, 1, targetY)
             }):Play()
         end
     end
@@ -150,7 +150,7 @@ local function showNotif(title, body, dur)
 
     -- Slide in
     TweenService:Create(f, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Position = UDim2.new(1, -242, 1, -64)
+        Position = UDim2.new(1, -212, 1, -54)
     }):Play()
 
     task.delay(dur or 3, function()
@@ -183,10 +183,10 @@ win.Active             = true
 win.Draggable          = false   -- locked
 win.ZIndex             = 10
 win.Parent             = gui
-Instance.new("UICorner", win).CornerRadius = UDim.new(0, 9)
+Instance.new("UICorner", win).CornerRadius = UDim.new(0, 8)
 
 local winS = Instance.new("UIStroke", win)
-winS.Thickness = 1.3; winS.Color = C.white; winS.Transparency = 0.35
+winS.Thickness = 1.2; winS.Color = C.white; winS.Transparency = 0.35
 
 -- Subtle white pulse glow loop (modern, calm — no flashy colors)
 task.spawn(function()
@@ -208,10 +208,10 @@ hdr.BackgroundTransparency = 0
 hdr.BorderSizePixel  = 0
 hdr.ZIndex           = 11
 hdr.Parent           = win
-Instance.new("UICorner", hdr).CornerRadius = UDim.new(0, 9)
+Instance.new("UICorner", hdr).CornerRadius = UDim.new(0, 8)
 
 local hPatch = Instance.new("Frame")
-hPatch.Size = UDim2.new(1,0,0,9); hPatch.Position = UDim2.new(0,0,1,-9)
+hPatch.Size = UDim2.new(1,0,0,7); hPatch.Position = UDim2.new(0,0,1,-7)
 hPatch.BackgroundColor3 = C.hdr; hPatch.BorderSizePixel = 0
 hPatch.ZIndex = 10; hPatch.Parent = hdr
 
@@ -221,8 +221,8 @@ hSep.BackgroundColor3 = C.sep; hSep.BorderSizePixel = 0
 hSep.ZIndex = 12; hSep.Parent = hdr
 
 local hLogo = Instance.new("ImageLabel")
-hLogo.Size               = UDim2.fromOffset(22, 22)
-hLogo.Position           = UDim2.fromOffset(8, 6)
+hLogo.Size               = UDim2.fromOffset(18, 18)
+hLogo.Position           = UDim2.fromOffset(6, 4)
 hLogo.BackgroundTransparency = 1
 hLogo.Image              = LOGO_ID
 hLogo.ScaleType          = Enum.ScaleType.Fit
@@ -230,12 +230,12 @@ hLogo.ZIndex             = 12
 hLogo.Parent             = hdr
 
 local hTitle = Instance.new("TextLabel")
-hTitle.Size               = UDim2.new(1, -100, 1, 0)
-hTitle.Position           = UDim2.fromOffset(36, 0)
+hTitle.Size               = UDim2.new(1, -90, 1, 0)
+hTitle.Position           = UDim2.fromOffset(28, 0)
 hTitle.BackgroundTransparency = 1
 hTitle.Text               = "Anonymous9x Animated Pack"
 hTitle.Font               = Enum.Font.GothamBold
-hTitle.TextSize            = 11
+hTitle.TextSize            = 10
 hTitle.TextColor3          = C.pri
 hTitle.TextXAlignment      = Enum.TextXAlignment.Left
 hTitle.TextTruncate        = Enum.TextTruncate.AtEnd
@@ -244,8 +244,8 @@ hTitle.Parent              = hdr
 
 local function makeCtrl(xOff, sym)
     local b = Instance.new("ImageButton")
-    b.Size               = UDim2.fromOffset(22, 19)
-    b.Position           = UDim2.new(1, xOff, 0.5, -9)
+    b.Size               = UDim2.fromOffset(20, 16)
+    b.Position           = UDim2.new(1, xOff, 0.5, -8)
     b.BackgroundColor3   = C.card
     b.BackgroundTransparency = 0
     b.BorderSizePixel    = 0
@@ -253,13 +253,13 @@ local function makeCtrl(xOff, sym)
     b.AutoButtonColor    = false
     b.ZIndex             = 13
     b.Parent             = hdr
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 3)
     local l = Instance.new("TextLabel")
     l.Size               = UDim2.fromScale(1, 1)
     l.BackgroundTransparency = 1
     l.Text               = sym
     l.Font               = Enum.Font.GothamBold
-    l.TextSize            = 12
+    l.TextSize            = 11
     l.TextColor3          = C.sec
     l.ZIndex              = 14
     l.Parent              = b
@@ -274,24 +274,24 @@ local function makeCtrl(xOff, sym)
     return b, l
 end
 
-local minBtn, minL   = makeCtrl(-50, "-")
-local closeBtn, _    = makeCtrl(-26, "x")
+local minBtn, minL   = makeCtrl(-44, "-")
+local closeBtn, _    = makeCtrl(-22, "x")
 
 -- ═══════════════════════════════════════════════
 -- FLOAT ICON (minimized state)
 -- ═══════════════════════════════════════════════
 local floatF = Instance.new("Frame")
 floatF.Name             = "FloatIcon"
-floatF.Size             = UDim2.fromOffset(48, 48)
+floatF.Size             = UDim2.fromOffset(42, 42)
 floatF.BackgroundColor3 = C.hdr
 floatF.BackgroundTransparency = 0
 floatF.BorderSizePixel  = 0
 floatF.Visible          = false
 floatF.ZIndex           = 500
 floatF.Parent           = gui
-Instance.new("UICorner", floatF).CornerRadius = UDim.new(0, 11)
+Instance.new("UICorner", floatF).CornerRadius = UDim.new(0, 9)
 local fiS = Instance.new("UIStroke", floatF)
-fiS.Color = C.white; fiS.Thickness = 1.2; fiS.Transparency = 0.3
+fiS.Color = C.white; fiS.Thickness = 1.1; fiS.Transparency = 0.3
 
 task.spawn(function()
     local t = 0
@@ -303,7 +303,7 @@ task.spawn(function()
 end)
 
 local fiImg = Instance.new("ImageLabel")
-fiImg.Size               = UDim2.fromOffset(40, 40)
+fiImg.Size               = UDim2.fromOffset(34, 34)
 fiImg.Position           = UDim2.fromOffset(4, 4)
 fiImg.BackgroundTransparency = 1
 fiImg.Image              = LOGO_ID
@@ -314,8 +314,7 @@ fiImg.Parent             = floatF
 local function anchorFloat()
     local vp = workspace.CurrentCamera.ViewportSize
     if vp.X < 10 then vp = Vector2.new(800, 600) end
-    -- bottom-right area, slightly toward center
-    floatF.Position = UDim2.fromOffset(vp.X - 70, vp.Y - 170)
+    floatF.Position = UDim2.fromOffset(vp.X - 62, vp.Y - 150)
 end
 anchorFloat()
 
@@ -347,33 +346,33 @@ end)
 -- SEARCH BAR
 -- ═══════════════════════════════════════════════
 local searchF = Instance.new("Frame")
-searchF.Size             = UDim2.new(1, -12, 0, 24)
-searchF.Position         = UDim2.fromOffset(6, HDR + 5)
+searchF.Size             = UDim2.new(1, -10, 0, 20)
+searchF.Position         = UDim2.fromOffset(5, HDR + 4)
 searchF.BackgroundColor3 = C.card
 searchF.BackgroundTransparency = 0
 searchF.BorderSizePixel  = 0
 searchF.ZIndex           = 11
 searchF.Parent           = win
-Instance.new("UICorner", searchF).CornerRadius = UDim.new(0, 5)
+Instance.new("UICorner", searchF).CornerRadius = UDim.new(0, 4)
 local sS = Instance.new("UIStroke", searchF); sS.Color=C.border; sS.Thickness=0.8
 
 local searchBox = Instance.new("TextBox")
-searchBox.Size               = UDim2.new(1, -30, 1, 0)
-searchBox.Position           = UDim2.fromOffset(8, 0)
+searchBox.Size               = UDim2.new(1, -26, 1, 0)
+searchBox.Position           = UDim2.fromOffset(6, 0)
 searchBox.BackgroundTransparency = 1
 searchBox.PlaceholderText    = "Search animations..."
 searchBox.PlaceholderColor3  = C.dim
 searchBox.Text               = ""
 searchBox.Font               = Enum.Font.Gotham
-searchBox.TextSize            = 9
+searchBox.TextSize            = 8
 searchBox.TextColor3          = C.pri
 searchBox.ClearTextOnFocus   = false
 searchBox.ZIndex              = 12
 searchBox.Parent              = searchF
 
 local searchClear = Instance.new("ImageButton")
-searchClear.Size               = UDim2.fromOffset(20, 20)
-searchClear.Position           = UDim2.new(1, -22, 0.5, -10)
+searchClear.Size               = UDim2.fromOffset(18, 18)
+searchClear.Position           = UDim2.new(1, -20, 0.5, -9)
 searchClear.BackgroundTransparency = 1
 searchClear.Image              = ""
 searchClear.AutoButtonColor    = false
@@ -381,7 +380,7 @@ searchClear.ZIndex             = 12
 searchClear.Parent             = searchF
 local scL = Instance.new("TextLabel")
 scL.Size=UDim2.fromScale(1,1); scL.BackgroundTransparency=1; scL.Text="x"
-scL.Font=Enum.Font.GothamBold; scL.TextSize=9; scL.TextColor3=C.dim
+scL.Font=Enum.Font.GothamBold; scL.TextSize=8; scL.TextColor3=C.dim
 scL.ZIndex=13; scL.Parent=searchClear
 searchClear.MouseButton1Click:Connect(function() searchBox.Text = "" end)
 
@@ -389,8 +388,8 @@ searchClear.MouseButton1Click:Connect(function() searchBox.Text = "" end)
 -- CATEGORY TAB BAR  (horizontal scroll)
 -- ═══════════════════════════════════════════════
 local tabScroll = Instance.new("ScrollingFrame")
-tabScroll.Size                 = UDim2.new(1, -12, 0, TAB)
-tabScroll.Position             = UDim2.fromOffset(6, HDR + SRCH + 8)
+tabScroll.Size                 = UDim2.new(1, -10, 0, TAB)
+tabScroll.Position             = UDim2.fromOffset(5, HDR + SRCH + 8)
 tabScroll.BackgroundTransparency = 1
 tabScroll.BorderSizePixel      = 0
 tabScroll.ScrollBarThickness   = 0
@@ -403,7 +402,7 @@ tabScroll.Parent               = win
 local tabLL = Instance.new("UIListLayout")
 tabLL.FillDirection      = Enum.FillDirection.Horizontal
 tabLL.VerticalAlignment  = Enum.VerticalAlignment.Center
-tabLL.Padding            = UDim.new(0, 4)
+tabLL.Padding            = UDim.new(0, 3)
 tabLL.SortOrder          = Enum.SortOrder.LayoutOrder
 tabLL.Parent             = tabScroll
 
@@ -428,7 +427,7 @@ end
 
 for i, cat in ipairs(CATS) do
     local b = Instance.new("ImageButton")
-    b.Size               = UDim2.fromOffset(#cat * 6 + 22, TAB - 2)
+    b.Size               = UDim2.fromOffset(#cat * 5 + 18, TAB - 2)
     b.BackgroundColor3   = cat=="All" and C.accentBg or C.card
     b.BackgroundTransparency = 0
     b.BorderSizePixel    = 0
@@ -437,13 +436,13 @@ for i, cat in ipairs(CATS) do
     b.LayoutOrder        = i
     b.ZIndex             = 12
     b.Parent             = tabScroll
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 12)
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
     local l = Instance.new("TextLabel")
     l.Size               = UDim2.fromScale(1,1)
     l.BackgroundTransparency = 1
     l.Text               = cat
     l.Font               = Enum.Font.GothamSemibold
-    l.TextSize            = 8
+    l.TextSize            = 7
     l.TextColor3          = cat=="All" and Color3.new(0,0,0) or C.sec
     l.ZIndex              = 13
     l.Parent              = b
@@ -454,14 +453,14 @@ end
 -- ═══════════════════════════════════════════════
 -- CONTENT SCROLL LIST
 -- ═══════════════════════════════════════════════
-local BODY_Y = HDR + SRCH + TAB + 14
+local BODY_Y = HDR + SRCH + TAB + 13
 
 local scroll = Instance.new("ScrollingFrame")
 scroll.Size                 = UDim2.new(1, 0, 1, -BODY_Y)
 scroll.Position             = UDim2.fromOffset(0, BODY_Y)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel      = 0
-scroll.ScrollBarThickness   = 3
+scroll.ScrollBarThickness   = 2
 scroll.ScrollBarImageColor3 = C.border
 scroll.ScrollingDirection   = Enum.ScrollingDirection.Y
 scroll.CanvasSize           = UDim2.fromOffset(0, 0)
@@ -471,14 +470,14 @@ scroll.Parent               = win
 
 local listLL = Instance.new("UIListLayout")
 listLL.SortOrder = Enum.SortOrder.LayoutOrder
-listLL.Padding   = UDim.new(0, 3)
+listLL.Padding   = UDim.new(0, 2)
 listLL.Parent    = scroll
 
 local listPad = Instance.new("UIPadding")
-listPad.PaddingLeft   = UDim.new(0, 6)
-listPad.PaddingRight  = UDim.new(0, 6)
-listPad.PaddingTop    = UDim.new(0, 4)
-listPad.PaddingBottom = UDim.new(0, 10)
+listPad.PaddingLeft   = UDim.new(0, 5)
+listPad.PaddingRight  = UDim.new(0, 5)
+listPad.PaddingTop    = UDim.new(0, 3)
+listPad.PaddingBottom = UDim.new(0, 8)
 listPad.Parent        = scroll
 
 -- ═══════════════════════════════════════════════
@@ -1061,7 +1060,7 @@ local allRows = {}   -- {frame=Frame, name=string, cat=string}
 local function mkRow(name, cat, onClick)
     local row = Instance.new("ImageButton")
     row.Name               = "Row"
-    row.Size                = UDim2.new(1, 0, 0, 30)
+    row.Size                = UDim2.new(1, 0, 0, 26)
     row.BackgroundColor3   = C.card
     row.BackgroundTransparency = 0
     row.BorderSizePixel    = 0
@@ -1070,15 +1069,15 @@ local function mkRow(name, cat, onClick)
     row.LayoutOrder        = #allRows + 1
     row.ZIndex             = 12
     row.Parent             = scroll
-    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 5)
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
 
     local nameL = Instance.new("TextLabel")
-    nameL.Size               = UDim2.new(1, -64, 1, 0)
-    nameL.Position           = UDim2.fromOffset(9, 0)
+    nameL.Size               = UDim2.new(1, -56, 1, 0)
+    nameL.Position           = UDim2.fromOffset(7, 0)
     nameL.BackgroundTransparency = 1
     nameL.Text               = name
     nameL.Font               = Enum.Font.GothamSemibold
-    nameL.TextSize            = 9
+    nameL.TextSize            = 8
     nameL.TextColor3          = C.pri
     nameL.TextXAlignment      = Enum.TextXAlignment.Left
     nameL.TextTruncate        = Enum.TextTruncate.AtEnd
@@ -1086,8 +1085,8 @@ local function mkRow(name, cat, onClick)
     nameL.Parent              = row
 
     local catL = Instance.new("TextLabel")
-    catL.Size               = UDim2.fromOffset(56, 16)
-    catL.Position           = UDim2.new(1, -62, 0.5, -8)
+    catL.Size               = UDim2.fromOffset(48, 14)
+    catL.Position           = UDim2.new(1, -54, 0.5, -7)
     catL.BackgroundColor3   = Color3.fromRGB(24, 24, 26)
     catL.BackgroundTransparency = 0
     catL.BorderSizePixel    = 0
@@ -1097,7 +1096,7 @@ local function mkRow(name, cat, onClick)
     catL.TextColor3          = C.sec
     catL.ZIndex              = 13
     catL.Parent              = row
-    Instance.new("UICorner", catL).CornerRadius = UDim.new(0, 4)
+    Instance.new("UICorner", catL).CornerRadius = UDim.new(0, 3)
 
     row.MouseEnter:Connect(function()
         TweenService:Create(row, TweenInfo.new(0.10), {BackgroundColor3=C.cardH}):Play()
@@ -1151,8 +1150,8 @@ end
 -- INFO SECTION  (rendered as special rows, category "Info")
 -- ═══════════════════════════════════════════════
 local function mkInfoCard(lines)
-    local lineH  = 13
-    local totalH = #lines * lineH + 10
+    local lineH  = 12
+    local totalH = #lines * lineH + 8
     local f = Instance.new("Frame")
     f.Size               = UDim2.new(1, 0, 0, totalH)
     f.BackgroundColor3   = C.card
@@ -1161,18 +1160,18 @@ local function mkInfoCard(lines)
     f.LayoutOrder        = #allRows + 1
     f.ZIndex             = 12
     f.Parent             = scroll
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 5)
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 4)
     local ll = Instance.new("UIListLayout")
     ll.SortOrder = Enum.SortOrder.LayoutOrder; ll.Parent = f
     local pad = Instance.new("UIPadding")
-    pad.PaddingLeft=UDim.new(0,8); pad.PaddingTop=UDim.new(0,5); pad.Parent=f
+    pad.PaddingLeft=UDim.new(0,6); pad.PaddingTop=UDim.new(0,4); pad.Parent=f
     for i, line in ipairs(lines) do
         local l = Instance.new("TextLabel")
-        l.Size               = UDim2.new(1, -14, 0, lineH)
+        l.Size               = UDim2.new(1, -12, 0, lineH)
         l.BackgroundTransparency = 1
         l.Text               = line
         l.Font               = line:sub(1,2)=="  " and Enum.Font.Gotham or Enum.Font.GothamBold
-        l.TextSize            = 8
+        l.TextSize            = 7
         l.TextColor3          = line:sub(1,2)=="  " and C.sec or C.pri
         l.TextXAlignment      = Enum.TextXAlignment.Left
         l.TextWrapped         = true
