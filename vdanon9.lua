@@ -1,6 +1,6 @@
 -- ========== KONFIGURASI ==========
 local ANOLIB_RAW_URL = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/anolib.lua"
-local REQUIRED_PLACE_ID = 6739698191  -- Place ID game
+local REQUIRED_PLACE_ID = 93978595733734  -- Place ID game
 -- =================================
 
 -- Load library dari raw URL
