@@ -2646,12 +2646,12 @@ end
 -- WINDOW  (Luna) — Key System DISABLED
 -- ════════════════════════════════════════════════════════════════
 local Window = Luna:CreateWindow({
-    Name = "Anonymous9x Vd",
-    Subtitle = "not a great script",
+    Name = "Anonymous9x VIP",
+    Subtitle = "Violance District",
     LogoID = LOGO_ASSET_ID,
     LoadingEnabled = true,
-    LoadingTitle = "Anonymous9x Vd",
-    LoadingSubtitle = "by Anonymous9x",
+    LoadingTitle = "Anonymous9x VIP",
+    LoadingSubtitle = "Dev? Anonymous9x",
 
     ConfigSettings = {
         RootFolder = nil,
