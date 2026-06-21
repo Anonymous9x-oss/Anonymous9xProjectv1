@@ -1,3 +1,30 @@
+--[[
+╔══════════════════════════════════════════════════════════════════╗
+║   Anonymous9x Vd                                                 ║
+║   not a great script                                             ║
+║   By Anonymous9x                                                 ║
+╠══════════════════════════════════════════════════════════════════╣
+║   ARCHITECTURE — 1 FILE (No Key System)                         ║
+║   Full GUI + every feature's logic, built on Luna Interface      ║
+║   Suite. No external key list required.                          ║
+║                                                                  ║
+║   >>> PASTE YOUR DISCORD INVITE CODE BELOW (DISCORD_CODE) <<<    ║
+║                                                                  ║
+║   Every feature's underlying LOGIC is carried over unmodified    ║
+║   from the source you provided. Only the UI-construction layer   ║
+║   (Tab/Section/Toggle/Slider/etc calls) was rewritten for Luna.  ║
+║   One real bug from the source was fixed: `safeNotify` was       ║
+║   called by the No-Skillcheck system before it was ever defined  ║
+║   (a local declared later in the file) — it is now defined right ║
+║   after Luna loads, before anything can call it.                 ║
+╚══════════════════════════════════════════════════════════════════╝
+]]
+
+-- ════════════════════════════════════════════════════════════════
+-- EDIT THIS LINE
+-- ════════════════════════════════════════════════════════════════
+local DISCORD_CODE  = "https://discord.gg/ptvyFfK3pU"   -- no "discord.gg/" prefix
+
 -- ════════════════════════════════════════════════════════════════
 -- LOAD LUNA INTERFACE SUITE
 -- ════════════════════════════════════════════════════════════════
@@ -2616,7 +2643,7 @@ local function fixCamera()
 end
 
 -- ════════════════════════════════════════════════════════════════
--- WINDOW  (Luna)
+-- WINDOW  (Luna) — Key System DISABLED
 -- ════════════════════════════════════════════════════════════════
 local Window = Luna:CreateWindow({
     Name = "Anonymous9x Vd",
@@ -2630,6 +2657,10 @@ local Window = Luna:CreateWindow({
         RootFolder = nil,
         ConfigFolder = "Anonymous9x Vd",
     },
+
+    -- KeySystem = true,   <-- REMOVED
+    -- KeySettings = { ... } <-- REMOVED
+
     -- Theme = "Dark", -- speculative: not confirmed in the example you gave me.
     -- Size = UDim2.new(0, 0, 0, 0), -- speculative: no Size field shown in the example.
 })
@@ -2654,7 +2685,7 @@ Window:CreateHomeTab({
         "CODex",
         "Delta"
     },
-    DiscordInvite = https://discord.gg/ptvyFfK3pU,
+    DiscordInvite = DISCORD_CODE,
     Icon = 1
 })
 
