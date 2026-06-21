@@ -21,9 +21,9 @@
 ]]
 
 -- ════════════════════════════════════════════════════════════════
--- EDIT THIS LINE
+-- EDIT THIS LINE — paste only the invite code, no "discord.gg/"
 -- ════════════════════════════════════════════════════════════════
-local DISCORD_CODE  = "https://discord.gg/ptvyFfK3pU"   -- no "discord.gg/" prefix
+local DISCORD_CODE  = "ptvyFfK3pU"   -- only the code, not the full URL
 
 -- ════════════════════════════════════════════════════════════════
 -- LOAD LUNA INTERFACE SUITE
@@ -2643,11 +2643,11 @@ local function fixCamera()
 end
 
 -- ════════════════════════════════════════════════════════════════
--- WINDOW  (Luna) — Key System DISABLED
+-- WINDOW  (Luna) — Key System DISABLED explicitly
 -- ════════════════════════════════════════════════════════════════
 local Window = Luna:CreateWindow({
     Name = "Anonymous9x VIP",
-    Subtitle = "Violance District",
+    Subtitle = "Violence District",
     LogoID = LOGO_ASSET_ID,
     LoadingEnabled = true,
     LoadingTitle = "Anonymous9x VIP",
@@ -2658,11 +2658,7 @@ local Window = Luna:CreateWindow({
         ConfigFolder = "Anonymous9x Vd",
     },
 
-    -- KeySystem = true,   <-- REMOVED
-    -- KeySettings = { ... } <-- REMOVED
-
-    -- Theme = "Dark", -- speculative: not confirmed in the example you gave me.
-    -- Size = UDim2.new(0, 0, 0, 0), -- speculative: no Size field shown in the example.
+    KeySystem = false,   -- no key required
 })
 
 Window:CreateHomeTab({
@@ -2685,7 +2681,7 @@ Window:CreateHomeTab({
         "CODex",
         "Delta"
     },
-    DiscordInvite = DISCORD_CODE,
+    DiscordInvite = DISCORD_CODE,   -- only the code, not the full URL
     Icon = 1
 })
 
@@ -2705,10 +2701,9 @@ ThemeTab:BuildThemeSection()
 ConfigTab:BuildConfigSection()
 
 -- ════════════════════════════════════════════════════════════════
--- PLAYER TAB
+-- PLAYER TAB  (removed all CreateDivider calls, not needed in Luna)
 -- ════════════════════════════════════════════════════════════════
 PlayerTab:CreateSection("Movement")
-PlayerTab:CreateDivider()
 
 PlayerTab:CreateToggle({
     Name = "Walk Speed",
@@ -2771,7 +2766,6 @@ PlayerTab:CreateToggle({
 }, "GodModeToggle")
 
 PlayerTab:CreateSection("Utilities")
-PlayerTab:CreateDivider()
 
 PlayerTab:CreateToggle({
     Name = "Anti AFK",
@@ -2791,7 +2785,6 @@ PlayerTab:CreateToggle({
 -- SURVIVOR TAB
 -- ════════════════════════════════════════════════════════════════
 SurvivorTab:CreateSection("Survivor Main")
-SurvivorTab:CreateDivider()
 
 SurvivorTab:CreateToggle({
     Name = "Auto Lever",
@@ -2825,7 +2818,6 @@ SurvivorTab:CreateToggle({
 -- KILLER TAB
 -- ════════════════════════════════════════════════════════════════
 KillerTab:CreateSection("Killer Main")
-KillerTab:CreateDivider()
 
 KillerTab:CreateToggle({
     Name = "Kill All",
@@ -2870,7 +2862,6 @@ KillerTab:CreateToggle({
 }, "NoFlashlightToggle")
 
 KillerTab:CreateSection("Killer Utility")
-KillerTab:CreateDivider()
 
 KillerTab:CreateButton({
     Name = "Fix Camera",
@@ -2884,7 +2875,6 @@ KillerTab:CreateButton({
 -- ESP TAB
 -- ════════════════════════════════════════════════════════════════
 ESPTab:CreateSection("ESP Settings")
-ESPTab:CreateDivider()
 
 ESPTab:CreateSlider({
     Name = "ESP Fill Transparency",
@@ -2926,7 +2916,6 @@ ESPTab:CreateSlider({
 }, "ESPTextSizeSlider")
 
 ESPTab:CreateSection("Player ESP")
-ESPTab:CreateDivider()
 
 ESPTab:CreateToggle({
     Name = "Survivor ESP",
@@ -3035,7 +3024,6 @@ ESPTab:CreateColorPicker({
 -- WORLD TAB
 -- ════════════════════════════════════════════════════════════════
 WorldTab:CreateSection("World ESP Toggles")
-WorldTab:CreateDivider()
 
 WorldTab:CreateToggle({
     Name = "Generators",
@@ -3133,7 +3121,6 @@ WorldTab:CreateToggle({
 }, "PalletESPToggle")
 
 WorldTab:CreateSection("World ESP Colors")
-WorldTab:CreateDivider()
 
 WorldTab:CreateColorPicker({
     Name = "Generator Color",
@@ -3171,7 +3158,6 @@ WorldTab:CreateColorPicker({
 }, "PalletColorPicker")
 
 WorldTab:CreateSection("World Cheats")
-WorldTab:CreateDivider()
 
 WorldTab:CreateToggle({
     Name = "Bypass Gate",
@@ -3187,7 +3173,6 @@ WorldTab:CreateToggle({
 -- VISUAL TAB
 -- ════════════════════════════════════════════════════════════════
 VisualTab:CreateSection("Lighting")
-VisualTab:CreateDivider()
 
 VisualTab:CreateToggle({
     Name = "Fullbright",
@@ -3233,7 +3218,6 @@ VisualTab:CreateToggle({
 }, "NoShadowsToggle")
 
 VisualTab:CreateSection("FOV")
-VisualTab:CreateDivider()
 
 VisualTab:CreateToggle({
     Name = "Custom FOV",
@@ -3264,7 +3248,6 @@ VisualTab:CreateSlider({
 -- TELEPORT TAB
 -- ════════════════════════════════════════════════════════════════
 TeleportTab:CreateSection("Player Teleport")
-TeleportTab:CreateDivider()
 
 TeleportTab:CreateButton({
     Name = "Teleport to Random Survivor",
@@ -3302,7 +3285,6 @@ TeleportTab:CreateButton({
 })
 
 TeleportTab:CreateSection("World Teleport")
-TeleportTab:CreateDivider()
 
 local selectedWorldCategory = "Generator"
 
@@ -3340,7 +3322,6 @@ TeleportTab:CreateButton({
 })
 
 TeleportTab:CreateSection("Escape")
-TeleportTab:CreateDivider()
 
 TeleportTab:CreateButton({
     Name = "Instant-Escape",
@@ -3385,7 +3366,6 @@ TeleportTab:CreateButton({
 -- CROSSHAIR TAB
 -- ════════════════════════════════════════════════════════════════
 CrosshairTab:CreateSection("Main Settings")
-CrosshairTab:CreateDivider()
 
 CrosshairTab:CreateToggle({
     Name = "Enable Crosshair",
@@ -3416,7 +3396,6 @@ CrosshairTab:CreateDropdown({
 }, "CrosshairTypeDropdown")
 
 CrosshairTab:CreateSection("Appearance")
-CrosshairTab:CreateDivider()
 
 CrosshairTab:CreateColorPicker({
     Name = "Crosshair Color",
@@ -3442,7 +3421,6 @@ CrosshairTab:CreateSlider({
 }, "CrosshairTransparencySlider")
 
 CrosshairTab:CreateSection("Advanced Settings")
-CrosshairTab:CreateDivider()
 
 CrosshairTab:CreateSlider({
     Name = "Line Thickness",
@@ -3482,7 +3460,6 @@ CrosshairTab:CreateToggle({
 }, "CrosshairPulseToggle")
 
 CrosshairTab:CreateSection("Preview & Control")
-CrosshairTab:CreateDivider()
 
 CrosshairTab:CreateButton({
     Name = "Refresh Crosshair",
@@ -3517,7 +3494,6 @@ CrosshairTab:CreateButton({
 -- MISC TAB
 -- ════════════════════════════════════════════════════════════════
 MiscTab:CreateSection("Notifications")
-MiscTab:CreateDivider()
 
 MiscTab:CreateToggle({
     Name = "Killer Ability Notify",
@@ -3529,12 +3505,9 @@ MiscTab:CreateToggle({
 }, "AbilityNotifyToggle")
 
 MiscTab:CreateSection("Fling Player")
-MiscTab:CreateDivider()
 
--- NOTE: Luna's documented example does not show a method to refresh a
--- Dropdown's options after creation. The dropdown below lists players who
--- were online when the menu loaded. For full reliability, use the exact-name
--- input box underneath — it works for anyone online right now.
+-- Luna does not have a built-in way to refresh a Dropdown after creation.
+-- This dropdown lists the names of players who were online when the menu loaded.
 local initialFlingNames = {}
 for _, p in ipairs(Players:GetPlayers()) do
     if p ~= LP then table.insert(initialFlingNames, p.Name) end
@@ -3555,9 +3528,10 @@ MiscTab:CreateDropdown({
     end
 }, "FlingPlayerDropdown")
 
-MiscTab:CreateInput({
+-- Use CreateTextbox (Luna's actual method for text input) instead of CreateInput
+MiscTab:CreateTextbox({
     Name = "Fling Target (exact name)",
-    Description = "Type an exact player name if they are not in the dropdown above (the dropdown only lists players who were online when the menu loaded).",
+    Description = "Type an exact player name if they are not in the dropdown above.",
     PlaceholderText = "ExamplePlayerName",
     CurrentValue = "",
     Numeric = false,
@@ -3626,7 +3600,6 @@ MiscTab:CreateButton({
 })
 
 MiscTab:CreateSection("Hitbox")
-MiscTab:CreateDivider()
 
 MiscTab:CreateToggle({
     Name = "Hitbox (Killer Only)",
