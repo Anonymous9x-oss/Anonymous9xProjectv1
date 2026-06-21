@@ -2630,22 +2630,6 @@ local Window = Luna:CreateWindow({
         RootFolder = nil,
         ConfigFolder = "Anonymous9x Vd",
     },
-
-    KeySystem = true,
-    KeySettings = {
-        Title = "Anonymous9x Vd",
-        Subtitle = "Key System",
-        Note = "Get your key from our Discord. The valid key list updates automatically — you never need to redownload this script when keys change.",
-        SaveInRoot = false,
-        SaveKey = true,
-        Key = RemoteKeys,
-        SecondAction = {
-            Enabled = true,
-            Type = "Discord",
-            Parameter = DISCORD_CODE,
-        }
-    },
-
     -- Theme = "Dark", -- speculative: not confirmed in the example you gave me.
     -- Size = UDim2.new(0, 0, 0, 0), -- speculative: no Size field shown in the example.
 })
@@ -2670,7 +2654,7 @@ Window:CreateHomeTab({
         "CODex",
         "Delta"
     },
-    DiscordInvite = DISCORD_CODE,
+    DiscordInvite = https://discord.gg/ptvyFfK3pU,
     Icon = 1
 })
 
