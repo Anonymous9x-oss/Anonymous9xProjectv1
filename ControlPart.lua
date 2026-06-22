@@ -40,7 +40,7 @@ local C = {
     pri     = Color3.fromRGB(222, 222, 226),
     sec     = Color3.fromRGB(118, 118, 126),
     dim     = Color3.fromRGB(60,  60,  66),
-    btnBg   = Color3.fromRGB(28,  28,  30),   -- grey-black for ctrl buttons
+    btnBg   = Color3.fromRGB(28,  28,  30),
 }
 
 local LOGO_ID  = "rbxassetid://97269958324726"
@@ -65,78 +65,58 @@ local function playToggleSound()
 end
 
 -- ═══════════════════════════════════════════════
--- NOTIFICATION SYSTEM  (bottom-right, black/white, smooth)
+-- STATUS BAR (replaces notification popups)
 -- ═══════════════════════════════════════════════
-local notifStack = {}
+local statusFrame = Instance.new("Frame")
+statusFrame.Size               = UDim2.fromOffset(W, 20)
+statusFrame.Position           = UDim2.fromScale(0.5, 0.5)
+statusFrame.AnchorPoint        = Vector2.new(0.5, 0.5)
+statusFrame.BackgroundColor3   = C.bg
+statusFrame.BackgroundTransparency = 0.2
+statusFrame.BorderSizePixel    = 0
+statusFrame.ZIndex             = 1000
+statusFrame.Parent             = gui
+Instance.new("UICorner", statusFrame).CornerRadius = UDim.new(0, 6)
+local statusStroke = Instance.new("UIStroke", statusFrame)
+statusStroke.Color = C.white
+statusStroke.Thickness = 1
+statusStroke.Transparency = 0.5
 
-local function showNotif(title, body, dur)
-    local f = Instance.new("Frame")
-    f.Size               = UDim2.fromOffset(190, 46)
-    f.Position           = UDim2.new(1, 12, 1, -58)
-    f.BackgroundColor3   = C.bg
-    f.BackgroundTransparency = 0
-    f.BorderSizePixel    = 0
-    f.ZIndex             = 900
-    f.Parent             = gui
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
-    local fs = Instance.new("UIStroke", f)
-    fs.Color = C.white; fs.Thickness = 1; fs.Transparency = 0.3
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size               = UDim2.new(1, 0, 1, 0)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text               = ""
+statusLabel.Font               = Enum.Font.GothamBold
+statusLabel.TextSize            = 9
+statusLabel.TextColor3          = C.white
+statusLabel.TextXAlignment      = Enum.TextXAlignment.Center
+statusLabel.ZIndex              = 1001
+statusLabel.Parent              = statusFrame
 
-    local t1 = Instance.new("TextLabel")
-    t1.Size               = UDim2.new(1, -10, 0, 16)
-    t1.Position           = UDim2.fromOffset(7, 4)
-    t1.BackgroundTransparency = 1
-    t1.Text               = title
-    t1.Font               = Enum.Font.GothamBold
-    t1.TextSize            = 9
-    t1.TextColor3          = C.white
-    t1.TextXAlignment      = Enum.TextXAlignment.Left
-    t1.ZIndex              = 901
-    t1.Parent              = f
-
-    local t2 = Instance.new("TextLabel")
-    t2.Size               = UDim2.new(1, -10, 0, 20)
-    t2.Position           = UDim2.fromOffset(7, 20)
-    t2.BackgroundTransparency = 1
-    t2.Text               = body
-    t2.Font               = Enum.Font.Gotham
-    t2.TextSize            = 7
-    t2.TextColor3          = C.sec
-    t2.TextXAlignment      = Enum.TextXAlignment.Left
-    t2.TextWrapped         = true
-    t2.ZIndex              = 901
-    t2.Parent              = f
-
-    local function recalc()
-        for i, nf in ipairs(notifStack) do
-            TweenService:Create(nf, TweenInfo.new(0.20, Enum.EasingStyle.Quad), {
-                Position = UDim2.new(1, -202, 1, -58 - (i-1)*50)
-            }):Play()
-        end
-    end
-
-    table.insert(notifStack, 1, f)
-    recalc()
-
-    TweenService:Create(f, TweenInfo.new(0.20, Enum.EasingStyle.Quad), {
-        Position = UDim2.new(1, -202, 1, -58)
-    }):Play()
-
-    task.delay(dur or 2.6, function()
-        TweenService:Create(f, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
-            Position = UDim2.new(1, 12, 1, f.Position.Y.Offset)
-        }):Play()
-        task.wait(0.20)
-        for i, nf in ipairs(notifStack) do
-            if nf == f then table.remove(notifStack, i); break end
-        end
-        recalc()
-        pcall(function() f:Destroy() end)
+local statusTween
+local function setStatus(msg, color)
+    if not color then color = C.white end
+    if statusTween then statusTween:Cancel() end
+    statusLabel.Text = msg
+    statusLabel.TextColor3 = color
+    statusFrame.Visible = true
+    local vp = Cam.ViewportSize
+    statusFrame.Position = UDim2.fromOffset(vp.X/2 - W/2, vp.Y - 60)
+    statusTween = TweenService:Create(statusFrame, TweenInfo.new(2.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        BackgroundTransparency = 0.85
+    })
+    statusTween:Play()
+    task.delay(2.2, function()
+        pcall(function()
+            statusFrame.Visible = false
+            statusLabel.Text = ""
+            statusFrame.BackgroundTransparency = 0.2
+        end)
     end)
 end
 
 -- ═══════════════════════════════════════════════
--- SHARED "BRING ANCHOR"  (follows head + offset)
+-- SHARED ANCHOR (above head)
 -- ═══════════════════════════════════════════════
 local anchorFolder = Instance.new("Folder", Workspace)
 anchorFolder.Name = "_A9xCtrlPartAnchor"
@@ -162,14 +142,57 @@ local function updateAnchor()
         anchorAttachment.WorldCFrame = hrp.CFrame * CFrame.new(BRING_OFFSET)
     end
 end
-
 RunService.RenderStepped:Connect(updateAnchor)
 
 -- ═══════════════════════════════════════════════
--- PART STATE TRACKING  (so we can cleanly release everything)
+-- TARGET ANCHOR (for send-part-to-target)
+-- ═══════════════════════════════════════════════
+local targetFolder = Instance.new("Folder", Workspace)
+targetFolder.Name = "_A9xCtrlPartTarget"
+
+local targetPart = Instance.new("Part", targetFolder)
+targetPart.Anchored     = true
+targetPart.CanCollide   = false
+targetPart.Transparency = 1
+targetPart.Size         = Vector3.new(0.2, 0.2, 0.2)
+
+local targetAttachment = Instance.new("Attachment", targetPart)
+targetAttachment.Name = "TargetAnchor"
+
+local currentTargetPlayer = nil
+
+local function updateTargetAnchor()
+    if currentTargetPlayer then
+        local char = currentTargetPlayer.Character
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            targetAttachment.WorldCFrame = hrp.CFrame
+        end
+    end
+end
+RunService.RenderStepped:Connect(updateTargetAnchor)
+
+local function setTargetPlayer(player)
+    if currentTargetPlayer == player then return end
+    currentTargetPlayer = player
+    if player then
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            targetAttachment.WorldCFrame = hrp.CFrame
+        end
+        setStatus("Target set: " .. player.Name, C.white)
+    else
+        setStatus("Target cleared", C.sec)
+    end
+end
+
+-- ═══════════════════════════════════════════════
+-- PART STATE TRACKING
 -- ═══════════════════════════════════════════════
 -- forcedParts[part] = {align=AlignPosition, torque=Torque, att=Attachment,
---                       origAnchored=bool, origCollide=bool, mode="bring"/"unanchor"}
+--                       origAnchored=bool, origCollide=bool,
+--                       mode="bring"/"unanchor"/"throw"}
 local forcedParts = {}
 
 local function isCharacterPart(part)
@@ -184,22 +207,21 @@ local function isSafeToGrab(part)
     if not part:IsA("BasePart") then return false end
     if part:IsDescendantOf(Workspace.Terrain) then return false end
     if part:IsDescendantOf(anchorFolder) then return false end
+    if part:IsDescendantOf(targetFolder) then return false end
     if isCharacterPart(part) then return false end
     local nl = part.Name:lower()
     if nl:find("baseplate") then return false end
-    if part.Size.Magnitude > 60 then return false end   -- skip giant map chunks
+    if part.Size.Magnitude > 60 then return false end
     return true
 end
 
--- Attach Torque + AlignPosition pulling toward the shared anchor.
--- Mirrors the proven JSY values (MaxForce=huge, Responsiveness=200).
-local function forcePart(part, mode)
+local function forcePart(part, mode, targetAtt)
     if forcedParts[part] then return end   -- already forced
 
     local origAnchored = part.Anchored
     local origCollide  = part.CanCollide
 
-    -- Clean any pre-existing movers so they don't fight our AlignPosition
+    -- Clean any pre-existing movers
     for _, x in ipairs(part:GetChildren()) do
         if x:IsA("BodyMover") or x:IsA("RocketPropulsion") then
             pcall(function() x:Destroy() end)
@@ -207,7 +229,7 @@ local function forcePart(part, mode)
     end
 
     part.CanCollide = false
-    if mode == "unanchor" then
+    if mode == "unanchor" or mode == "throw" then
         part.Anchored = false
     end
 
@@ -223,11 +245,18 @@ local function forcePart(part, mode)
     align.MaxVelocity    = math.huge
     align.Responsiveness = 200
     align.Attachment0    = att
-    align.Attachment1    = anchorAttachment
+    if mode == "throw" and targetAtt then
+        align.Attachment1 = targetAtt
+        align.Responsiveness = 500   -- brutal throw
+        align.MaxVelocity  = 500
+    else
+        align.Attachment1 = anchorAttachment
+    end
 
     forcedParts[part] = {
         align = align, torque = torque, att = att,
-        origAnchored = origAnchored, origCollide = origCollide, mode = mode,
+        origAnchored = origAnchored, origCollide = origCollide,
+        mode = mode,
     }
 end
 
@@ -240,7 +269,7 @@ local function releasePart(part)
     if part and part.Parent then
         pcall(function()
             part.CanCollide = entry.origCollide
-            if entry.mode == "unanchor" then
+            if entry.mode == "unanchor" or entry.mode == "throw" then
                 part.Anchored = entry.origAnchored
             end
         end)
@@ -254,11 +283,19 @@ local function releaseAll()
     end
 end
 
+local function releaseThrowParts()
+    for part, entry in pairs(forcedParts) do
+        if entry.mode == "throw" then
+            releasePart(part)
+        end
+    end
+end
+
 -- ═══════════════════════════════════════════════
--- NEARBY PART SCAN  (radius-limited, capped count)
+-- NEARBY PART SCAN
 -- ═══════════════════════════════════════════════
 local SCAN_RADIUS = 80
-local SCAN_LIMIT  = 12
+local SCAN_LIMIT  = 20   -- increased for throw
 
 local function scanNearbyParts()
     local results = {}
@@ -314,7 +351,7 @@ task.spawn(function()
 end)
 
 -- ═══════════════════════════════════════════════
--- HEADER  (with drag)
+-- HEADER (with drag)
 -- ═══════════════════════════════════════════════
 local hdr = Instance.new("Frame")
 hdr.Size             = UDim2.new(1, 0, 0, HDR)
@@ -333,7 +370,7 @@ local hSep = Instance.new("Frame")
 hSep.Size=UDim2.new(1,0,0,1); hSep.Position=UDim2.new(0,0,1,-1)
 hSep.BackgroundColor3=C.sep; hSep.BorderSizePixel=0; hSep.ZIndex=12; hSep.Parent=hdr
 
--- Title with 3D black<->white color shift animation (default white)
+-- Title with 3D color shift
 local hTitle = Instance.new("TextLabel")
 hTitle.Size               = UDim2.new(1, -50, 1, 0)
 hTitle.Position           = UDim2.fromOffset(8, 0)
@@ -349,13 +386,11 @@ hTitle.TextTruncate        = Enum.TextTruncate.AtEnd
 hTitle.ZIndex              = 12
 hTitle.Parent              = hdr
 
--- 3D embossed shift: main text fades white -> light grey,
--- stroke fades dark grey -> black, creating a subtle depth flip.
 task.spawn(function()
     local t = 0
     while hdr.Parent do
         t = t + task.wait(0.05)
-        local s = (math.sin(t * 1.1) + 1) / 2   -- 0..1
+        local s = (math.sin(t * 1.1) + 1) / 2
         hTitle.TextColor3       = Color3.new(1,1,1):Lerp(Color3.fromRGB(150,150,155), s*0.45)
         hTitle.TextStrokeColor3 = Color3.fromRGB(20,20,22):Lerp(Color3.new(0,0,0), s)
     end
@@ -375,7 +410,6 @@ local function makeCtrl(xOff, sym)
     Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
     local bS = Instance.new("UIStroke", b)
     bS.Color = C.white; bS.Thickness = 0.9; bS.Transparency = 0.4
-    -- glow loop
     task.spawn(function()
         local t = 0
         while b.Parent do
@@ -408,7 +442,7 @@ local minBtn, minL   = makeCtrl(-40, "-")
 local closeBtn, _    = makeCtrl(-20, "x")
 
 -- ═══════════════════════════════════════════════
--- DRAG  (main panel only — header drag, global UIS)
+-- DRAG (main panel only)
 -- ═══════════════════════════════════════════════
 do
     local drag=false; local dRef=nil; local sI=nil; local sW=nil
@@ -447,7 +481,7 @@ do
 end
 
 -- ═══════════════════════════════════════════════
--- FLOAT ICON  (minimized state — fixed position, no drag)
+-- FLOAT ICON (minimized)
 -- ═══════════════════════════════════════════════
 local floatF = Instance.new("Frame")
 floatF.Name             = "FloatIcon"
@@ -480,7 +514,6 @@ fiImg.ScaleType          = Enum.ScaleType.Fit
 fiImg.ZIndex             = 501
 fiImg.Parent             = floatF
 
--- Fixed position: bottom-right area, vertically toward the bottom — locked, no drag
 local function anchorFloat()
     local vp = Cam.ViewportSize
     if vp.X < 10 then vp = Vector2.new(800, 600) end
@@ -511,6 +544,7 @@ end)
 closeBtn.MouseButton1Click:Connect(function()
     releaseAll()
     pcall(function() anchorFolder:Destroy() end)
+    pcall(function() targetFolder:Destroy() end)
     pcall(function() gui:Destroy() end)
 end)
 
@@ -755,20 +789,19 @@ mkToggle({title="Unanchor Nearby", sub="Frees anchored parts near you", cb=funct
                 task.wait(0.8)
             end
         end)
-        showNotif("Unanchor Nearby", "Active — freeing nearby parts.", 3)
+        setStatus("Unanchor Nearby: Active", C.white)
     else
-        -- Release only the parts we unanchored, not bring-mode parts
         for part, entry in pairs(forcedParts) do
             if entry.mode == "unanchor" then
                 releasePart(part)
             end
         end
-        showNotif("Unanchor Nearby", "Stopped. Parts restored.", 2.5)
+        setStatus("Unanchor Nearby: Stopped", C.sec)
     end
 end})
 
 -- ═══════════════════════════════════════════════
--- FEATURE 2 — BRING ALL NEARBY
+-- FEATURE 2 — BRING ALL NEARBY (upgraded brutal)
 -- ═══════════════════════════════════════════════
 mkSec("Bring")
 local bringAllOn = false
@@ -785,7 +818,7 @@ mkToggle({title="Bring All Nearby", sub="Pulls loose parts above your head", cb=
                         if obj:IsA("BasePart") and not obj.Anchored and isSafeToGrab(obj) then
                             local d = (obj.Position - hrp.Position).Magnitude
                             if d <= SCAN_RADIUS then
-                                forcePart(obj, "bring")
+                                forcePart(obj, "bring")  -- already brutal with upgraded responsiveness
                             end
                         end
                     end
@@ -793,40 +826,41 @@ mkToggle({title="Bring All Nearby", sub="Pulls loose parts above your head", cb=
                 task.wait(0.8)
             end
         end)
-        showNotif("Bring All Nearby", "Active — pulling loose parts to you.", 3)
+        setStatus("Bring All Nearby: Active", C.white)
     else
         for part, entry in pairs(forcedParts) do
             if entry.mode == "bring" then
                 releasePart(part)
             end
         end
-        showNotif("Bring All Nearby", "Stopped. Parts released.", 2.5)
+        setStatus("Bring All Nearby: Stopped", C.sec)
     end
 end})
 
 mkBtn({title="Bring Selected", sub="Pulls only the tagged part above", cb=function()
     if not selectedPart or not selectedPart.Parent then
-        showNotif("Bring Selected", "No part selected. Use Smart ESP to tag one.", 3)
+        setStatus("No part selected. Use Smart ESP to tag one.", C.sec)
         return
     end
     if selectedPart.Anchored then
-        showNotif("Bring Selected", "That part is anchored — unanchor it first.", 3)
+        setStatus("That part is anchored — unanchor it first.", C.sec)
         return
     end
     forcePart(selectedPart, "bring")
-    showNotif("Bring Selected", selectedPart.Name .. " is now being pulled to you.", 2.5)
+    setStatus(selectedPart.Name .. " is now being pulled to you.", C.white)
 end})
 
 -- ═══════════════════════════════════════════════
--- FEATURE 3 — SMART ESP  (nearby unanchored parts only)
+-- FEATURE 3 — SMART ESP (nearby unanchored parts)
 -- ═══════════════════════════════════════════════
 mkSec("Smart ESP")
 local espOn = false
-local espTags = {}   -- part -> {gui=BillboardGui}
+local espTags = {}
 
 local function clearEspTags()
     for part, data in pairs(espTags) do
         pcall(function() data.gui:Destroy() end)
+        pcall(function() data.hl:Destroy() end)
     end
     espTags = {}
 end
@@ -888,10 +922,9 @@ local function buildEspTag(part)
         boxS.Color = C.white
         box.BackgroundTransparency = 0
         playToggleSound()
-        showNotif("Part Selected", part.Name .. " tagged for Bring Selected.", 2.2)
+        setStatus(part.Name .. " selected.", C.white)
     end)
 
-    -- Thin highlight to make it pop visually
     local hl = Instance.new("Highlight")
     hl.Name             = "_A9xEspHL"
     hl.FillTransparency = 0.85
@@ -923,7 +956,6 @@ mkToggle({title="Smart ESP", sub="Tags closest loose parts, tap to select", cb=f
                     seen[entry.part] = true
                     buildEspTag(entry.part)
                 end
-                -- Remove tags for parts no longer nearby
                 for part, _ in pairs(espTags) do
                     if not seen[part] then removeEspTag(part) end
                 end
@@ -931,10 +963,307 @@ mkToggle({title="Smart ESP", sub="Tags closest loose parts, tap to select", cb=f
             end
             clearEspTags()
         end)
-        showNotif("Smart ESP", "Scanning nearby loose parts.", 2.5)
+        setStatus("Smart ESP: Active", C.white)
     else
-        showNotif("Smart ESP", "ESP disabled.", 2)
+        setStatus("Smart ESP: Disabled", C.sec)
     end
+end})
+
+-- ═══════════════════════════════════════════════
+-- FEATURE 4 — SEND PART TO TARGET
+-- ═══════════════════════════════════════════════
+mkSec("Send Part To Target")
+
+-- Player list refresh / selection
+local playerListFrame = Instance.new("Frame")
+playerListFrame.Size               = UDim2.new(1, 0, 0, 80)
+playerListFrame.BackgroundColor3   = C.card
+playerListFrame.BackgroundTransparency = 0
+playerListFrame.BorderSizePixel    = 0
+playerListFrame.LayoutOrder        = o()
+playerListFrame.ZIndex             = 12
+playerListFrame.Parent             = scroll
+Instance.new("UICorner", playerListFrame).CornerRadius = UDim.new(0, 5)
+local playerScroll = Instance.new("ScrollingFrame", playerListFrame)
+playerScroll.Size = UDim2.new(1, -4, 1, -22)
+playerScroll.Position = UDim2.fromOffset(2, 2)
+playerScroll.BackgroundTransparency = 1
+playerScroll.BorderSizePixel = 0
+playerScroll.ScrollBarThickness = 2
+playerScroll.ScrollBarImageColor3 = C.border
+playerScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+playerScroll.CanvasSize = UDim2.fromOffset(0, 0)
+playerScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+playerScroll.ZIndex = 13
+local playerLL = Instance.new("UIListLayout", playerScroll)
+playerLL.SortOrder = Enum.SortOrder.LayoutOrder
+playerLL.Padding = UDim.new(0, 2)
+
+local refreshBtn = Instance.new("ImageButton")
+refreshBtn.Size               = UDim2.new(1, -4, 0, 16)
+refreshBtn.Position           = UDim2.new(0, 2, 1, -20)
+refreshBtn.BackgroundColor3   = C.btnBg
+refreshBtn.BackgroundTransparency = 0
+refreshBtn.BorderSizePixel    = 0
+refreshBtn.Image              = ""
+refreshBtn.AutoButtonColor    = false
+refreshBtn.ZIndex             = 14
+refreshBtn.Parent             = playerListFrame
+Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 4)
+local refreshLbl = Instance.new("TextLabel")
+refreshLbl.Size = UDim2.fromScale(1, 1)
+refreshLbl.BackgroundTransparency = 1
+refreshLbl.Text = "Refresh Players"
+refreshLbl.Font = Enum.Font.GothamBold
+refreshLbl.TextSize = 8
+refreshLbl.TextColor3 = C.sec
+refreshLbl.ZIndex = 15
+refreshLbl.Parent = refreshBtn
+refreshBtn.MouseButton1Click:Connect(function() end) -- connected below
+
+local selectedTargetLabel = Instance.new("TextLabel")
+selectedTargetLabel.Size               = UDim2.new(1, -10, 0, 16)
+selectedTargetLabel.Position           = UDim2.fromOffset(7, 0)  -- will be placed below playerListFrame
+selectedTargetLabel.BackgroundTransparency = 1
+selectedTargetLabel.Text               = "Target: None"
+selectedTargetLabel.Font               = Enum.Font.GothamBold
+selectedTargetLabel.TextSize            = 8
+selectedTargetLabel.TextColor3          = C.sec
+selectedTargetLabel.TextXAlignment      = Enum.TextXAlignment.Left
+selectedTargetLabel.ZIndex              = 12
+selectedTargetLabel.LayoutOrder        = o()
+selectedTargetLabel.Parent             = scroll
+
+-- Refresh player list
+local function refreshPlayerList()
+    -- Clear old buttons
+    for _, child in ipairs(playerScroll:GetChildren()) do
+        if child:IsA("TextButton") or child:IsA("ImageButton") then
+            child:Destroy()
+        end
+    end
+    local players = Players:GetPlayers()
+    table.sort(players, function(a,b) return a.Name < b.Name end)
+    for _, plr in ipairs(players) do
+        if plr ~= LP then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -4, 0, 18)
+            btn.BackgroundColor3 = C.btnBg
+            btn.BackgroundTransparency = 0
+            btn.BorderSizePixel = 0
+            btn.Text = plr.Name
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 8
+            btn.TextColor3 = C.pri
+            btn.AutoButtonColor = false
+            btn.ZIndex = 14
+            btn.LayoutOrder = o()
+            btn.Parent = playerScroll
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 3)
+            btn.MouseButton1Click:Connect(function()
+                setTargetPlayer(plr)
+                updateTargetLabel()
+            end)
+        end
+    end
+end
+
+refreshBtn.MouseButton1Click:Connect(function()
+    refreshPlayerList()
+    setStatus("Player list refreshed", C.sec)
+end)
+refreshPlayerList()
+
+local function updateTargetLabel()
+    if currentTargetPlayer and currentTargetPlayer.Parent then
+        local char = currentTargetPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local myChar = LP.Character
+            local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if myHrp then
+                local dist = (hrp.Position - myHrp.Position).Magnitude
+                selectedTargetLabel.Text = string.format("Target: %s (%.0fm)", currentTargetPlayer.Name, dist)
+            else
+                selectedTargetLabel.Text = "Target: " .. currentTargetPlayer.Name
+            end
+        else
+            selectedTargetLabel.Text = "Target: " .. currentTargetPlayer.Name .. " (no char)"
+        end
+    else
+        selectedTargetLabel.Text = "Target: None"
+    end
+end
+
+-- Smart Player ESP (auto-target nearest)
+local smartPlayerESPon = false
+local smartPlayerGui = nil
+
+local function clearSmartPlayerGui()
+    if smartPlayerGui then
+        pcall(function() smartPlayerGui:Destroy() end)
+        smartPlayerGui = nil
+    end
+end
+
+local function updateSmartPlayerESP()
+    if not smartPlayerESPon then return end
+    local nearest = nil
+    local nearestDist = math.huge
+    local myChar = LP.Character
+    local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHrp then
+        clearSmartPlayerGui()
+        return
+    end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LP then
+            local char = plr.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (hrp.Position - myHrp.Position).Magnitude
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearest = plr
+                end
+            end
+        end
+    end
+    if nearest then
+        local char = nearest.Character
+        local head = char and char:FindFirstChild("Head") or char and char:FindFirstChild("HumanoidRootPart")
+        if head then
+            if not smartPlayerGui or smartPlayerGui.Adornee ~= head then
+                clearSmartPlayerGui()
+                smartPlayerGui = Instance.new("BillboardGui")
+                smartPlayerGui.Name = "_A9xSmartPlayer"
+                smartPlayerGui.Size = UDim2.fromOffset(120, 36)
+                smartPlayerGui.StudsOffset = Vector3.new(0, 2, 0)
+                smartPlayerGui.AlwaysOnTop = true
+                smartPlayerGui.Parent = head
+                local box = Instance.new("Frame", smartPlayerGui)
+                box.Size = UDim2.fromScale(1, 1)
+                box.BackgroundColor3 = C.bg
+                box.BackgroundTransparency = 0.1
+                box.BorderSizePixel = 0
+                Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
+                local boxS = Instance.new("UIStroke", box)
+                boxS.Color = C.white; boxS.Thickness = 0.8; boxS.Transparency = 0.3
+                local nameLbl = Instance.new("TextLabel", box)
+                nameLbl.Size = UDim2.new(1, -6, 0, 14)
+                nameLbl.Position = UDim2.fromOffset(3, 2)
+                nameLbl.BackgroundTransparency = 1
+                nameLbl.Text = nearest.Name
+                nameLbl.Font = Enum.Font.GothamBold
+                nameLbl.TextSize = 9
+                nameLbl.TextColor3 = C.white
+                nameLbl.ZIndex = 6
+                local distLbl = Instance.new("TextLabel", box)
+                distLbl.Size = UDim2.new(1, -6, 0, 11)
+                distLbl.Position = UDim2.fromOffset(3, 15)
+                distLbl.BackgroundTransparency = 1
+                distLbl.Text = string.format("%.0f m", nearestDist)
+                distLbl.Font = Enum.Font.Gotham
+                distLbl.TextSize = 7
+                distLbl.TextColor3 = C.sec
+                distLbl.ZIndex = 6
+                local selBtn = Instance.new("TextButton", box)
+                selBtn.Size = UDim2.fromOffset(50, 12)
+                selBtn.Position = UDim2.new(1, -56, 0, 2)
+                selBtn.BackgroundColor3 = C.btnBg
+                selBtn.BorderSizePixel = 0
+                selBtn.Text = "Select"
+                selBtn.Font = Enum.Font.GothamBold
+                selBtn.TextSize = 7
+                selBtn.TextColor3 = C.sec
+                selBtn.AutoButtonColor = false
+                selBtn.ZIndex = 7
+                Instance.new("UICorner", selBtn).CornerRadius = UDim.new(0, 3)
+                selBtn.MouseButton1Click:Connect(function()
+                    setTargetPlayer(nearest)
+                    updateTargetLabel()
+                    playToggleSound()
+                end)
+            else
+                -- update distance label
+                local distLbl = smartPlayerGui:FindFirstChild("Frame") and smartPlayerGui.Frame:FindFirstChild("TextLabel")
+                if distLbl then
+                    distLbl.Text = string.format("%.0f m", nearestDist)
+                end
+            end
+            return
+        end
+    end
+    clearSmartPlayerGui()
+end
+
+RunService.RenderStepped:Connect(function()
+    if smartPlayerESPon then
+        updateSmartPlayerESP()
+    end
+end)
+
+mkToggle({title="Smart Player ESP", sub="Show nearest player, tap to select target", cb=function(v)
+    smartPlayerESPon = v
+    if v then
+        updateSmartPlayerESP()
+        setStatus("Smart Player ESP: Active", C.white)
+    else
+        clearSmartPlayerGui()
+        setStatus("Smart Player ESP: Disabled", C.sec)
+    end
+end})
+
+-- Throw button
+local throwBtn = mkBtn({title="Throw All Nearby Parts", sub="Hurls nearby parts to selected target", cb=function()
+    if not currentTargetPlayer then
+        setStatus("No target selected!", C.sec)
+        return
+    end
+    local char = LP.Character
+    local myHrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not myHrp then
+        setStatus("You have no character!", C.sec)
+        return
+    end
+    local targetChar = currentTargetPlayer.Character
+    local targetHrp = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+    if not targetHrp then
+        setStatus("Target has no character!", C.sec)
+        return
+    end
+    local dist = (targetHrp.Position - myHrp.Position).Magnitude
+    if dist > 600 then
+        setStatus("Target too far! Max 600m.", Color3.fromRGB(255,100,100))
+        return
+    end
+
+    local nearby = scanNearbyParts()
+    local count = 0
+    for _, entry in ipairs(nearby) do
+        local part = entry.part
+        if not forcedParts[part] then
+            -- unanchor if needed
+            if part.Anchored then
+                -- unanchor and then force
+                part.Anchored = false
+            end
+            forcePart(part, "throw", targetAttachment)
+            count = count + 1
+        end
+    end
+    setStatus(string.format("Throwing %d parts to %s!", count, currentTargetPlayer.Name), C.white)
+end})
+
+local stopThrowBtn = mkBtn({title="Stop Throwing", sub="Release all thrown parts", cb=function()
+    local count = 0
+    for part, entry in pairs(forcedParts) do
+        if entry.mode == "throw" then
+            count = count + 1
+        end
+    end
+    releaseThrowParts()
+    setStatus(string.format("Released %d thrown parts.", count), C.sec)
 end})
 
 -- ═══════════════════════════════════════════════
@@ -946,13 +1275,17 @@ mkBtn({title="Stop & Release All", sub="Cleans up every effect and restores part
     unanchorOn   = false
     bringAllOn   = false
     espOn        = false
+    smartPlayerESPon = false
+    clearSmartPlayerGui()
     releaseAll()
     clearEspTags()
     setSelected(nil)
-    showNotif("Released", "All parts restored to their original state.", 3)
+    setTargetPlayer(nil)
+    updateTargetLabel()
+    setStatus("All parts restored.", C.white)
 end})
 
 -- ═══════════════════════════════════════════════
 -- INIT
 -- ═══════════════════════════════════════════════
-showNotif("Anonymous9x ControlPart", "Loaded. Unanchor, Bring, and Smart ESP ready.", 4)
+setStatus("Anonymous9x ControlPart loaded.", C.white)
