@@ -43,7 +43,7 @@ local C = {
     btnBg   = Color3.fromRGB(28,  28,  30),
 }
 
-local LOGO_ID  = "rbxassetid://97269958324726"   -- same logo
+local LOGO_ID  = "rbxassetid://97269958324726"
 local TOGGLE_SOUND_ID = "rbxassetid://942127495"
 
 local W   = 190
@@ -65,7 +65,7 @@ local function playToggleSound()
 end
 
 -- ═══════════════════════════════════════════════
--- STATUS BAR (bottom, same style)
+-- STATUS BAR
 -- ═══════════════════════════════════════════════
 local statusFrame = Instance.new("Frame")
 statusFrame.Size               = UDim2.fromOffset(W, 20)
@@ -236,7 +236,7 @@ local minBtn, minL   = makeCtrl(-40, "-")
 local closeBtn, _    = makeCtrl(-20, "x")
 
 -- ═══════════════════════════════════════════════
--- DRAG
+-- DRAG (main panel only)
 -- ═══════════════════════════════════════════════
 do
     local drag=false; local dRef=nil; local sI=nil; local sW=nil
@@ -336,17 +336,108 @@ minBtn.MouseButton1Click:Connect(function()
 end)
 
 closeBtn.MouseButton1Click:Connect(function()
-    -- Stop all trolls
     if connection then connection:Disconnect() end
     pcall(function() gui:Destroy() end)
 end)
 
 -- ═══════════════════════════════════════════════
--- SCROLL BODY
+-- PLAYER LIST (fixed panel, not in scroll)
+-- ═══════════════════════════════════════════════
+local playerListPanel = Instance.new("Frame")
+playerListPanel.Size = UDim2.new(1, 0, 0, 90)  -- fixed height
+playerListPanel.Position = UDim2.fromOffset(0, HDR)
+playerListPanel.BackgroundTransparency = 1
+playerListPanel.BorderSizePixel = 0
+playerListPanel.ZIndex = 11
+playerListPanel.Parent = win
+
+-- Search box inside panel
+local searchBox = Instance.new("TextBox")
+searchBox.Size = UDim2.new(1, -12, 0, 20)
+searchBox.Position = UDim2.fromOffset(6, 2)
+searchBox.BackgroundColor3 = C.card
+searchBox.BorderSizePixel = 0
+searchBox.PlaceholderText = "Search player..."
+searchBox.PlaceholderColor3 = C.sec
+searchBox.Text = ""
+searchBox.TextColor3 = C.white
+searchBox.TextSize = 8
+searchBox.Font = Enum.Font.Gotham
+searchBox.ClearTextOnFocus = false
+searchBox.ZIndex = 12
+searchBox.Parent = playerListPanel
+Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 5)
+Instance.new("UIPadding", searchBox).PaddingLeft = UDim.new(0, 6)
+
+-- Nested ScrollingFrame for players (works fine in this fixed panel)
+local playerListScroll = Instance.new("ScrollingFrame")
+playerListScroll.Size = UDim2.new(1, -12, 1, -48)  -- below search, above refresh
+playerListScroll.Position = UDim2.fromOffset(6, 26)
+playerListScroll.BackgroundColor3 = C.card
+playerListScroll.BackgroundTransparency = 0
+playerListScroll.BorderSizePixel = 0
+playerListScroll.ScrollBarThickness = 4
+playerListScroll.ScrollBarImageColor3 = C.border
+playerListScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+playerListScroll.CanvasSize = UDim2.fromOffset(0, 0)
+playerListScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+playerListScroll.ZIndex = 12
+playerListScroll.Active = true
+playerListScroll.Parent = playerListPanel
+Instance.new("UICorner", playerListScroll).CornerRadius = UDim.new(0, 5)
+
+local playerListLayout = Instance.new("UIListLayout")
+playerListLayout.SortOrder = Enum.SortOrder.Name
+playerListLayout.Padding = UDim.new(0, 2)
+playerListLayout.Parent = playerListScroll
+
+Instance.new("UIPadding", playerListScroll).PaddingLeft = UDim.new(0, 4)
+Instance.new("UIPadding", playerListScroll).PaddingRight = UDim.new(0, 4)
+Instance.new("UIPadding", playerListScroll).PaddingTop = UDim.new(0, 4)
+
+local selectedPlayerLabel = Instance.new("TextLabel")
+selectedPlayerLabel.Size = UDim2.new(1, -12, 0, 16)
+selectedPlayerLabel.Position = UDim2.new(0, 6, 1, -18)
+selectedPlayerLabel.BackgroundTransparency = 1
+selectedPlayerLabel.Text = "Target: None"
+selectedPlayerLabel.Font = Enum.Font.GothamBold
+selectedPlayerLabel.TextSize = 8
+selectedPlayerLabel.TextColor3 = C.sec
+selectedPlayerLabel.TextXAlignment = Enum.TextXAlignment.Left
+selectedPlayerLabel.ZIndex = 12
+selectedPlayerLabel.Parent = playerListPanel
+
+local refreshBtn = Instance.new("ImageButton")
+refreshBtn.Size = UDim2.new(1, -12, 0, 18)
+refreshBtn.Position = UDim2.fromOffset(6, 72) -- inside panel
+refreshBtn.BackgroundColor3 = C.btnBg
+refreshBtn.BackgroundTransparency = 0
+refreshBtn.BorderSizePixel = 0
+refreshBtn.Image = ""
+refreshBtn.AutoButtonColor = false
+refreshBtn.ZIndex = 13
+refreshBtn.Parent = playerListPanel
+Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 4)
+local refreshLbl = Instance.new("TextLabel")
+refreshLbl.Size = UDim2.fromScale(1, 1)
+refreshLbl.BackgroundTransparency = 1
+refreshLbl.Text = "Refresh List"
+refreshLbl.Font = Enum.Font.GothamBold
+refreshLbl.TextSize = 8
+refreshLbl.TextColor3 = C.sec
+refreshLbl.ZIndex = 14
+refreshLbl.Parent = refreshBtn
+refreshBtn.MouseButton1Click:Connect(function()
+    updatePlayerList(searchBox.Text)
+    setStatus("Player list refreshed", C.sec)
+end)
+
+-- ═══════════════════════════════════════════════
+-- SCROLL BODY (below the player panel)
 -- ═══════════════════════════════════════════════
 local scroll = Instance.new("ScrollingFrame")
-scroll.Size                 = UDim2.new(1, 0, 1, -HDR)
-scroll.Position             = UDim2.fromOffset(0, HDR)
+scroll.Size                 = UDim2.new(1, 0, 1, -(HDR + 90))   -- remaining space
+scroll.Position             = UDim2.fromOffset(0, HDR + 90)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel      = 0
 scroll.ScrollBarThickness   = 2
@@ -355,6 +446,7 @@ scroll.ScrollingDirection   = Enum.ScrollingDirection.Y
 scroll.CanvasSize           = UDim2.fromOffset(0, 0)
 scroll.AutomaticCanvasSize  = Enum.AutomaticSize.Y
 scroll.ZIndex               = 11
+scroll.Active               = true
 scroll.Parent               = win
 
 local sLL = Instance.new("UIListLayout")
@@ -373,7 +465,7 @@ local _o = 0
 local function o() _o = _o + 1; return _o end
 
 -- ═══════════════════════════════════════════════
--- COMPONENT LIBRARY (same as ControlPart)
+-- COMPONENT LIBRARY
 -- ═══════════════════════════════════════════════
 local function mkSec(title)
     local f = Instance.new("Frame")
@@ -532,84 +624,20 @@ local flingTouchEnabled = false
 local flingPower = 50000
 
 -- ═══════════════════════════════════════════════
--- PLAYER LIST SECTION
+-- PLAYER LIST FUNCTIONS
 -- ═══════════════════════════════════════════════
-mkSec("Player List")
-
-local searchBox = Instance.new("TextBox")
-searchBox.Size = UDim2.new(1, 0, 0, 22)
-searchBox.BackgroundColor3 = C.card
-searchBox.BorderSizePixel = 0
-searchBox.PlaceholderText = "Search player..."
-searchBox.PlaceholderColor3 = C.sec
-searchBox.Text = ""
-searchBox.TextColor3 = C.white
-searchBox.TextSize = 8
-searchBox.Font = Enum.Font.Gotham
-searchBox.ClearTextOnFocus = false
-searchBox.LayoutOrder = o()
-searchBox.ZIndex = 12
-searchBox.Parent = scroll
-Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 5)
-local searchPadding = Instance.new("UIPadding")
-searchPadding.PaddingLeft = UDim.new(0, 6)
-searchPadding.PaddingRight = UDim.new(0, 6)
-searchPadding.Parent = searchBox
-
-local playerListScroll = Instance.new("ScrollingFrame")
-playerListScroll.Size = UDim2.new(1, 0, 0, 80)
-playerListScroll.BackgroundColor3 = C.card
-playerListScroll.BackgroundTransparency = 0
-playerListScroll.BorderSizePixel = 0
-playerListScroll.ScrollBarThickness = 2
-playerListScroll.ScrollBarImageColor3 = C.border
-playerListScroll.ScrollingDirection = Enum.ScrollingDirection.Y
-playerListScroll.CanvasSize = UDim2.fromOffset(0, 0)
-playerListScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-playerListScroll.LayoutOrder = o()
-playerListScroll.ZIndex = 12
-playerListScroll.Parent = scroll
-Instance.new("UICorner", playerListScroll).CornerRadius = UDim.new(0, 5)
-
-local playerListLayout = Instance.new("UIListLayout")
-playerListLayout.SortOrder = Enum.SortOrder.Name
-playerListLayout.Padding = UDim.new(0, 2)
-playerListLayout.Parent = playerListScroll
-
-local playerListPadding = Instance.new("UIPadding")
-playerListPadding.PaddingLeft = UDim.new(0, 4)
-playerListPadding.PaddingRight = UDim.new(0, 4)
-playerListPadding.PaddingTop = UDim.new(0, 4)
-playerListPadding.Parent = playerListScroll
-
-local refreshBtn = mkBtn({title="Refresh Players", cb=function()
-    updatePlayerList(searchBox.Text)
-    setStatus("Player list refreshed", C.sec)
-end})
-
-local selectedPlayerLabel = Instance.new("TextLabel")
-selectedPlayerLabel.Size = UDim2.new(1, 0, 0, 18)
-selectedPlayerLabel.BackgroundTransparency = 1
-selectedPlayerLabel.Text = "Target: None"
-selectedPlayerLabel.Font = Enum.Font.GothamBold
-selectedPlayerLabel.TextSize = 8
-selectedPlayerLabel.TextColor3 = C.sec
-selectedPlayerLabel.TextXAlignment = Enum.TextXAlignment.Left
-selectedPlayerLabel.LayoutOrder = o()
-selectedPlayerLabel.ZIndex = 12
-selectedPlayerLabel.Parent = scroll
-
 local function createPlayerButton(plr)
     local displayName = plr.DisplayName
     local userName = plr.Name
     local btn = Instance.new("TextButton")
+    btn.Name = plr.Name
     btn.Size = UDim2.new(1, -2, 0, 22)
     btn.BackgroundColor3 = C.btnBg
     btn.BackgroundTransparency = 0
     btn.BorderSizePixel = 0
     btn.Text = ""
     btn.AutoButtonColor = false
-    btn.ZIndex = 13
+    btn.ZIndex = 14
     btn.Parent = playerListScroll
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     local lbl = Instance.new("TextLabel")
@@ -622,8 +650,9 @@ local function createPlayerButton(plr)
     lbl.TextColor3 = C.pri
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.TextTruncate = Enum.TextTruncate.AtEnd
-    lbl.ZIndex = 14
+    lbl.ZIndex = 15
     lbl.Parent = btn
+
     btn.MouseButton1Click:Connect(function()
         selectedPlayer = Players:FindFirstChild(btn.Name)
         if selectedPlayer then
@@ -654,11 +683,8 @@ end
 
 local function updatePlayerList(searchText)
     searchText = searchText and searchText:lower() or ""
-    -- clear
     for _, child in pairs(playerListScroll:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
-        end
+        if child:IsA("TextButton") then child:Destroy() end
     end
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LP then
@@ -682,12 +708,12 @@ Players.PlayerAdded:Connect(function()
     updatePlayerList(searchBox.Text)
 end)
 Players.PlayerRemoving:Connect(function()
-    wait(0.1)
+    task.wait(0.1)
     updatePlayerList(searchBox.Text)
 end)
 
 -- ═══════════════════════════════════════════════
--- FOLLOW MODES SECTION
+-- FOLLOW MODES (in scroll)
 -- ═══════════════════════════════════════════════
 mkSec("Follow Modes")
 
@@ -745,7 +771,7 @@ for i, mode in ipairs(modes) do
 end
 
 -- ═══════════════════════════════════════════════
--- FOLLOW TOGGLE BUTTON
+-- FOLLOW TOGGLE BUTTON (in scroll)
 -- ═══════════════════════════════════════════════
 mkSec("Control")
 local followToggleBtn = mkBtn({title="Start Follow", sub="Activate troll follow mode", cb=function()
@@ -765,7 +791,7 @@ local followToggleBtn = mkBtn({title="Start Follow", sub="Activate troll follow 
 end})
 
 -- ═══════════════════════════════════════════════
--- FLING TOUCH TOGGLE
+-- FLING TOUCH (in scroll)
 -- ═══════════════════════════════════════════════
 mkSec("Troll Extras")
 
@@ -784,7 +810,6 @@ local flingTouchToggle = mkToggle({
     end
 })
 
--- Power input for fling
 local flingPowerCard = Instance.new("Frame")
 flingPowerCard.Size = UDim2.new(1, 0, 0, 24)
 flingPowerCard.BackgroundColor3 = C.card
@@ -830,7 +855,7 @@ flingPowerInput.FocusLost:Connect(function()
 end)
 
 -- ═══════════════════════════════════════════════
--- STOP ALL BUTTON
+-- STOP ALL
 -- ═══════════════════════════════════════════════
 mkSec("Reset")
 mkBtn({title="Stop All Trolls", sub="Release follow & fling", cb=function()
@@ -842,7 +867,7 @@ mkBtn({title="Stop All Trolls", sub="Release follow & fling", cb=function()
 end})
 
 -- ═══════════════════════════════════════════════
--- FOLLOW LOGIC (from Siexther, adapted)
+-- FOLLOW LOGIC (adapted from Siexther)
 -- ═══════════════════════════════════════════════
 local function startFollowing()
     if not selectedPlayer or not selectedPlayer.Character then
@@ -944,38 +969,35 @@ local function stopFollowing()
 end
 
 -- ═══════════════════════════════════════════════
--- FLING TOUCH LOGIC (Walk Fling)
+-- FLING TOUCH LOGIC
 -- ═══════════════════════════════════════════════
 local flingConnections = {}
 
-local function setupFlingTouch()
-    if not LP.Character then return end
-    -- Connect Touched event on all current and future character parts
-    local function connectChar(char)
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                local con = part.Touched:Connect(function(hit)
-                    if not flingTouchEnabled then return end
-                    local hitParent = hit.Parent
-                    if hitParent and hitParent:IsA("Model") then
-                        local targetPlayer = Players:GetPlayerFromCharacter(hitParent)
-                        if targetPlayer and targetPlayer ~= LP then
-                            local targetRoot = hitParent:FindFirstChild("HumanoidRootPart")
-                            if targetRoot then
-                                local vel = (targetRoot.Position - part.Position).Unit * flingPower
-                                targetRoot.Velocity = vel
-                            end
+local function connectCharacterForFling(char)
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local con = part.Touched:Connect(function(hit)
+                if not flingTouchEnabled then return end
+                local hitParent = hit.Parent
+                if hitParent and hitParent:IsA("Model") then
+                    local targetPlayer = Players:GetPlayerFromCharacter(hitParent)
+                    if targetPlayer and targetPlayer ~= LP then
+                        local targetRoot = hitParent:FindFirstChild("HumanoidRootPart")
+                        if targetRoot then
+                            targetRoot.Velocity = (targetRoot.Position - part.Position).Unit * flingPower
                         end
                     end
-                end)
-                table.insert(flingConnections, con)
-            end
+                end
+            end)
+            table.insert(flingConnections, con)
         end
     end
-    if LP.Character then connectChar(LP.Character) end
-    LP.CharacterAdded:Connect(function(char)
-        connectChar(char)
-    end)
+end
+
+local function setupFlingTouch()
+    if flingTouchEnabled and LP.Character then
+        connectCharacterForFling(LP.Character)
+    end
 end
 
 local function cleanupFlingTouch()
@@ -986,11 +1008,10 @@ local function cleanupFlingTouch()
     flingConnections = {}
 end
 
--- Initial fling state off
--- Setup character added for future
+-- Reconnect on respawn
 LP.CharacterAdded:Connect(function(char)
     if flingTouchEnabled then
-        setupFlingTouch()
+        connectCharacterForFling(char)
     end
 end)
 
