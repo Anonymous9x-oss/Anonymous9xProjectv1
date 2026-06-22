@@ -2,7 +2,7 @@
 -- KONFIGURASI
 -- ============================================================
 local ANOLIB_RAW_URL = "https://raw.githubusercontent.com/Anonymous9x-oss/Anonymous9xProjectv1/refs/heads/main/anolib.lua"
-local REQUIRED_PLACE_ID = 142823291  -- Place ID Murder Mystery 2 (atau sesuaikan)
+local REQUIRED_PLACE_ID = 142823291  -- Place ID Murder Mystery 2
 
 -- ============================================================
 -- LOAD BEARLIB
@@ -13,7 +13,7 @@ if not bearlib then
 end
 
 -- ============================================================
--- CEK GAME (OPSIONAL, BISA DISESUAIKAN)
+-- CEK GAME
 -- ============================================================
 if game.PlaceId ~= REQUIRED_PLACE_ID then
     pcall(function()
@@ -62,13 +62,9 @@ end
 uCR(lp.Character or lp.CharacterAdded:Wait())
 lp.CharacterAdded:Connect(function(newChar) uCR(newChar) end)
 
-local blacklist = { [1848960] = true }
+-- Blacklist dan Discord (dihilangkan fungsi kick, hanya placeholder)
+local blacklist = {}
 local discordLink = "https://discord.gg/ptvyFfK3pU"
-
-if blacklist[lp.UserId] then
-    lp:Kick("Exploiting")
-    return
-end
 
 local gid = 0
 local bannedRanks = {}
@@ -100,21 +96,35 @@ local antiAfkToggle = false
 local FlingToggle = false
 local antiFlingToggle = false
 local flingThread
+local antiAdminToggle = false
+
+-- ESP Variables (baru, lebih robust)
+local ESPEnabled = false
+local ESPHighlightEnabled = false
+local ESPNamesEnabled = false
+local ESPDistanceEnabled = false
+local ESPBoxesEnabled = false
+local ESPTracersEnabled = false
+local ESPObjects = {}
+local espHighlights = {}
+local espBillboards = {}
+local espBoxes = {}
+local espTracers = {}
+local espLoopRunning = false
 local selectedESPTypes = {}
-local ESPHighlight = false
-local ESPTracers = false
-local ESPNames = false
-local ESPBoxes = false
-local ESPStuds = false
-local esp = {}
-local tracers = {}
-local boxes = {}
-local names = {}
-local studs = {}
-local DrawingAvailable = (type(Drawing) == "table" or type(Drawing) == "userdata")
 
 -- ============================================================
--- FUNGSI-FUNGSI DARI AZURE HUB
+-- VARIABEL FLING SYSTEM (TAMBAHAN)
+-- ============================================================
+local FlingTargetPlayer = nil          -- Target player yang dipilih
+local FlingTargetToggle = false        -- Fling satu target
+local FlingLoopToggle = false          -- Loop fling (terus menerus)
+local FlingAllToggle = false           -- Fling semua player
+local FlingAllRunning = false          -- Status sedang menjalankan fling all
+local FlingLoopRunning = false         -- Status loop fling
+
+-- ============================================================
+-- FUNGSI-FUNGSI DARI AZURE HUB (TIDAK DIUBAH)
 -- ============================================================
 local function fling()
     local movel = 0.1
@@ -326,276 +336,6 @@ local function autofarm()
 end
 
 -- ============================================================
--- FUNGSI ESP (DARI AZURE HUB)
--- ============================================================
-local function contains(tbl, val)
-    if not tbl or type(tbl) ~= "table" then return false end
-    for _, v in ipairs(tbl) do
-        if v == val then return true end
-    end
-    return false
-end
-
-local function isMurderObject(obj)
-    local child = obj:FindFirstChild("Footsteps") or obj:FindFirstChild("Sleight") or obj:FindFirstChild("Decoy") or obj:FindFirstChild("Ghost") or obj:FindFirstChild("Fake Gun") or obj:FindFirstChild("Xray") or obj:FindFirstChild("Haste") or obj:FindFirstChild("Trap") or obj:FindFirstChild("Sprint") or obj:FindFirstChild("Ninja")
-    return child and child:IsA("Folder")
-end
-
-local function isSheriffObject(obj)
-    if obj.Name == "Gun" and obj:IsA("Tool") then return true end
-    return false
-end
-
-local function isPlayerObject(obj)
-    if obj:IsA("Model") and obj:FindFirstChild("Head") and obj.Name ~= lp.Name then
-        if not isMurderObject(obj) and not isSheriffObject(obj) then
-            return true
-        end
-    end
-    return false
-end
-
-local function isGunObject(obj)
-    if obj.Name == "GunDrop" and obj:IsA("BasePart") then return true end
-    return false
-end
-
-local function passesDropdownFilter(obj)
-    if not selectedESPTypes or #selectedESPTypes == 0 then return false end
-    if contains(selectedESPTypes, "Murderer") and isMurderObject(obj) then return true end
-    if contains(selectedESPTypes, "Sheriff") and isSheriffObject(obj) then return true end
-    if contains(selectedESPTypes, "Players") and isPlayerObject(obj) then return true end
-    if contains(selectedESPTypes, "Gun") and isGunObject(obj) then return true end
-    return false
-end
-
-local function getObjColor(obj)
-    if isPlayerObject(obj) then return Color3.fromRGB(0, 255, 0) end
-    if isSheriffObject(obj) then return Color3.fromRGB(0, 0, 255) end
-    if isMurderObject(obj) then return Color3.fromRGB(255, 0, 0) end
-    if isGunObject(obj) then return Color3.fromRGB(0, 0, 255) end
-    return Color3.fromRGB(0, 255, 0)
-end
-
-local function getRootPosition(target)
-    if target:IsA("BasePart") then return target.Position end
-    if target:IsA("Model") then
-        if target.PrimaryPart then return target.PrimaryPart.Position end
-        local root = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("VisibleParts")
-        if root and root:IsA("BasePart") then return root.Position end
-        return target:GetPivot().Position
-    end
-    return Vector3.new(0, 0, 0)
-end
-
-local function ensureHighlight(obj)
-    if not ESPHighlight then
-        if esp[obj] and esp[obj].highlight then
-            esp[obj].highlight:Destroy()
-            esp[obj].highlight = nil
-        end
-        return
-    end
-    if not esp[obj].highlight then
-        local h = Instance.new("Highlight")
-        h.Adornee = obj
-        h.FillTransparency = 0.5
-        h.OutlineTransparency = 0
-        h.FillColor = getObjColor(obj)
-        h.OutlineColor = Color3.new(1, 1, 1)
-        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        h.Parent = obj
-        esp[obj].highlight = h
-    end
-end
-
-local function ensureBillboard(obj)
-    if not (ESPNames or ESPStuds) then
-        if esp[obj].billboard then
-            esp[obj].billboard:Destroy()
-            esp[obj].billboard = nil
-        end
-        return
-    end
-    if not esp[obj].billboard then
-        local head = obj:FindFirstChild("Head") or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildWhichIsA("BasePart")
-        if not head then return end
-        local b = Instance.new("BillboardGui")
-        b.Name = "roblox"
-        b.Size = UDim2.new(0, 200, 0, 50)
-        b.Adornee = head
-        b.AlwaysOnTop = true
-        b.MaxDistance = 5000
-        b.Parent = obj
-        local n = Instance.new("TextLabel")
-        n.Name = "MainLabel"
-        n.Parent = b
-        n.BackgroundTransparency = 1
-        n.Size = UDim2.new(1, 0, 1, 0)
-        n.Text = ""
-        n.Font = Enum.Font.SourceSansBold
-        n.TextSize = 14
-        n.TextStrokeTransparency = 0
-        n.RichText = true
-        esp[obj].billboard = b
-        esp[obj].nameLabel = n
-        esp[obj].studsLabel = nil
-    end
-end
-
-local function ensureTracer(obj)
-    if not ESPTracers then
-        if tracers[obj] then tracers[obj]:Remove() tracers[obj] = nil end
-        return
-    end
-    if not tracers[obj] then
-        local L = Drawing.new("Line")
-        L.Thickness = 1
-        L.Transparency = 1
-        tracers[obj] = L
-    end
-end
-
-local function ensureBox(obj)
-    if not ESPBoxes then
-        if boxes[obj] then
-            for _, l in pairs(boxes[obj]) do l:Remove() end
-            boxes[obj] = nil
-        end
-        return
-    end
-    if not boxes[obj] then
-        boxes[obj] = {
-            tl = Drawing.new("Line"),
-            tr = Drawing.new("Line"),
-            bl = Drawing.new("Line"),
-            br = Drawing.new("Line")
-        }
-        for _, line in pairs(boxes[obj]) do
-            line.Thickness = 1
-            line.Transparency = 1
-        end
-    end
-end
-
-local function ensureAllFor(obj)
-    if not esp[obj] then esp[obj] = {} end
-    ensureHighlight(obj)
-    ensureBillboard(obj)
-    ensureTracer(obj)
-    ensureBox(obj)
-end
-
-local function removeESP(obj)
-    local d = esp[obj]
-    if d then
-        if d.highlight then pcall(function() d.highlight:Destroy() end) end
-        if d.billboard then pcall(function() d.billboard:Destroy() end) end
-        esp[obj] = nil
-    end
-    if tracers[obj] then pcall(function() tracers[obj]:Remove() end) tracers[obj] = nil end
-    if boxes[obj] then
-        for _, l in pairs(boxes[obj]) do pcall(function() l:Remove() end) end
-        boxes[obj] = nil
-    end
-end
-
--- ESP Loop
-local lR, rI = 0, 1.5
-RunService.Heartbeat:Connect(function()
-    local now = tick()
-    if now - lR > rI then
-        lR = now
-        for _, obj in ipairs(workspace:GetChildren()) do
-            if obj ~= lp.Character and passesDropdownFilter(obj) then
-                ensureAllFor(obj)
-            end
-        end
-        local dropgun = workspace:FindFirstChild("GunDrop", true)
-        if dropgun and passesDropdownFilter(dropgun) then
-            ensureAllFor(dropgun)
-        end
-    end
-
-    local viewportSize = Camera.ViewportSize
-    local myRoot = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-
-    for obj, data in pairs(esp) do
-        local color = getObjColor(obj)
-        if not obj or not obj.Parent or not passesDropdownFilter(obj) then
-            removeESP(obj)
-            continue
-        end
-
-        if obj:IsA("Model") and obj:FindFirstChild("Head") then
-            local p = Players:GetPlayerFromCharacter(obj)
-            if p then
-                local b = p:FindFirstChild("Backpack")
-                if obj:FindFirstChild("Gun") or (b and b:FindFirstChild("Gun")) then
-                    color = Color3.fromRGB(0, 0, 255)
-                end
-            end
-        end
-
-        local worldPos = getRootPosition(obj)
-        local screenPos, onScreen = Camera:WorldToViewportPoint(worldPos)
-        local isVisible = onScreen and screenPos.Z > 0
-
-        if tracers[obj] then
-            tracers[obj].Visible = isVisible and ESPTracers
-            if tracers[obj].Visible then
-                tracers[obj].Color = color
-                tracers[obj].From = Vector2.new(viewportSize.X / 2, viewportSize.Y)
-                tracers[obj].To = Vector2.new(screenPos.X, screenPos.Y)
-            end
-        end
-
-        if data.billboard then
-            data.billboard.Enabled = isVisible and (ESPNames or ESPStuds)
-            if data.billboard.Enabled and myRoot then
-                local targetLabel = data.nameLabel or data.billboard:FindFirstChildOfClass("TextLabel")
-                if targetLabel then
-                    targetLabel.Visible = true
-                    local dist = (Camera.CFrame.Position - worldPos).Magnitude
-                    if ESPNames and ESPStuds then
-                        targetLabel.Text = obj.Name .. " (" .. string.format("%.0fm", dist) .. ")"
-                    elseif ESPNames then
-                        targetLabel.Text = obj.Name
-                    elseif ESPStuds then
-                        targetLabel.Text = string.format("%.0fm", dist)
-                    end
-                    targetLabel.TextColor3 = color
-                end
-            end
-        end
-
-        if boxes[obj] then
-            local box = boxes[obj]
-            local showBox = isVisible and ESPBoxes
-            for _, line in pairs(box) do line.Visible = showBox; line.Color = color end
-            if showBox then
-                local size = (1 / screenPos.Z) * 1000
-                local w, h = size * 0.6, size
-                local x, y = screenPos.X, screenPos.Y
-                box.tl.From = Vector2.new(x-w, y-h); box.tl.To = Vector2.new(x+w, y-h)
-                box.tr.From = Vector2.new(x+w, y-h); box.tr.To = Vector2.new(x+w, y+h)
-                box.br.From = Vector2.new(x+w, y+h); box.br.To = Vector2.new(x-w, y+h)
-                box.bl.From = Vector2.new(x-w, y+h); box.bl.To = Vector2.new(x-w, y-h)
-            end
-        end
-
-        if data.highlight then data.highlight.FillColor = color end
-    end
-end)
-
-Workspace.ChildAdded:Connect(function(child)
-    task.wait(0.5)
-    if passesDropdownFilter(child) then ensureAllFor(child) end
-end)
-
-Workspace.ChildRemoved:Connect(function(child) removeESP(child) end)
-
--- ============================================================
 -- NOCLIP & SPEED
 -- ============================================================
 local function noclip()
@@ -655,12 +395,384 @@ task.spawn(function()
 end)
 
 -- ============================================================
+-- FUNGSI FLING TARGET (TAMBAHAN)
+-- ============================================================
+local function FlingTargetPlayerFunction(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then
+        Notify("Fling Error", "Target tidak valid atau tidak memiliki karakter", 2)
+        return
+    end
+
+    local targetHRP = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not targetHRP then
+        Notify("Fling Error", "Target tidak memiliki HumanoidRootPart", 2)
+        return
+    end
+
+    local myHRP = root
+    if not myHRP then
+        Notify("Fling Error", "Karakter Anda tidak valid", 2)
+        return
+    end
+
+    -- Simpan posisi awal
+    local originalPos = myHRP.CFrame
+
+    -- Fling logic (sama seperti touch fling tapi untuk target spesifik)
+    for i = 1, 5 do
+        if not FlingTargetToggle and not FlingLoopToggle and not FlingAllToggle then break end
+        myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 1)
+        task.wait(0.1)
+        myHRP.Velocity = Vector3.new(0, 1000, 0)
+        task.wait(0.1)
+        myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 5, 0)
+        task.wait(0.1)
+        myHRP.Velocity = Vector3.new(1000, 0, 0)
+        task.wait(0.1)
+        myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, -5, 0)
+        task.wait(0.1)
+        myHRP.Velocity = Vector3.new(-1000, 0, 0)
+        task.wait(0.1)
+    end
+
+    -- Kembali ke posisi awal
+    myHRP.CFrame = originalPos
+    myHRP.Velocity = Vector3.new(0, 0, 0)
+end
+
+-- ============================================================
+-- FUNGSI FLING ALL (TAMBAHAN)
+-- ============================================================
+local function FlingAllPlayers()
+    if FlingAllRunning then return end
+    FlingAllRunning = true
+
+    local playersToFling = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= lp and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            table.insert(playersToFling, p)
+        end
+    end
+
+    if #playersToFling == 0 then
+        Notify("Fling All", "Tidak ada player lain yang ditemukan", 2)
+        FlingAllRunning = false
+        return
+    end
+
+    Notify("Fling All", "Memulai fling " .. #playersToFling .. " player(s)", 3)
+
+    for _, target in ipairs(playersToFling) do
+        if not FlingAllToggle and not FlingLoopToggle then
+            FlingAllRunning = false
+            return
+        end
+        FlingTargetPlayerFunction(target)
+        task.wait(0.5)
+    end
+
+    FlingAllRunning = false
+    if FlingLoopToggle then
+        -- Jika loop aktif, jalankan ulang
+        task.wait(1)
+        FlingAllPlayers()
+    else
+        Notify("Fling All", "Selesai fling semua player", 2)
+    end
+end
+
+-- ============================================================
+-- FUNGSI FLING TARGET DENGAN LOOP (TAMBAHAN)
+-- ============================================================
+local function FlingTargetLoop()
+    if FlingLoopRunning then return end
+    FlingLoopRunning = true
+
+    while FlingLoopToggle and FlingTargetPlayer do
+        if not FlingTargetToggle then
+            task.wait(0.5)
+            continue
+        end
+        FlingTargetPlayerFunction(FlingTargetPlayer)
+        task.wait(1)
+    end
+
+    FlingLoopRunning = false
+end
+
+-- ============================================================
+-- FUNGSI ESP (BARU, LEBIH ROBUST)
+-- ============================================================
+-- Helper: cek apakah objek termasuk tipe yang dipilih
+local function isMurderObject(obj)
+    local child = obj:FindFirstChild("Footsteps") or obj:FindFirstChild("Sleight") or obj:FindFirstChild("Decoy") or obj:FindFirstChild("Ghost") or obj:FindFirstChild("Fake Gun") or obj:FindFirstChild("Xray") or obj:FindFirstChild("Haste") or obj:FindFirstChild("Trap") or obj:FindFirstChild("Sprint") or obj:FindFirstChild("Ninja")
+    return child and child:IsA("Folder")
+end
+
+local function isSheriffObject(obj)
+    if obj.Name == "Gun" and obj:IsA("Tool") then return true end
+    return false
+end
+
+local function isPlayerObject(obj)
+    if obj:IsA("Model") and obj:FindFirstChild("Head") and obj.Name ~= lp.Name then
+        if not isMurderObject(obj) and not isSheriffObject(obj) then
+            return true
+        end
+    end
+    return false
+end
+
+local function isGunObject(obj)
+    if obj.Name == "GunDrop" and obj:IsA("BasePart") then return true end
+    return false
+end
+
+local function contains(tbl, val)
+    for _, v in ipairs(tbl) do
+        if v == val then return true end
+    end
+    return false
+end
+
+local function passesESPFilter(obj)
+    if not selectedESPTypes or #selectedESPTypes == 0 then return false end
+    if contains(selectedESPTypes, "Murderer") and isMurderObject(obj) then return true end
+    if contains(selectedESPTypes, "Sheriff") and isSheriffObject(obj) then return true end
+    if contains(selectedESPTypes, "Players") and isPlayerObject(obj) then return true end
+    if contains(selectedESPTypes, "Gun") and isGunObject(obj) then return true end
+    return false
+end
+
+local function getESPColor(obj)
+    if isPlayerObject(obj) then return Color3.fromRGB(0, 255, 0) end
+    if isSheriffObject(obj) then return Color3.fromRGB(0, 0, 255) end
+    if isMurderObject(obj) then return Color3.fromRGB(255, 0, 0) end
+    if isGunObject(obj) then return Color3.fromRGB(0, 0, 255) end
+    return Color3.fromRGB(0, 255, 0)
+end
+
+local function getRootPart(obj)
+    if obj:IsA("BasePart") then return obj end
+    if obj:IsA("Model") then
+        if obj.PrimaryPart then return obj.PrimaryPart end
+        local r = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head") or obj:FindFirstChild("VisibleParts")
+        if r and r:IsA("BasePart") then return r end
+        return obj:FindFirstChildWhichIsA("BasePart", true)
+    end
+    return nil
+end
+
+-- ESP Loop utama (berjalan terus, update setiap 0.5 detik)
+local function ESPLoop()
+    if espLoopRunning then return end
+    espLoopRunning = true
+
+    task.spawn(function()
+        while ESPEnabled do
+            -- Kumpulkan semua objek yang memenuhi filter
+            local validObjects = {}
+            for _, obj in ipairs(workspace:GetChildren()) do
+                if obj ~= lp.Character and passesESPFilter(obj) then
+                    table.insert(validObjects, obj)
+                end
+            end
+
+            -- Hapus ESP untuk objek yang sudah tidak valid
+            for obj, _ in pairs(espHighlights) do
+                if not table.find(validObjects, obj) then
+                    if espHighlights[obj] then espHighlights[obj]:Destroy() end
+                    espHighlights[obj] = nil
+                    if espBillboards[obj] then espBillboards[obj]:Destroy() end
+                    espBillboards[obj] = nil
+                    if espBoxes[obj] then
+                        for _, line in pairs(espBoxes[obj]) do line:Remove() end
+                        espBoxes[obj] = nil
+                    end
+                    if espTracers[obj] then espTracers[obj]:Remove() end
+                    espTracers[obj] = nil
+                end
+            end
+
+            -- Buat atau update ESP untuk setiap objek valid
+            for _, obj in ipairs(validObjects) do
+                local color = getESPColor(obj)
+                local rootPart = getRootPart(obj)
+                if not rootPart then continue end
+
+                -- Highlight
+                if ESPHighlightEnabled then
+                    if not espHighlights[obj] then
+                        local h = Instance.new("Highlight")
+                        h.Adornee = obj
+                        h.FillTransparency = 0.5
+                        h.OutlineTransparency = 0
+                        h.FillColor = color
+                        h.OutlineColor = Color3.new(1, 1, 1)
+                        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                        h.Parent = obj
+                        espHighlights[obj] = h
+                    else
+                        espHighlights[obj].FillColor = color
+                        espHighlights[obj].Enabled = true
+                    end
+                else
+                    if espHighlights[obj] then
+                        espHighlights[obj]:Destroy()
+                        espHighlights[obj] = nil
+                    end
+                end
+
+                -- Billboard (Nama + Jarak)
+                if ESPNamesEnabled or ESPDistanceEnabled then
+                    if not espBillboards[obj] then
+                        local b = Instance.new("BillboardGui")
+                        b.Size = UDim2.new(0, 200, 0, 50)
+                        b.Adornee = rootPart
+                        b.AlwaysOnTop = true
+                        b.MaxDistance = 5000
+                        b.Parent = obj
+                        local l = Instance.new("TextLabel")
+                        l.Name = "Label"
+                        l.Parent = b
+                        l.BackgroundTransparency = 1
+                        l.Size = UDim2.new(1, 0, 1, 0)
+                        l.Font = Enum.Font.SourceSansBold
+                        l.TextSize = 14
+                        l.TextStrokeTransparency = 0
+                        espBillboards[obj] = b
+                    end
+                    local label = espBillboards[obj]:FindFirstChild("Label")
+                    if label then
+                        local dist = (Camera.CFrame.Position - rootPart.Position).Magnitude
+                        local text = ""
+                        if ESPNamesEnabled then
+                            text = obj.Name
+                        end
+                        if ESPDistanceEnabled then
+                            if text ~= "" then text = text .. " " end
+                            text = text .. string.format("%.0fm", dist)
+                        end
+                        label.Text = text
+                        label.TextColor3 = color
+                        espBillboards[obj].Enabled = true
+                    end
+                else
+                    if espBillboards[obj] then
+                        espBillboards[obj]:Destroy()
+                        espBillboards[obj] = nil
+                    end
+                end
+
+                -- Tracers (garis ke objek)
+                if ESPTracersEnabled then
+                    if not espTracers[obj] then
+                        local L = Drawing.new("Line")
+                        L.Thickness = 1
+                        L.Transparency = 1
+                        espTracers[obj] = L
+                    end
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+                    if onScreen and screenPos.Z > 0 then
+                        espTracers[obj].Visible = true
+                        espTracers[obj].Color = color
+                        espTracers[obj].From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        espTracers[obj].To = Vector2.new(screenPos.X, screenPos.Y)
+                    else
+                        espTracers[obj].Visible = false
+                    end
+                else
+                    if espTracers[obj] then
+                        espTracers[obj]:Remove()
+                        espTracers[obj] = nil
+                    end
+                end
+
+                -- Boxes (kotak di sekitar objek)
+                if ESPBoxesEnabled then
+                    if not espBoxes[obj] then
+                        espBoxes[obj] = {
+                            tl = Drawing.new("Line"),
+                            tr = Drawing.new("Line"),
+                            bl = Drawing.new("Line"),
+                            br = Drawing.new("Line")
+                        }
+                        for _, line in pairs(espBoxes[obj]) do
+                            line.Thickness = 1
+                            line.Transparency = 1
+                        end
+                    end
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+                    if onScreen and screenPos.Z > 0 then
+                        local size = (1 / screenPos.Z) * 1000
+                        local w, h = size * 0.6, size
+                        local x, y = screenPos.X, screenPos.Y
+                        local box = espBoxes[obj]
+                        box.tl.From = Vector2.new(x-w, y-h); box.tl.To = Vector2.new(x+w, y-h)
+                        box.tr.From = Vector2.new(x+w, y-h); box.tr.To = Vector2.new(x+w, y+h)
+                        box.br.From = Vector2.new(x+w, y+h); box.br.To = Vector2.new(x-w, y+h)
+                        box.bl.From = Vector2.new(x-w, y+h); box.bl.To = Vector2.new(x-w, y-h)
+                        for _, line in pairs(box) do
+                            line.Visible = true
+                            line.Color = color
+                        end
+                    else
+                        for _, line in pairs(espBoxes[obj]) do
+                            line.Visible = false
+                        end
+                    end
+                else
+                    if espBoxes[obj] then
+                        for _, line in pairs(espBoxes[obj]) do line:Remove() end
+                        espBoxes[obj] = nil
+                    end
+                end
+            end
+
+            task.wait(0.5)
+        end
+        espLoopRunning = false
+    end)
+end
+
+-- Fungsi untuk memulai/menghentikan ESP
+local function ToggleESP(state)
+    ESPEnabled = state
+    if state then
+        ESPLoop()
+        Notify("ESP", "Enabled", 2)
+    else
+        -- Hapus semua ESP
+        for obj, _ in pairs(espHighlights) do
+            if espHighlights[obj] then espHighlights[obj]:Destroy() end
+            if espBillboards[obj] then espBillboards[obj]:Destroy() end
+            if espBoxes[obj] then
+                for _, line in pairs(espBoxes[obj]) do line:Remove() end
+            end
+            if espTracers[obj] then espTracers[obj]:Remove() end
+        end
+        espHighlights = {}
+        espBillboards = {}
+        espBoxes = {}
+        espTracers = {}
+        espLoopRunning = false
+        Notify("ESP", "Disabled", 2)
+    end
+end
+
+-- Fungsi untuk update dropdown ESP Types
+local function UpdateESPTypes(types)
+    selectedESPTypes = types
+    Notify("ESP Types", "Updated: " .. table.concat(types, ", "), 2)
+end
+
+-- ============================================================
 -- MEMBUAT WINDOW BEARLIB (ANONYMOUS9x VIP | MM2)
 -- ============================================================
 local Window = bearlib:MakeWindow({
     Name = "Anonymous9x VIP",
     SubTitle = "For Murder Mystery 2",
-    SaveFolder = "MM2_Config.json"
+    SaveFolder = "MM2_Config.json"  -- tetap ada meski config tab dihapus, tidak masalah
 })
 
 -- ============================================================
@@ -670,7 +782,6 @@ local MainTab   = Window:MakeTab({ Title = "Main",   Icon = "rbxassetid://107349
 local EspTab    = Window:MakeTab({ Title = "ESP",    Icon = "rbxassetid://10723346959" })
 local PlayerTab = Window:MakeTab({ Title = "Player", Icon = "rbxassetid://10734975692" })
 local MiscTab   = Window:MakeTab({ Title = "Misc",   Icon = "rbxassetid://10734950309" })
-local ConfigTab = Window:MakeTab({ Title = "Config", Icon = "rbxassetid://10734949073" })
 
 -- ============================================================
 -- MAIN TAB - MURDERER SECTION
@@ -683,8 +794,12 @@ MainTab:AddToggle({
     Flag = "MM2_KillAura",
     Callback = function(state)
         KillAuraToggle = state
-        if state then loopkillaura() end
-        Notify("Kill Aura", state and "Enabled" or "Disabled", 2)
+        if state then
+            loopkillaura()
+            Notify("Kill Aura", "Enabled", 2)
+        else
+            Notify("Kill Aura", "Disabled", 2)
+        end
     end
 })
 
@@ -696,6 +811,7 @@ MainTab:AddSlider({
     Flag = "MM2_KillAuraRadius",
     Callback = function(val)
         KillAuraRadius = tonumber(val)
+        Notify("Kill Aura Radius", "Set to " .. val, 2)
     end
 })
 
@@ -705,8 +821,12 @@ MainTab:AddToggle({
     Flag = "MM2_KillAll",
     Callback = function(state)
         AutoKillToggle = state
-        if state then killplayers() end
-        Notify("Kill Everyone", state and "Enabled" or "Disabled", 2)
+        if state then
+            killplayers()
+            Notify("Kill Everyone", "Enabled", 2)
+        else
+            Notify("Kill Everyone", "Disabled", 2)
+        end
     end
 })
 
@@ -721,8 +841,12 @@ MainTab:AddToggle({
     Flag = "MM2_AutoShoot",
     Callback = function(state)
         AutoShootToggle = state
-        if state then autoshoot() end
-        Notify("Auto Shoot", state and "Enabled" or "Disabled", 2)
+        if state then
+            autoshoot()
+            Notify("Auto Shoot", "Enabled", 2)
+        else
+            Notify("Auto Shoot", "Disabled", 2)
+        end
     end
 })
 
@@ -735,6 +859,7 @@ MainTab:AddToggle({
         if state and not getgenv().PREMIUM_KEY then
             PredictionToggle = false
             Notify("Premium Feature", "Get premium in our discord server.", 3)
+            return
         end
         Notify("Prediction", state and "Enabled" or "Disabled", 2)
     end
@@ -751,8 +876,12 @@ MainTab:AddToggle({
     Flag = "MM2_AutoGrab",
     Callback = function(state)
         AutoGrabToggle = state
-        if state then autograb() end
-        Notify("Auto Grab", state and "Enabled" or "Disabled", 2)
+        if state then
+            autograb()
+            Notify("Auto Grab", "Enabled", 2)
+        else
+            Notify("Auto Grab", "Disabled", 2)
+        end
     end
 })
 
@@ -771,11 +900,12 @@ MainTab:AddToggle({
             NoclipToggle = true
             noclip()
             autofarm()
+            Notify("Auto Farm", "Enabled", 2)
         else
             NoclipToggle = false
             clip()
+            Notify("Auto Farm", "Disabled", 2)
         end
-        Notify("Auto Farm", state and "Enabled" or "Disabled", 2)
     end
 })
 
@@ -796,6 +926,126 @@ MainTab:AddDropdown({
     Flag = "MM2_FarmMethod",
     Callback = function(opt)
         AutoFarmMethod = opt
+        Notify("Farm Method", "Set to " .. opt, 2)
+    end
+})
+
+-- ============================================================
+-- MAIN TAB - FLING SYSTEM (TAMBAHAN)
+-- ============================================================
+MainTab:AddSection("Fling System")
+
+-- Dropdown pilih target player (update saat player join/leave)
+local function UpdateFlingDropdown()
+    local names = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= lp then table.insert(names, p.Name) end
+    end
+    if #names == 0 then table.insert(names, "No players") end
+    return names
+end
+
+local flingDropdown = MainTab:AddDropdown({
+    Name = "Select Fling Target",
+    Options = UpdateFlingDropdown(),
+    Default = "No players",
+    Flag = "MM2_FlingTarget",
+    Callback = function(opt)
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name == opt then
+                FlingTargetPlayer = p
+                break
+            end
+        end
+        if FlingTargetPlayer then
+            Notify("Fling Target", "Target set: " .. FlingTargetPlayer.Name, 2)
+        else
+            Notify("Fling Target", "Player not found", 2)
+        end
+    end
+})
+
+-- Update dropdown saat player join/leave
+Players.PlayerAdded:Connect(function()
+    flingDropdown:Refresh(UpdateFlingDropdown(), true)
+end)
+Players.PlayerRemoving:Connect(function()
+    flingDropdown:Refresh(UpdateFlingDropdown(), true)
+end)
+
+-- Toggle Fling Target (fling satu kali atau berulang jika loop aktif)
+MainTab:AddToggle({
+    Name = "Fling Selected Target",
+    Default = false,
+    Flag = "MM2_FlingTargetToggle",
+    Callback = function(state)
+        FlingTargetToggle = state
+        if state then
+            if FlingTargetPlayer then
+                if FlingLoopToggle then
+                    task.spawn(FlingTargetLoop)
+                else
+                    FlingTargetPlayerFunction(FlingTargetPlayer)
+                    Notify("Fling Target", "Flinged " .. FlingTargetPlayer.Name, 2)
+                end
+            else
+                Notify("Fling Target", "Pilih target terlebih dahulu", 2)
+                FlingTargetToggle = false
+            end
+        else
+            Notify("Fling Target", "Disabled", 2)
+        end
+    end
+})
+
+-- Toggle Loop Fling (fling terus menerus)
+MainTab:AddToggle({
+    Name = "Loop Fling",
+    Default = false,
+    Flag = "MM2_LoopFling",
+    Callback = function(state)
+        FlingLoopToggle = state
+        if state then
+            Notify("Loop Fling", "Enabled - akan fling terus sampai dimatikan", 2)
+            if FlingTargetToggle and FlingTargetPlayer then
+                task.spawn(FlingTargetLoop)
+            end
+        else
+            FlingLoopRunning = false
+            Notify("Loop Fling", "Disabled", 2)
+        end
+    end
+})
+
+-- Button Fling All (fling semua player)
+MainTab:AddButton({
+    Name = "Fling All Players",
+    Callback = function()
+        if FlingLoopToggle then
+            if FlingAllRunning then
+                Notify("Fling All", "Already running", 2)
+                return
+            end
+            FlingAllToggle = true
+            task.spawn(FlingAllPlayers)
+            Notify("Fling All", "Started (loop mode)", 2)
+        else
+            FlingAllToggle = true
+            task.spawn(FlingAllPlayers)
+        end
+    end
+})
+
+-- Button Stop All Fling
+MainTab:AddButton({
+    Name = "Stop All Fling",
+    Callback = function()
+        FlingTargetToggle = false
+        FlingLoopToggle = false
+        FlingAllToggle = false
+        FlingAllRunning = false
+        FlingLoopRunning = false
+        Notify("Fling", "All fling stopped", 2)
     end
 })
 
@@ -811,36 +1061,28 @@ EspTab:AddDropdown({
     Multi = true,
     Flag = "MM2_ESP_Types",
     Callback = function(opt)
-        selectedESPTypes = opt
+        UpdateESPTypes(opt)
     end
 })
 
 EspTab:AddSection("ESP Options")
 
 EspTab:AddToggle({
+    Name = "Enable ESP",
+    Default = false,
+    Flag = "MM2_ESP_Enable",
+    Callback = function(state)
+        ToggleESP(state)
+    end
+})
+
+EspTab:AddToggle({
     Name = "Highlight Objects",
     Default = false,
     Flag = "MM2_ESP_Highlight",
     Callback = function(state)
-        ESPHighlight = state
-    end
-})
-
-EspTab:AddToggle({
-    Name = "Show Tracers",
-    Default = false,
-    Flag = "MM2_ESP_Tracers",
-    Callback = function(state)
-        ESPTracers = state
-    end
-})
-
-EspTab:AddToggle({
-    Name = "Show Boxes",
-    Default = false,
-    Flag = "MM2_ESP_Boxes",
-    Callback = function(state)
-        ESPBoxes = state
+        ESPHighlightEnabled = state
+        Notify("ESP Highlight", state and "Enabled" or "Disabled", 2)
     end
 })
 
@@ -849,16 +1091,38 @@ EspTab:AddToggle({
     Default = false,
     Flag = "MM2_ESP_Names",
     Callback = function(state)
-        ESPNames = state
+        ESPNamesEnabled = state
+        Notify("ESP Names", state and "Enabled" or "Disabled", 2)
     end
 })
 
 EspTab:AddToggle({
-    Name = "Show Studs (Distance)",
+    Name = "Show Distance (Studs)",
     Default = false,
-    Flag = "MM2_ESP_Studs",
+    Flag = "MM2_ESP_Distance",
     Callback = function(state)
-        ESPStuds = state
+        ESPDistanceEnabled = state
+        Notify("ESP Distance", state and "Enabled" or "Disabled", 2)
+    end
+})
+
+EspTab:AddToggle({
+    Name = "Show Tracers",
+    Default = false,
+    Flag = "MM2_ESP_Tracers",
+    Callback = function(state)
+        ESPTracersEnabled = state
+        Notify("ESP Tracers", state and "Enabled" or "Disabled", 2)
+    end
+})
+
+EspTab:AddToggle({
+    Name = "Show Boxes",
+    Default = false,
+    Flag = "MM2_ESP_Boxes",
+    Callback = function(state)
+        ESPBoxesEnabled = state
+        Notify("ESP Boxes", state and "Enabled" or "Disabled", 2)
     end
 })
 
@@ -888,10 +1152,11 @@ PlayerTab:AddToggle({
         NoclipToggle = state
         if state then
             noclip()
+            Notify("Noclip", "Enabled", 2)
         else
             clip()
+            Notify("Noclip", "Disabled", 2)
         end
-        Notify("Noclip", state and "Enabled" or "Disabled", 2)
     end
 })
 
@@ -913,6 +1178,7 @@ PlayerTab:AddSlider({
     Flag = "MM2_WalkSpeedVal",
     Callback = function(val)
         currentSpeed = val
+        Notify("WalkSpeed Value", "Set to " .. val, 2)
     end
 })
 
@@ -926,6 +1192,7 @@ MiscTab:AddToggle({
     Default = false,
     Flag = "MM2_ProtectIdentity",
     Callback = function(state)
+        local idConn
         local function bacon(c)
             if not character then return end
             for _, v in pairs(character:GetChildren()) do
@@ -956,10 +1223,11 @@ MiscTab:AddToggle({
                 task.wait(2)
                 bacon(c)
             end)
+            Notify("Protect Identity", "Enabled", 2)
         else
             if idConn then idConn:Disconnect() end
+            Notify("Protect Identity", "Disabled", 2)
         end
-        Notify("Protect Identity", state and "Enabled" or "Disabled", 2)
     end
 })
 
@@ -979,8 +1247,12 @@ MiscTab:AddToggle({
     Flag = "MM2_Fling",
     Callback = function(state)
         FlingToggle = state
-        if state then fling() end
-        Notify("Fling", state and "Enabled" or "Disabled", 2)
+        if state then
+            fling()
+            Notify("Touch Fling", "Enabled", 2)
+        else
+            Notify("Touch Fling", "Disabled", 2)
+        end
     end
 })
 
@@ -1013,8 +1285,7 @@ MiscTab:AddToggle({
     end
 })
 
--- Anti Admin Loop
-local antiAdminToggle = false
+-- Anti Admin Loop (tetap berjalan)
 task.spawn(function()
     while task.wait(1) do
         if antiAdminToggle then
@@ -1028,36 +1299,6 @@ task.spawn(function()
         if target then target:Destroy() end
     end
 end)
-
--- ============================================================
--- CONFIG TAB
--- ============================================================
-ConfigTab:AddSection("Configuration")
-
-local configName = "MM2_Config"
-ConfigTab:AddTextbox({
-    Name = "Config Name",
-    Placeholder = "Config Name",
-    Default = configName,
-    Callback = function(value)
-        configName = value
-        Notify("Config", "Name set to: " .. value, 2)
-    end
-})
-
-ConfigTab:AddButton({
-    Name = "Save Config",
-    Callback = function()
-        Notify("Config", "Saved automatically by bearlib", 2)
-    end
-})
-
-ConfigTab:AddButton({
-    Name = "Load Config",
-    Callback = function()
-        Notify("Config", "Loaded from bearlib storage", 2)
-    end
-})
 
 -- ============================================================
 -- INISIALISASI
